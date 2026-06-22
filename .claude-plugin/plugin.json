@@ -1,0 +1,8 @@
+{
+  "name": "izg-ai-skill-set",
+  "version": "0.1.0",
+  "description": "Modular skill repository for Claude Code. Skills are pulled selectively per project — no global overhead.",
+  "author": {
+    "name": "izgoodjez"
+  }
+}
