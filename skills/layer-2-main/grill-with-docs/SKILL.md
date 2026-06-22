@@ -1,8 +1,8 @@
 ---
 name: grill-with-docs
 description: A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go.
-layer: 1
-dependencies: ["grilling", "domain-modeling"]
+layer: 2
+dependencies: ["grilling", "izg-domain-modeling"]
 disable-model-invocation: true
 ---
 

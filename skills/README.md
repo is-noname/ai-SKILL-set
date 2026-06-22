@@ -10,7 +10,7 @@ Zentrales Repository für Claude Code Skills. Skills werden **nicht global insta
 
 **Workflow:**
 1. Skills im Repo pflegen und weiterentwickeln
-2. Bei neuem Projekt: `/pull-skills` aufrufen, Profil wählen, fertig
+2. Bei neuem Projekt: `/izg-ai-repo-pull` aufrufen, Skills oder Set angeben
 3. Skills landen in `.claude/skills/` des jeweiligen Projekts
 
 ---
@@ -19,26 +19,21 @@ Zentrales Repository für Claude Code Skills. Skills werden **nicht global insta
 
 ```
 ai-SKILL-set/
-├── registry.json                    # Auto-generierter Index (via pre-commit hook, Phase 2)
-├── sets/                            # Vorgefertigte Skill-Kombinationen (JSON)
-│   └── grilling.json
-├── layer-0-core/                    # Skill-Primitives (nur als Dependency, nie direkt aufgerufen)
-│   └── {skill-name}/
-│       └── SKILL.md
-├── layer-1-base/                    # Direkt nutzbare Basis-Skills
-│   └── {skill-name}/
-│       └── SKILL.md
-├── layer-2-domain/                  # Domänen-spezifische Skills
-│   ├── finance/
-│   ├── coding/
-│   └── analysis/
-├── layer-3-project/                 # Projekt-spezifische Skills
-│   └── {project-name}/
-│       └── {skill-name}/
-└── projects/                        # Projekt-Profile (welche Skills gehören zusammen)
-    └── {project-name}/
-        ├── skills.json
-        └── config.json
+├── registry.json                    # Auto-generierter Index (scripts/generate_registry.py)
+├── scripts/
+│   ├── generate_registry.py         # Scannt SKILL.md, validiert, schreibt registry.json
+│   └── pull_skill.py                # Backend für den izg-ai-repo-pull Skill
+├── skills/
+│   ├── layer-0-core/                # Skill-Primitives (nur als Dependency, nie direkt aufgerufen)
+│   ├── layer-1-base/                # Direkt nutzbare Basis-Skills
+│   ├── layer-2-main/                # Kompositionen aus layer-0/1 Skills
+│   ├── layer-3-domain/              # Domänen-spezifische Skills
+│   │   ├── finance/
+│   │   ├── coding/
+│   │   └── analysis/
+│   ├── layer-4-project/             # Projekt-spezifische Skills (nicht wiederverwendbar)
+│   ├── sets/                        # Vorgefertigte Skill-Kombinationen (JSON)
+│   └── projects/                    # Projekt-Profile mit skills.json
 ```
 
 ---
@@ -47,14 +42,17 @@ ai-SKILL-set/
 
 | Layer | Name | Semantik | Beispiel |
 |-------|------|----------|---------|
-| **0** | Core | Skill-Primitives — nur als Dependency, nie direkt aufgerufen | `grilling` |
-| **1** | Base | Direkt nutzbare Basis-Skills, können Layer 0 nutzen | `grill-me` |
-| **2** | Domain | Spezialisierte Skills für bestimmte Fachbereiche | Finance, Coding |
-| **3** | Project | Projekt-spezifische Anpassungen, nicht wiederverwendbar | Custom Logic |
+| **0** | Core | Primitives — nur als Dependency, nie direkt aufgerufen | `grilling` |
+| **1** | Base | Direkt nutzbare Einzelskills | `grill-me`, `izg-ai-repo-pull` |
+| **2** | Main | Kompositionen aus Layer-0/1 Skills | `grill-with-docs` |
+| **3** | Domain | Domänen-spezifisch (finance, coding, analysis) | — |
+| **4** | Project | Projekt-spezifisch, nicht wiederverwendbar | — |
 
-**Dependency-Regel:** Ein Skill aus Layer N darf nur Skills aus Layer 0 bis N-1 als Dependency haben.
-
-**Layer-0-Regel:** Layer-0-Skills dürfen nicht direkt in `sets/` oder `projects/skills.json` stehen — sie werden immer transitiv geladen.
+**Dependency-Regeln:**
+- Layer 0 hat keine Deps
+- Aufwärts-Dependencies (dep.layer > skill.layer) sind verboten
+- Zyklische Dependencies sind verboten
+- Layer-0-Skills stehen nie direkt in `sets/` oder `projects/skills.json` — sie werden transitiv geladen
 
 ---
 
@@ -77,7 +75,7 @@ Skill-Inhalt hier...
 
 ## Sets
 
-Sets sind JSON-Listen vorgefertigter Skill-Kombinationen. Kein eigener Ordner-Layer — nur Konfigurationsdateien.
+Sets sind JSON-Listen vorgefertigter Skill-Kombinationen:
 
 ```json
 {
@@ -87,36 +85,18 @@ Sets sind JSON-Listen vorgefertigter Skill-Kombinationen. Kein eigener Ordner-La
 }
 ```
 
-Beim Pull eines Sets werden alle gelisteten Skills + ihre transitiven Dependencies geladen.
-
----
-
-## Projekt-Profile
-
-Jedes Projekt hat ein Profil in `projects/{name}/skills.json`:
-
-```json
-{
-  "skills": ["grill-me", "domain-modeling"],
-  "sets": ["grilling"]
-}
-```
-
-Der `/pull-skills` Skill scannt `projects/` dynamisch und zeigt eine Auswahlliste.
-
 ---
 
 ## Dependency-Auflösung
 
-Der pull-skill löst Abhängigkeiten automatisch rekursiv auf:
+`pull_skill.py` löst Abhängigkeiten transitiv auf, sortiert topologisch (Deps zuerst):
 
 ```
-Set: grilling
-  → grill-me (Layer 1)
-      → grilling (Layer 0, auto)
+pull grill-with-docs
+  → grilling (layer 0, auto)
+  → izg-domain-modeling (layer 1, auto)
+  → grill-with-docs (layer 2)
 ```
-
-Alle Skills landen parallel in `.claude/skills/` des Projekts.
 
 ---
 
@@ -126,25 +106,27 @@ Alle Skills landen parallel in `.claude/skills/` des Projekts.
 |-------|-------|-------------|
 | `grilling` | 0 | Relentless interview prompt (Primitive) |
 | `grill-me` | 1 | Plan/Design-Review via Interview |
-| `grill-with-docs` | 1 | Review + ADR/Glossar-Erstellung (benötigt `domain-modeling`) |
-| `izg-starter-icon-mkr` | 1 | Desktop-Startericon für lokale Server-Apps (Linux Mint/Cinnamon) |
+| `izg-ai-repo-pull` | 1 | Skills aus diesem Repo in ein Projekt pullen |
+| `izg-domain-modeling` | 1 | Domänenmodell aufbauen — Begriffe, ADRs, CONTEXT.md |
+| `izg-starter-icon-mkr` | 1 | Desktop-Startericon für lokale Server-Apps |
+| `grill-with-docs` | 2 | Review + ADR/Glossar-Erstellung in einer Session |
 
 ---
 
 ## Status
 
 **Fertig:**
-- Layer-Struktur (0-3) mit klarer Semantik
+- Layer-Struktur (0–4) mit klarer Semantik
 - SKILL.md Format (4 Pflichtfelder, YAML Frontmatter)
-- Sets-Konzept (JSON-Konfigurationen in `sets/`)
-- Projekt-Profile in `projects/`
-- Dependency-Regel + Layer-0-Validierung (durch registry-Generator)
-- Versioning via Git Branches
+- `scripts/generate_registry.py` — scannt, validiert, schreibt `registry.json`
+- `scripts/pull_skill.py` — Dependency-Auflösung + Copy, `pull`/`list`, `--set`, `--force`, `--dry-run`
+- `izg-ai-repo-pull` Skill
+- Sets-Konzept (`sets/`)
+- Projekt-Profile (`projects/`)
 
-**Phase 2 (nach Grundgerüst):**
-- Pull-Skill Implementation (global in `~/.claude/skills/`)
-- registry.json Generierungs-Script
+**Offen:**
+- `izg-ai-repo-update` Skill
+- `izg-ai-repo-search` Skill
 - Pre-commit Hook für automatische registry-Generierung
-- Update-Skills Workflow
-
-Detaillierte offene Punkte: [OPEN-ITEMS.md](OPEN-ITEMS.md)
+- `projects/` vs `layer-4-project/` Abgrenzung klären
+- Update-Workflow: wie werden bereits gepullte Skills in Projekten aktualisiert?

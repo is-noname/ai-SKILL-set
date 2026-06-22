@@ -1,4 +1,4 @@
-# Layer 2: Domain Skills
+# Layer 3: Domain Skills
 
 **Zweck:** Domänen-spezifische Fähigkeiten und Analysen.
 
@@ -6,7 +6,7 @@
 - Jede Domäne hat eigenen Unterordner
 - Skills hier sind spezialisiert auf bestimmte Anwendungsbereiche
 
-**Abhängigkeiten:** Layer 0 (Core) und Layer 1 (Base) müssen vorhanden sein.
+**Abhängigkeiten:** Layer 0 (Core), Layer 1 (Base) und Layer 2 (Main) müssen vorhanden sein.
 
 **Verfügbare Domänen:**
 - `finance/` - Finanzanalysen, Marktdaten, Portfolio-Management

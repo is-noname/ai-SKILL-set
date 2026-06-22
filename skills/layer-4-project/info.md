@@ -1,4 +1,4 @@
-# Layer 3: Project Skills
+# Layer 4: Project Skills
 
 **Zweck:** Projekt-spezifische Skills und Anpassungen.
 
@@ -9,9 +9,9 @@
 - Integration externer Tools
 
 **Struktur:**
-- Jedes Projekt hat eigenen Unterordner unter `layer-3-project/`
-- Beispiel: `layer-3-project/mein-projekt/spezial-skill/`
+- Jedes Projekt hat eigenen Unterordner unter `layer-4-project/`
+- Beispiel: `layer-4-project/mein-projekt/spezial-skill/`
 
-**Abhängigkeiten:** Layer 0 + Layer 1 (+ ggf. Layer 2)
+**Abhängigkeiten:** Layer 0–3 (je nach Bedarf)
 
 **Hinweis:** Skills hier sind nicht für generelle Wiederverwendung gedacht, sondern für spezifische Projektanforderungen.

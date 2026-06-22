@@ -1,0 +1,54 @@
+{
+  "generated": "2026-06-22",
+  "skills": {
+    "grilling": {
+      "name": "grilling",
+      "description": "Interview the user relentlessly about a plan or design. Use when the user wants to stress-test a plan before building, or uses any 'grill' trigger phrases.",
+      "layer": 0,
+      "dependencies": [],
+      "path": "skills/layer-0-core/grilling"
+    },
+    "grill-me": {
+      "name": "grill-me",
+      "description": "A relentless interview to sharpen a plan or design.",
+      "layer": 1,
+      "dependencies": [
+        "grilling"
+      ],
+      "path": "skills/layer-1-base/grill-me",
+      "disable-model-invocation": true
+    },
+    "izg-ai-repo-pull": {
+      "name": "izg-ai-repo-pull",
+      "description": "Pulls skills from the izg ai-SKILL-set repo into the current project. Resolves transitive dependencies automatically. Use when the user wants to install, add, or pull a skill into a project.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/izg-ai-repo-pull"
+    },
+    "izg-domain-modeling": {
+      "name": "izg-domain-modeling",
+      "description": "Baut das Domänenmodell eines Projekts auf — Begriffe klären, ADRs erstellen, Glossar pflegen. Verwendet doc-ids für ADR-Benennung. Ersetzt domain-modeling vollständig.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/izg-domain-modeling"
+    },
+    "izg-starter-icon-mkr": {
+      "name": "izg-starter-icon-mkr",
+      "description": "Erstellt für eine selbstgebaute Server-App (Flask, FastAPI, Streamlit, Node etc.) ein Desktop-Startericon auf dem Schreibtisch. Beim Klick werden laufende Instanzen beendet, der Server losgelöst gestartet und der Browser geöffnet, ohne dass ein Terminalfenster hängen bleibt. Dieser Skill sollte verwendet werden, wenn ein Doppelklick-Starter, Desktop-Icon oder Launcher für eine lokale App gewünscht ist (mach mir ein Startericon, Desktop-Verknüpfung, App per Klick starten). Prüft dabei verpflichtend, dass die App einen Beenden-Button hat und kein Terminalfenster offen bleibt.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/izg-starter-icon-mkr"
+    },
+    "grill-with-docs": {
+      "name": "grill-with-docs",
+      "description": "A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go.",
+      "layer": 2,
+      "dependencies": [
+        "grilling",
+        "izg-domain-modeling"
+      ],
+      "path": "skills/layer-2-main/grill-with-docs",
+      "disable-model-invocation": true
+    }
+  }
+}

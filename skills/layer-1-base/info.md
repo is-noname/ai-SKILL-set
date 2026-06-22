@@ -9,7 +9,8 @@
 | Skill | Beschreibung | Dependencies |
 |-------|-------------|-------------|
 | `grill-me` | Plan/Design-Review via relentless interview | `grilling` |
-| `grill-with-docs` | Review + ADR/Glossar-Erstellung | `grilling`, `izg-domain-modeling` |
+| `izg-ai-repo-pull` | Skills aus dem ai-SKILL-set repo in ein Projekt pullen | — |
+| `izg-domain-modeling` | Domänenmodell aufbauen — Begriffe, ADRs (doc-ids), CONTEXT.md | — |
 | `izg-starter-icon-mkr` | Desktop-Startericon für lokale Server-Apps (Linux Mint/Cinnamon) | — |
 
 **Hinweis:** Skills hier sollten projekt-unabhängig und wiederverwendbar sein.
