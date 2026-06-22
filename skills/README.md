@@ -127,6 +127,7 @@ Alle Skills landen parallel in `.claude/skills/` des Projekts.
 | `grilling` | 0 | Relentless interview prompt (Primitive) |
 | `grill-me` | 1 | Plan/Design-Review via Interview |
 | `grill-with-docs` | 1 | Review + ADR/Glossar-Erstellung (benötigt `domain-modeling`) |
+| `izg-starter-icon-mkr` | 1 | Desktop-Startericon für lokale Server-Apps (Linux Mint/Cinnamon) |
 
 ---
 

@@ -1,6 +1,8 @@
 ---
 name: izg-starter-icon-mkr
 description: "Erstellt für eine selbstgebaute Server-App (Flask, FastAPI, Streamlit, Node etc.) ein Desktop-Startericon auf dem Schreibtisch. Beim Klick werden laufende Instanzen beendet, der Server losgelöst gestartet und der Browser geöffnet, ohne dass ein Terminalfenster hängen bleibt. Dieser Skill sollte verwendet werden, wenn ein Doppelklick-Starter, Desktop-Icon oder Launcher für eine lokale App gewünscht ist (mach mir ein Startericon, Desktop-Verknüpfung, App per Klick starten). Prüft dabei verpflichtend, dass die App einen Beenden-Button hat und kein Terminalfenster offen bleibt."
+layer: 1
+dependencies: []
 ---
 
 # IZG Starter Icon Maker

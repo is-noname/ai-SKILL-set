@@ -3,7 +3,7 @@
 **Zweck:** Code-spezifische Fähigkeiten und Analysen.
 
 **Mögliche Skills:**
-- Code-Review (z.B. grilling)
+- Code-Review (nutzt `grill-me` aus Layer 1 als Dependency)
 - Statische Code-Analyse
 - Refactoring-Vorschläge
 - Testgenerierung

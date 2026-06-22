@@ -11,5 +11,6 @@
 | Skill | Beschreibung | Genutzt von |
 |-------|-------------|-------------|
 | `grilling` | Relentless interview prompt für Plan/Design-Reviews | `grill-me`, `grill-with-docs` |
+| `izg-domain-modeling` | Domänenmodell aufbauen — Begriffe, ADRs (doc-ids), CONTEXT.md | `grill-with-docs` |
 
 **Hinweis:** Neue Skills hier einordnen wenn sie ausschließlich als Dependency anderer Skills existieren und nie eigenständig aufgerufen werden.
