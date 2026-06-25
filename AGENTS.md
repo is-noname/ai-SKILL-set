@@ -27,10 +27,25 @@ Ask the user which of these applies — do not guess:
 → Then use the `/izg-ai-repo-pull` skill to install — no local scripts needed.
 
 **Bootstrap tickets for a project:**
+
+Run from within the target project directory:
+
 ```bash
-bash scripts/init_tickets.sh
+# 1. Fetch the bootstrap script and run it:
+curl -fsSL https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main/scripts/init_tickets.sh -o /tmp/init_tickets.sh
+bash /tmp/init_tickets.sh
+
+# 2. Fetch convention docs (script needs repo context — fetch separately):
+mkdir -p docs
+curl -fsSL https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main/docs/tickets.md -o docs/tickets.md
+curl -fsSL https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main/docs/doc-ids.md -o docs/doc-ids.md
 ```
-Then link `@docs/tickets.md` and `@docs/doc-ids.md` in the project's `CLAUDE.md`.
+
+Then add to the project's `CLAUDE.md`:
+```markdown
+@docs/tickets.md
+@docs/doc-ids.md
+```
 
 ---
 
