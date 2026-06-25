@@ -1,5 +1,7 @@
 # ai-SKILL-set
 
+> **Agents:** Read `AGENTS.md` first — it has context, use-cases, and the fastest path to what you need.
+
 Modular skill repository for Claude Code. Skills are not installed globally — they are pulled selectively into projects as needed. This keeps each project lean: only the skills it actually uses.
 
 ---
@@ -60,28 +62,6 @@ This creates `tickets/`, deploys `docs/tickets.md` and `docs/doc-ids.md` into yo
 @docs/doc-ids.md
 ```
 Claude will load these automatically at session start — no need to repeat the conventions in prompts.
-
----
-
-## For agents: getting oriented
-
-**You are likely here to:**
-- Pull skills into a project → use the `izg-ai-repo-pull` skill or run `scripts/pull_skill.py` directly
-- Build or modify a skill → read `skills/README.md` for format and layer rules
-- Run a utility script → see `scripts/`
-
-**Key conventions used in this repo:**
-
-| Convention | Reference |
-|------------|-----------|
-| Document naming (AUD, RPT, RFC, ADR, BT) | `docs/doc-ids.md` |
-| Ticket system (bugs, tasks, features) | `docs/tickets.md` |
-| Skill format and layer rules | `skills/README.md` |
-
-**Bootstrap tickets for this repo:**
-```bash
-bash scripts/init_tickets.sh
-```
 
 ---
 
