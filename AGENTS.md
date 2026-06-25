@@ -31,15 +31,11 @@ Ask the user which of these applies — do not guess:
 Run from within the target project directory:
 
 ```bash
-# 1. Fetch the bootstrap script and run it:
 curl -fsSL https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main/scripts/init_tickets.sh -o /tmp/init_tickets.sh
 bash /tmp/init_tickets.sh
-
-# 2. Fetch convention docs (script needs repo context — fetch separately):
-mkdir -p docs
-curl -fsSL https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main/docs/tickets.md -o docs/tickets.md
-curl -fsSL https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main/docs/doc-ids.md -o docs/doc-ids.md
 ```
+
+This creates `tickets/`, deploys `docs/tickets.md` and `docs/doc-ids.md`, and copies `scripts/init_tickets.sh` into the project for future use.
 
 Then add to the project's `CLAUDE.md`:
 ```markdown

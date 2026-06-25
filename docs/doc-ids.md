@@ -22,7 +22,7 @@ Claude trägt beim ersten Einsatz in einem neuen Projekt das Kürzel ein — die
 
 | Kürzel | Projekt |
 |--------|---------|
-| `IZG` | ai-SKILL-set |
+| | |
 
 ## Typ-Codes
 

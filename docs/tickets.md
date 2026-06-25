@@ -12,7 +12,7 @@ Leichtgewichtiges, file-basiertes Tracking für Bugs, Tasks, Features und Fragen
 
 `tickets/` liegt immer im **Repo-Root**.
 
-Falls `tickets/` noch nicht existiert:
+Falls `tickets/` noch nicht existiert (nach Bootstrap liegt das Script lokal):
 ```bash
 bash scripts/init_tickets.sh
 ```

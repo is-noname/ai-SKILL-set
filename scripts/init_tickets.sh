@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Bootstraps tickets/ folder structure in the given directory (default: current dir)
 TARGET="${1:-.}"
+REPO_ROOT="$(dirname "$0")/.."
+RAW_BASE="https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main"
 
 if [ -d "$TARGET/tickets" ]; then
   echo "tickets/ already exists in $TARGET — nothing to do."
@@ -61,19 +63,30 @@ EOF
 
 chmod +x "$TARGET/scripts/next_ticket_id.sh"
 
-# Deploy convention docs — repo version is authoritative.
-# doc-ids.md is only copied if none exists yet (may contain project-specific prefixes).
-REPO_ROOT="$(dirname "$0")/.."
+# Copy this script itself into the target project so it's re-runnable locally.
+cp "$0" "$TARGET/scripts/init_tickets.sh"
+chmod +x "$TARGET/scripts/init_tickets.sh"
+
+# Deploy convention docs.
+# Prefer local repo copy; fall back to raw GitHub if running from outside the repo.
 mkdir -p "$TARGET/docs"
 
-if [ ! -f "$TARGET/docs/doc-ids.md" ]; then
-  cp "$REPO_ROOT/docs/doc-ids.md" "$TARGET/docs/doc-ids.md"
-  echo "  doc-ids.md deployed to $TARGET/docs/"
+if [ -f "$REPO_ROOT/docs/tickets.md" ]; then
+  cp "$REPO_ROOT/docs/tickets.md" "$TARGET/docs/tickets.md"
 else
-  echo "  doc-ids.md already exists — skipped (repo version in $REPO_ROOT/docs/doc-ids.md)"
+  curl -fsSL "$RAW_BASE/docs/tickets.md" -o "$TARGET/docs/tickets.md"
 fi
-
-cp "$REPO_ROOT/docs/tickets.md" "$TARGET/docs/tickets.md"
 echo "  tickets.md deployed to $TARGET/docs/"
 
-echo "tickets/ initialized in $TARGET (counter at 0, next_ticket_id.sh + docs deployed)"
+if [ ! -f "$TARGET/docs/doc-ids.md" ]; then
+  if [ -f "$REPO_ROOT/docs/doc-ids.md" ]; then
+    cp "$REPO_ROOT/docs/doc-ids.md" "$TARGET/docs/doc-ids.md"
+  else
+    curl -fsSL "$RAW_BASE/docs/doc-ids.md" -o "$TARGET/docs/doc-ids.md"
+  fi
+  echo "  doc-ids.md deployed to $TARGET/docs/"
+else
+  echo "  doc-ids.md already exists — skipped"
+fi
+
+echo "tickets/ initialized in $TARGET (counter at 0, scripts + docs deployed)"
