@@ -4,6 +4,86 @@ TARGET="${1:-.}"
 REPO_ROOT="$(dirname "$0")/.."
 RAW_BASE="https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main"
 
+# --- Global infrastructure ---
+# Each AI agent has its own global config dir and a different entrypoint file.
+# tickets.md + doc-ids.md are deployed to every agent dir that exists.
+# Claude supports @file includes; others get an inline Ticketsystem block.
+
+declare -A AGENT_CONFIGS=(
+  ["$HOME/.claude"]="CLAUDE.md"
+  ["$HOME/.codex"]="instructions.md"
+  ["$HOME/.gemini"]="GEMINI.md"
+  ["$HOME/.vibe"]="AGENTS.md"
+)
+
+_fetch_doc() {
+  local name="$1" dest="$2"
+  if [ -f "$REPO_ROOT/docs/$name" ]; then
+    cp "$REPO_ROOT/docs/$name" "$dest"
+  else
+    curl -fsSL "$RAW_BASE/docs/$name" -o "$dest"
+  fi
+}
+
+_patch_claude() {
+  local cfg="$1"
+  if ! grep -q "^@tickets.md" "$cfg"; then
+    printf '\n## Ticketsystem\n\nBei Projektarbeit zuerst `tickets/in-progress/` prüfen — läuft noch etwas?\n\n@tickets.md\n' >> "$cfg"
+    echo "  patched: $cfg (@tickets.md include)"
+  fi
+}
+
+_patch_generic() {
+  local cfg="$1" dir="$2"
+  if ! grep -q "tickets/in-progress" "$cfg"; then
+    cat >> "$cfg" << BLOCK
+
+## Ticketsystem
+
+Bei Projektarbeit zuerst \`tickets/in-progress/\` prüfen — läuft noch etwas?
+Vollständige Konvention: \`$dir/tickets.md\`
+
+Lookup-Reihenfolge:
+1. \`tickets/in-progress/\` — läuft noch was?
+2. \`tickets/open/\` — nächste Arbeit
+3. \`tickets/blocked/\` — nur wenn Blocker gezielt gelöst werden soll
+
+Ticket-ID via \`bash scripts/next_ticket_id.sh {PRJ}\`.
+Status-Feld im Frontmatter ändern — Hook verschiebt die Datei automatisch.
+BLOCK
+    echo "  patched: $cfg (inline Ticketsystem block)"
+  fi
+}
+
+for dir in "${!AGENT_CONFIGS[@]}"; do
+  cfg_file="${AGENT_CONFIGS[$dir]}"
+  cfg="$dir/$cfg_file"
+  [ -d "$dir" ] || continue
+
+  # Deploy docs
+  for doc in tickets.md doc-ids.md; do
+    dest="$dir/$doc"
+    if [ -f "$dest" ]; then
+      echo "  $dest already exists — skipped"
+    else
+      _fetch_doc "$doc" "$dest"
+      echo "  deployed: $dest"
+    fi
+  done
+
+  # Patch config if it exists
+  if [ -f "$cfg" ]; then
+    if [[ "$cfg_file" == "CLAUDE.md" ]]; then
+      _patch_claude "$cfg"
+    else
+      _patch_generic "$cfg" "$dir"
+    fi
+  else
+    echo "  $cfg not found — skipping patch"
+  fi
+done
+
+# --- Project-local structure ---
 if [ -d "$TARGET/tickets" ]; then
   echo "tickets/ already exists in $TARGET — nothing to do."
   exit 0
@@ -19,7 +99,7 @@ echo "0" > "$TARGET/tickets/.counter"
 cat > "$TARGET/tickets/PROTOCOL.md" << 'EOF'
 # Tickets
 
-Vollständige Konvention: `docs/tickets.md`
+Vollständige Konvention: `tickets.md` im globalen Verzeichnis deines AI-Agenten.
 
 ## Lookup-Reihenfolge
 1. `in-progress/` — läuft noch was?
@@ -28,7 +108,7 @@ Vollständige Konvention: `docs/tickets.md`
 
 ## Dateiname
 `{PRJ}-T-{NNN}_{kurz-beschreibung}.md`
-Projekt-Kürzel aus `docs/doc-ids.md`.
+Projekt-Kürzel aus `doc-ids.md` im globalen Agent-Verzeichnis.
 
 ## Ticket-ID vergeben
 ```bash
@@ -63,30 +143,11 @@ EOF
 
 chmod +x "$TARGET/scripts/next_ticket_id.sh"
 
-# Copy this script itself into the target project so it's re-runnable locally.
-cp "$0" "$TARGET/scripts/init_tickets.sh"
-chmod +x "$TARGET/scripts/init_tickets.sh"
-
-# Deploy convention docs.
-# Prefer local repo copy; fall back to raw GitHub if running from outside the repo.
-mkdir -p "$TARGET/docs"
-
-if [ -f "$REPO_ROOT/docs/tickets.md" ]; then
-  cp "$REPO_ROOT/docs/tickets.md" "$TARGET/docs/tickets.md"
-else
-  curl -fsSL "$RAW_BASE/docs/tickets.md" -o "$TARGET/docs/tickets.md"
-fi
-echo "  tickets.md deployed to $TARGET/docs/"
-
-if [ ! -f "$TARGET/docs/doc-ids.md" ]; then
-  if [ -f "$REPO_ROOT/docs/doc-ids.md" ]; then
-    cp "$REPO_ROOT/docs/doc-ids.md" "$TARGET/docs/doc-ids.md"
-  else
-    curl -fsSL "$RAW_BASE/docs/doc-ids.md" -o "$TARGET/docs/doc-ids.md"
-  fi
-  echo "  doc-ids.md deployed to $TARGET/docs/"
-else
-  echo "  doc-ids.md already exists — skipped"
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+DEST="$(cd "$TARGET/scripts" && pwd)/init_tickets.sh"
+if [ "$SELF" != "$DEST" ]; then
+  cp "$0" "$TARGET/scripts/init_tickets.sh"
+  chmod +x "$TARGET/scripts/init_tickets.sh"
 fi
 
-echo "tickets/ initialized in $TARGET (counter at 0, scripts + docs deployed)"
+echo "tickets/ initialized in $TARGET (counter at 0, scripts deployed)"
