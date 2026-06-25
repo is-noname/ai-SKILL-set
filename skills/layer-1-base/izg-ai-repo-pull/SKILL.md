@@ -3,6 +3,7 @@ name: izg-ai-repo-pull
 description: Pulls skills from the izg ai-SKILL-set repo into the current project. Resolves transitive dependencies automatically. Use when the user wants to install, add, or pull a skill into a project.
 layer: 1
 dependencies: []
+disable-model-invocation: true
 ---
 
 # IZG AI Repo — Pull

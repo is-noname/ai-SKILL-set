@@ -1,0 +1,108 @@
+# ai-SKILL-set
+
+Modular skill repository for Claude Code. Skills are not installed globally — they are pulled selectively into projects as needed. This keeps each project lean: only the skills it actually uses.
+
+---
+
+## What this repo is
+
+A library of reusable Claude Code skills, organized by layer (core primitives → base skills → domain-specific compositions). Skills are Markdown files with YAML frontmatter that Claude Code loads as slash commands.
+
+---
+
+## Folder structure
+
+| Folder | Purpose |
+|--------|---------|
+| `skills/` | All skills, organized by layer (0–4). Start here. See `skills/README.md`. |
+| `scripts/` | Utility scripts: `generate_registry.py` (rebuilds registry.json), `pull_skill.py` (skill installer backend), `init_tickets.sh` (bootstrap tickets/ in a project) |
+| `hooks/` | Claude Code hooks: `pre-commit-registry.sh` auto-regenerates registry.json when SKILL.md files change |
+| `AI/` | Planning documents (RFCs, ADRs) for this repo itself |
+| `agents/` | Agent definitions (in progress) |
+| `commands/` | Custom slash commands (in progress) |
+| `mcps/` | MCP server configurations (in progress) |
+| `workflows/` | Multi-agent workflows (in progress) |
+| `infra/` | Infrastructure configs (in progress) |
+| `registry.json` | Auto-generated skill index — do not edit manually |
+
+---
+
+## Quick start
+
+**1. Clone this repo once:**
+```bash
+git clone https://github.com/is-noname/ai-SKILL-set.git ~/Dokumente/AI/ai-SKILL-set
+```
+
+**2. From within your project, bootstrap the pull skill:**
+```bash
+python3 ~/Dokumente/AI/ai-SKILL-set/scripts/pull_skill.py pull izg-ai-repo-pull --target .claude/skills
+```
+
+**3. From now on, use the skill inside Claude Code:**
+```
+/izg-ai-repo-pull
+```
+It lists available skills, resolves dependencies, and installs into `.claude/skills/`.
+
+**4. Bootstrap tickets and convention docs for your project:**
+```bash
+bash ~/Dokumente/AI/ai-SKILL-set/scripts/init_tickets.sh
+```
+This creates `tickets/`, deploys `docs/tickets.md` and `docs/doc-ids.md` into your project.
+
+**5. Link the convention docs in your project's `CLAUDE.md`:**
+```markdown
+## Ticketsystem
+@docs/tickets.md
+
+## Dokument-IDs
+@docs/doc-ids.md
+```
+Claude will load these automatically at session start — no need to repeat the conventions in prompts.
+
+---
+
+## For agents: getting oriented
+
+**You are likely here to:**
+- Pull skills into a project → use the `izg-ai-repo-pull` skill or run `scripts/pull_skill.py` directly
+- Build or modify a skill → read `skills/README.md` for format and layer rules
+- Run a utility script → see `scripts/`
+
+**Key conventions used in this repo:**
+
+| Convention | Reference |
+|------------|-----------|
+| Document naming (AUD, RPT, RFC, ADR, BT) | `docs/doc-ids.md` |
+| Ticket system (bugs, tasks, features) | `docs/tickets.md` |
+| Skill format and layer rules | `skills/README.md` |
+
+**Bootstrap tickets for this repo:**
+```bash
+bash scripts/init_tickets.sh
+```
+
+---
+
+## Installing a skill into a project
+
+```bash
+# From within the target project:
+bash /path/to/ai-SKILL-set/scripts/pull_skill.py pull <skill-name>
+
+# List available skills:
+bash /path/to/ai-SKILL-set/scripts/pull_skill.py list
+```
+
+Or use the `izg-ai-repo-pull` skill if it is already installed in your project.
+
+---
+
+## Adding a skill to this repo
+
+1. Create `skills/layer-{N}/{skill-name}/SKILL.md` with valid frontmatter (`name`, `description`, `layer`, `dependencies`)
+2. The pre-commit hook regenerates `registry.json` automatically on commit
+3. To regenerate manually: `python3 scripts/generate_registry.py`
+
+See `skills/README.md` for layer rules and the full SKILL.md format.

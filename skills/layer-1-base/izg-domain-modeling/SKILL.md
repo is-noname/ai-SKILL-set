@@ -3,6 +3,7 @@ name: izg-domain-modeling
 description: Baut das Domänenmodell eines Projekts auf — Begriffe klären, ADRs erstellen, Glossar pflegen. Verwendet doc-ids für ADR-Benennung. Ersetzt domain-modeling vollständig.
 layer: 1
 dependencies: []
+disable-model-invocation: true
 ---
 
 # IZG Domain Modeling

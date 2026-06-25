@@ -105,10 +105,52 @@ def cmd_pull(args: argparse.Namespace, registry: dict) -> int:
     return 0
 
 
+def cmd_update(args: argparse.Namespace, registry: dict) -> int:
+    target = Path(args.target)
+    if not target.exists():
+        print(f"Target '{target}' does not exist — nothing installed.", file=sys.stderr)
+        return 1
+
+    installed = [d.name for d in target.iterdir() if d.is_dir()]
+    if not installed:
+        print("No skills installed.")
+        return 0
+
+    outdated: list[str] = []
+    unknown: list[str] = []
+
+    for name in sorted(installed):
+        if name not in registry:
+            unknown.append(name)
+            continue
+        local_skill = target / name / "SKILL.md"
+        repo_skill = REPO_ROOT / registry[name]["path"] / "SKILL.md"
+        if not local_skill.exists() or not repo_skill.exists():
+            outdated.append(name)
+        elif local_skill.read_text(encoding="utf-8") != repo_skill.read_text(encoding="utf-8"):
+            outdated.append(name)
+
+    if unknown:
+        print("Unknown (not in registry, skipped):", ", ".join(unknown))
+
+    if not outdated:
+        print("All skills up to date.")
+        return 0
+
+    print("Outdated:", ", ".join(outdated))
+
+    if args.dry_run:
+        return 0
+
+    installed_names, _ = pull(outdated, target, registry, force=True)
+    print("Updated:", ", ".join(installed_names))
+    return 0
+
+
 def cmd_list(registry: dict) -> int:
     by_layer: dict[int, list] = {}
     for entry in registry.values():
-        layer = entry.get("layer", -1)
+        layer = entry.get("layer") if entry.get("layer") is not None else -1
         by_layer.setdefault(layer, []).append(entry)
 
     for layer in sorted(by_layer):
@@ -139,6 +181,15 @@ def main() -> int:
 
     p_list = sub.add_parser("list", help="List available skills")
 
+    p_update = sub.add_parser("update", help="Update outdated installed skills")
+    p_update.add_argument(
+        "--target",
+        default=".claude/skills",
+        metavar="DIR",
+        help="Target directory (default: .claude/skills)",
+    )
+    p_update.add_argument("--dry-run", action="store_true", help="Show what would be updated")
+
     args = parser.parse_args()
     if not args.cmd:
         parser.print_help()
@@ -150,6 +201,8 @@ def main() -> int:
         return cmd_pull(args, registry)
     if args.cmd == "list":
         return cmd_list(registry)
+    if args.cmd == "update":
+        return cmd_update(args, registry)
     return 1
 
 

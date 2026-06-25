@@ -2,7 +2,7 @@
 
 **Zweck:** Projekt-Profile — definieren welche Skills ein bestimmtes Projekt braucht.
 
-**Workflow:** Der `/pull-skills` Skill scannt diesen Ordner dynamisch und zeigt eine Auswahlliste. Du wählst ein Profil, er löst alle Dependencies auf und kopiert die Skills nach `.claude/skills/` im Projekt.
+**Workflow:** Der `/izg-ai-repo-pull` Skill scannt diesen Ordner dynamisch und zeigt eine Auswahlliste. Du wählst ein Profil, er löst alle Dependencies auf und kopiert die Skills nach `.claude/skills/` im Projekt.
 
 **Struktur:**
 ```

@@ -1,12 +1,29 @@
 {
-  "generated": "2026-06-22",
+  "generated": "2026-06-25",
   "skills": {
     "grilling": {
       "name": "grilling",
       "description": "Interview the user relentlessly about a plan or design. Use when the user wants to stress-test a plan before building, or uses any 'grill' trigger phrases.",
       "layer": 0,
       "dependencies": [],
-      "path": "skills/layer-0-core/grilling"
+      "path": "skills/layer-0-core/grilling",
+      "disable-model-invocation": true
+    },
+    "handoff": {
+      "name": "handoff",
+      "description": "Compact the current conversation into a handoff document for another agent to pick up.",
+      "layer": 0,
+      "dependencies": [],
+      "path": "skills/layer-0-core/handoff",
+      "disable-model-invocation": true
+    },
+    "izg-create-fixplan": {
+      "name": "izg-create-fixplan",
+      "description": "Erstelle einen umsetzbaren Fix-Plan.",
+      "layer": 0,
+      "dependencies": [],
+      "path": "skills/layer-0-core/izg-create-fixplan",
+      "disable-model-invocation": true
     },
     "grill-me": {
       "name": "grill-me",
@@ -23,21 +40,48 @@
       "description": "Pulls skills from the izg ai-SKILL-set repo into the current project. Resolves transitive dependencies automatically. Use when the user wants to install, add, or pull a skill into a project.",
       "layer": 1,
       "dependencies": [],
-      "path": "skills/layer-1-base/izg-ai-repo-pull"
+      "path": "skills/layer-1-base/izg-ai-repo-pull",
+      "disable-model-invocation": true
+    },
+    "izg-ai-repo-pull-update": {
+      "name": "izg-ai-repo-pull-update",
+      "description": "Updates already-installed skills in the current project to the latest version from the ai-SKILL-set repo. Use when the user wants to update, refresh, or sync installed skills.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/izg-ai-repo-pull-update",
+      "disable-model-invocation": true
     },
     "izg-domain-modeling": {
       "name": "izg-domain-modeling",
       "description": "Baut das Domänenmodell eines Projekts auf — Begriffe klären, ADRs erstellen, Glossar pflegen. Verwendet doc-ids für ADR-Benennung. Ersetzt domain-modeling vollständig.",
       "layer": 1,
       "dependencies": [],
-      "path": "skills/layer-1-base/izg-domain-modeling"
+      "path": "skills/layer-1-base/izg-domain-modeling",
+      "disable-model-invocation": true
     },
     "izg-starter-icon-mkr": {
       "name": "izg-starter-icon-mkr",
       "description": "Erstellt für eine selbstgebaute Server-App (Flask, FastAPI, Streamlit, Node etc.) ein Desktop-Startericon auf dem Schreibtisch. Beim Klick werden laufende Instanzen beendet, der Server losgelöst gestartet und der Browser geöffnet, ohne dass ein Terminalfenster hängen bleibt. Dieser Skill sollte verwendet werden, wenn ein Doppelklick-Starter, Desktop-Icon oder Launcher für eine lokale App gewünscht ist (mach mir ein Startericon, Desktop-Verknüpfung, App per Klick starten). Prüft dabei verpflichtend, dass die App einen Beenden-Button hat und kein Terminalfenster offen bleibt.",
       "layer": 1,
       "dependencies": [],
-      "path": "skills/layer-1-base/izg-starter-icon-mkr"
+      "path": "skills/layer-1-base/izg-starter-icon-mkr",
+      "disable-model-invocation": true
+    },
+    "prototype": {
+      "name": "prototype",
+      "description": "Build a throwaway prototype to flesh out a design — a runnable terminal app for state/business-logic questions, or several radically different UI variations toggleable from one route.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/prototype",
+      "disable-model-invocation": true
+    },
+    "teach": {
+      "name": "teach",
+      "description": "Teach the user a new skill or concept, within this workspace.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/teach",
+      "disable-model-invocation": true
     },
     "grill-with-docs": {
       "name": "grill-with-docs",
@@ -48,6 +92,22 @@
         "izg-domain-modeling"
       ],
       "path": "skills/layer-2-main/grill-with-docs",
+      "disable-model-invocation": true
+    },
+    "improve-codebase-architecture": {
+      "name": "improve-codebase-architecture",
+      "description": "Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.",
+      "layer": 3,
+      "dependencies": [],
+      "path": "skills/layer-3-domain/coding/improve-codebase-architecture",
+      "disable-model-invocation": true
+    },
+    "sector-rotation": {
+      "name": "sector-rotation",
+      "description": "Sector rotation analysis framework for identifying sector momentum, relative strength, and rotation opportunities. Use when analyzing sector performance trends, comparing sector momentum across timeframes (1M/3M/6M), generating sector allocation recommendations, or identifying sector rotation signals for tactical asset allocation.",
+      "layer": 4,
+      "dependencies": [],
+      "path": "skills/projects/Stonky/sector-rotation",
       "disable-model-invocation": true
     }
   }

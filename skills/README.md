@@ -123,10 +123,10 @@ pull grill-with-docs
 - `izg-ai-repo-pull` Skill
 - Sets-Konzept (`sets/`)
 - Projekt-Profile (`projects/`)
+- Pre-commit Hook (`hooks/pre-commit-registry.sh`) — regeneriert `registry.json` bei SKILL.md-Änderungen
 
 **Offen:**
 - `izg-ai-repo-update` Skill
 - `izg-ai-repo-search` Skill
-- Pre-commit Hook für automatische registry-Generierung
-- `projects/` vs `layer-4-project/` Abgrenzung klären
+- `projects/` vs `layer-4-project/` Abgrenzung klären (IZG-T-002)
 - Update-Workflow: wie werden bereits gepullte Skills in Projekten aktualisiert?
