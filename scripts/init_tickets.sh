@@ -40,7 +40,6 @@ _patch_generic() {
 
 ## Ticketsystem
 
-Bei Projektarbeit zuerst \`tickets/in-progress/\` prüfen — läuft noch etwas?
 Vollständige Konvention: \`$dir/tickets.md\`
 
 Lookup-Reihenfolge:
@@ -50,6 +49,11 @@ Lookup-Reihenfolge:
 
 Ticket-ID via \`bash scripts/next_ticket_id.sh {PRJ}\`.
 Status-Feld im Frontmatter ändern — Hook verschiebt die Datei automatisch.
+
+Neues Projekt bootstrappen (einmalig):
+\`\`\`bash
+bash ~/.claude/scripts/init_tickets.sh /pfad/zum/projekt
+\`\`\`
 BLOCK
     echo "  patched: $cfg (inline Ticketsystem block)"
   fi
