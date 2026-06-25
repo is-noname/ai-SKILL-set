@@ -4,7 +4,7 @@ Stop. Read this before scanning the repo.
 
 ## What this repo is
 
-A skill library — not a project. Agents are sent here to pull skills into their user's project, or to build new ones. You are not here to work on this repo itself.
+A skill library — not a project. Agents are sent here to pull skills into their user's project. You are not here to work on this repo itself.
 
 Full documentation (folder structure, quick start, adding skills): `README.md`
 
