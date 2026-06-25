@@ -15,7 +15,7 @@ Full documentation (folder structure, quick start, adding skills): `README.md`
 Ask the user which of these applies — do not guess:
 
 1. **Pull a skill** (most common) → Which skill? Into which project?
-2. **Bootstrap ticket system** → `bash scripts/init_tickets.sh`, then add `@docs/tickets.md` to the project's `CLAUDE.md`
+2. **Bootstrap ticket system** → two steps: global setup (once per machine), then per-project init
 3. **Something else** → Let the user describe it
 
 ---
@@ -26,22 +26,25 @@ Ask the user which of these applies — do not guess:
 → Browse available skills via `registry.json` (machine-readable, all skills with metadata) or browse `skills/` directly.
 → Then use the `/izg-ai-repo-pull` skill to install — no local scripts needed.
 
-**Bootstrap tickets for a project:**
+**Bootstrap tickets — global setup (once per machine):**
+
+Deploys `tickets.md` + `doc-ids.md` to all AI agent dirs and patches their global config files.
+Skip if already done (idempotent, but only run when the user asks for it).
+
+```bash
+bash scripts/setup_global_tickets.sh
+```
+
+**Bootstrap tickets — per project:**
 
 Run from within the target project directory:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main/scripts/init_tickets.sh -o /tmp/init_tickets.sh
-bash /tmp/init_tickets.sh
+bash ~/.claude/scripts/init_tickets.sh /pfad/zum/projekt
 ```
 
-This creates `tickets/`, deploys `docs/tickets.md` and `docs/doc-ids.md`, and copies `scripts/init_tickets.sh` into the project for future use.
-
-Then add these lines to the project's `CLAUDE.md` (do this yourself — do not ask the user):
-```markdown
-@docs/tickets.md
-@docs/doc-ids.md
-```
+This creates `tickets/` with subfolders, `.counter`, `PROTOCOL.md`, and `scripts/next_ticket_id.sh`.
+Does NOT touch global agent dirs.
 
 ---
 
