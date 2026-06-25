@@ -15,9 +15,8 @@ Full documentation (folder structure, quick start, adding skills): `README.md`
 Ask the user which of these applies — do not guess:
 
 1. **Pull a skill** (most common) → Which skill? Into which project?
-2. **Build or modify a skill** → Read `skills/README.md`, then build together
-3. **Bootstrap ticket system** → `bash scripts/init_tickets.sh`, then add `@docs/tickets.md` to the project's `CLAUDE.md`
-4. **Something else** → Let the user describe it
+2. **Bootstrap ticket system** → `bash scripts/init_tickets.sh`, then add `@docs/tickets.md` to the project's `CLAUDE.md`
+3. **Something else** → Let the user describe it
 
 ---
 
@@ -26,9 +25,6 @@ Ask the user which of these applies — do not guess:
 **Pull a skill into your project:**
 → Browse available skills via `registry.json` (machine-readable, all skills with metadata) or browse `skills/` directly.
 → Then use the `/izg-ai-repo-pull` skill to install — no local scripts needed.
-
-**Build or modify a skill:**
-→ Read `skills/README.md` for format and layer rules.
 
 **Bootstrap tickets for a project:**
 ```bash
