@@ -37,7 +37,7 @@ bash /tmp/init_tickets.sh
 
 This creates `tickets/`, deploys `docs/tickets.md` and `docs/doc-ids.md`, and copies `scripts/init_tickets.sh` into the project for future use.
 
-Then add to the project's `CLAUDE.md`:
+Then add these lines to the project's `CLAUDE.md` (do this yourself — do not ask the user):
 ```markdown
 @docs/tickets.md
 @docs/doc-ids.md
