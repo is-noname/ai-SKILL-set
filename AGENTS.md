@@ -44,6 +44,5 @@ Then link `@docs/tickets.md` and `@docs/doc-ids.md` in the project's `CLAUDE.md`
 |------|--------|
 | `registry.json` | Auto-generated — never edit manually. Updated automatically via pre-commit hook (`scripts/generate_registry.py`). Read `skills/` instead. |
 | `scripts/` | Internal tooling for maintaining this repo — not relevant for skill usage |
-| `tickets/` | Internal development tracking — not relevant for skill usage |
 | `AI/` | Planning docs — context only, not actionable |
 | `hooks/` | Optional Claude Code hooks — only relevant if setting up this repo locally |

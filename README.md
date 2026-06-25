@@ -17,7 +17,7 @@ A library of reusable Claude Code skills, organized by layer (core primitives â†
 | Folder | Purpose |
 |--------|---------|
 | `skills/` | All skills, organized by layer (0â€“4). Start here. See `skills/README.md`. |
-| `scripts/` | Utility scripts: `generate_registry.py` (rebuilds registry.json), `pull_skill.py` (skill installer backend), `init_tickets.sh` (bootstrap tickets/ in a project) |
+| `scripts/` | Internal maintenance scripts: `generate_registry.py` (rebuilds registry.json), `init_tickets.sh` (bootstrap ticket system + convention docs in a project) |
 | `hooks/` | Claude Code hooks: `pre-commit-registry.sh` auto-regenerates registry.json when SKILL.md files change |
 | `AI/` | Planning documents (RFCs, ADRs) for this repo itself |
 | `agents/` | Agent definitions (in progress) |
@@ -31,51 +31,45 @@ A library of reusable Claude Code skills, organized by layer (core primitives â†
 
 ## Quick start
 
-**1. Clone this repo once:**
+**1. Clone this repo once (one-time setup):**
 ```bash
-git clone https://github.com/is-noname/ai-SKILL-set.git ~/Dokumente/AI/ai-SKILL-set
+git clone https://github.com/is-noname/ai-SKILL-set.git /path/to/ai-SKILL-set
 ```
 
-**2. From within your project, bootstrap the pull skill:**
+**2. Install the pull skill into your project:**
 ```bash
-python3 ~/Dokumente/AI/ai-SKILL-set/scripts/pull_skill.py pull izg-ai-repo-pull --target .claude/skills
+# Run from within your project directory:
+python3 /path/to/ai-SKILL-set/scripts/pull_skill.py pull izg-ai-repo-pull --target .claude/skills
 ```
 
 **3. From now on, use the skill inside Claude Code:**
 ```
 /izg-ai-repo-pull
 ```
-It lists available skills, resolves dependencies, and installs into `.claude/skills/`.
+It lists available skills, resolves dependencies, and installs into `.claude/skills/`. No more manual script calls.
 
-**4. Bootstrap tickets and convention docs for your project:**
+**4. Optionally bootstrap a ticket system and convention docs for your project:**
 ```bash
-bash ~/Dokumente/AI/ai-SKILL-set/scripts/init_tickets.sh
+bash /path/to/ai-SKILL-set/scripts/init_tickets.sh
 ```
-This creates `tickets/`, deploys `docs/tickets.md` and `docs/doc-ids.md` into your project.
+This creates `tickets/` and deploys `docs/tickets.md` and `docs/doc-ids.md` into your project.
 
 **5. Link the convention docs in your project's `CLAUDE.md`:**
 ```markdown
-## Ticketsystem
 @docs/tickets.md
-
-## Dokument-IDs
 @docs/doc-ids.md
 ```
-Claude will load these automatically at session start â€” no need to repeat the conventions in prompts.
+Claude will load these automatically at session start.
 
 ---
 
 ## Installing a skill into a project
 
-```bash
-# From within the target project:
-bash /path/to/ai-SKILL-set/scripts/pull_skill.py pull <skill-name>
-
-# List available skills:
-bash /path/to/ai-SKILL-set/scripts/pull_skill.py list
+Once `izg-ai-repo-pull` is set up (see Quick start), use it inside Claude Code:
 ```
-
-Or use the `izg-ai-repo-pull` skill if it is already installed in your project.
+/izg-ai-repo-pull
+```
+It shows available skills, handles dependencies, and installs into `.claude/skills/`.
 
 ---
 
