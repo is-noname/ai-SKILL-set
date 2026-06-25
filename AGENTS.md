@@ -26,13 +26,16 @@ Ask the user which of these applies — do not guess:
 → Browse available skills via `registry.json` (machine-readable, all skills with metadata) or browse `skills/` directly.
 → Then use the `/izg-ai-repo-pull` skill to install — no local scripts needed.
 
-**Bootstrap tickets — global setup (once per machine):**
+**Bootstrap tickets — global setup (once per machine, per agent):**
 
-Deploys `tickets.md` + `doc-ids.md` to all AI agent dirs and patches their global config files.
-Skip if already done (idempotent, but only run when the user asks for it).
+Deploys `tickets.md` + `doc-ids.md` to your own agent dir and patches your global config.
+Each agent runs this only for itself — pass your own dir:
 
 ```bash
-bash scripts/setup_global_tickets.sh
+bash scripts/setup_global_tickets.sh ~/.vibe    # if you are Vibe
+bash scripts/setup_global_tickets.sh ~/.gemini  # if you are Gemini
+bash scripts/setup_global_tickets.sh ~/.codex   # if you are Codex
+bash scripts/setup_global_tickets.sh ~/.claude  # if you are Claude
 ```
 
 **Bootstrap tickets — per project:**
