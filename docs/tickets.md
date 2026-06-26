@@ -8,6 +8,10 @@
 
 Leichtgewichtiges, file-basiertes Tracking für Bugs, Tasks, Features und Fragen.
 
+> Diese Datei beschreibt die **Konvention** (Felder, Regeln). Wie das System intern
+> funktioniert (ID-Vergabe, Status-Hook, Bootstrap-Ebenen), erklärt der
+> Architektur-Guide `docs/ticketsystem-architektur.md` im ai-SKILL-set-Repo.
+
 ## Ablage
 
 `tickets/` liegt immer im **Repo-Root**.

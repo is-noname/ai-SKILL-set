@@ -61,6 +61,11 @@ This creates `tickets/` and deploys `docs/tickets.md` and `docs/doc-ids.md` into
 ```
 Claude will load these automatically at session start.
 
+To understand *how* the ticket system works internally (ID assignment, status hook,
+bootstrap levels), see the architecture guide:
+[`docs/ticket-system-architecture.en.md`](docs/ticket-system-architecture.en.md)
+(Deutsch: [`docs/ticketsystem-architektur.md`](docs/ticketsystem-architektur.md)).
+
 ---
 
 ## Installing a skill into a project
