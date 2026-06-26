@@ -8,3 +8,10 @@ agents/
 AI/
 tickets/
 testing/
+
+# Generierte/lokale Artefakte in Skill-Verzeichnissen
+__pycache__/
+*.pyc
+*.pyo
+*.backup
+*.db

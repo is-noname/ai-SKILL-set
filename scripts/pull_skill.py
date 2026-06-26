@@ -2,6 +2,7 @@
 """Pulls skills and their transitive dependencies into a target project."""
 
 import argparse
+import hashlib
 import json
 import shutil
 import sys
@@ -10,6 +11,31 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).parent.parent
 REGISTRY_PATH = REPO_ROOT / "registry.json"
 SETS_DIR = REPO_ROOT / "skills" / "sets"
+
+# Generierte/lokale Artefakte, die nie in den Inhaltsvergleich gehören.
+IGNORE_DIR_NAMES = {"__pycache__", ".git"}
+IGNORE_SUFFIXES = {".pyc", ".pyo", ".backup", ".db"}
+
+
+def dir_digest(root: Path) -> str:
+    """Stabiler Hash über alle relevanten Dateien eines Skill-Verzeichnisses.
+
+    Erfasst Pfade UND Inhalte, damit auch Backend-Änderungen ohne SKILL.md-Änderung
+    als veraltet erkannt werden. Generierte Artefakte (siehe IGNORE_*) bleiben außen vor.
+    """
+    h = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        if any(part in IGNORE_DIR_NAMES for part in path.relative_to(root).parts):
+            continue
+        if not path.is_file():
+            continue
+        if path.suffix in IGNORE_SUFFIXES:
+            continue
+        h.update(str(path.relative_to(root)).encode("utf-8"))
+        h.update(b"\0")
+        h.update(path.read_bytes())
+        h.update(b"\0")
+    return h.hexdigest()
 
 
 def load_registry() -> dict:
@@ -123,11 +149,11 @@ def cmd_update(args: argparse.Namespace, registry: dict) -> int:
         if name not in registry:
             unknown.append(name)
             continue
-        local_skill = target / name / "SKILL.md"
-        repo_skill = REPO_ROOT / registry[name]["path"] / "SKILL.md"
-        if not local_skill.exists() or not repo_skill.exists():
+        local_dir = target / name
+        repo_dir = REPO_ROOT / registry[name]["path"]
+        if not local_dir.exists() or not repo_dir.exists():
             outdated.append(name)
-        elif local_skill.read_text(encoding="utf-8") != repo_skill.read_text(encoding="utf-8"):
+        elif dir_digest(local_dir) != dir_digest(repo_dir):
             outdated.append(name)
 
     if unknown:

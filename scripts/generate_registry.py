@@ -106,8 +106,32 @@ def validate(skills: dict) -> list[str]:
     return errors
 
 
+def find_skill_files(root: Path) -> tuple[list[Path], list[str]]:
+    """Findet SKILL.md case-insensitiv. Warnt bei abweichender Schreibweise.
+
+    Linux ist case-sensitiv, daher würde rglob("SKILL.md") z.B. skill.md still
+    überspringen. Kanonisch ist genau "SKILL.md" (siehe skills/README.md) — alles
+    andere wird erfasst, aber als Warnung gemeldet.
+    """
+    found: list[Path] = []
+    naming_warnings: list[str] = []
+    for path in root.rglob("*"):
+        if not path.is_file() or path.name.lower() != "skill.md":
+            continue
+        found.append(path)
+        if path.name != "SKILL.md":
+            try:
+                shown = path.relative_to(REPO_ROOT)
+            except ValueError:
+                shown = path
+            naming_warnings.append(
+                f"{shown}: Schreibweise '{path.name}' — kanonisch ist 'SKILL.md'"
+            )
+    return sorted(found), naming_warnings
+
+
 def main() -> int:
-    skill_files = sorted(SKILLS_DIR.rglob("SKILL.md"))
+    skill_files, naming_warnings = find_skill_files(SKILLS_DIR)
     if not skill_files:
         print("No SKILL.md files found.", file=sys.stderr)
         return 1
@@ -169,6 +193,11 @@ def main() -> int:
 
     REGISTRY_OUT.write_text(json.dumps(registry, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"registry.json written — {len(skills)} skills")
+
+    if naming_warnings:
+        print("\nWarnungen (nicht-kanonische Schreibweise, trotzdem erfasst):")
+        for warn in naming_warnings:
+            print(f"  ~ {warn}")
 
     if skipped_outside:
         print(f"\nSkipped (außerhalb skills/layer-*/, nicht registriert):")

@@ -46,7 +46,7 @@ ai-SKILL-set/
 | **1** | Base | Direkt nutzbare Einzelskills | `grill-me`, `izg-ai-repo-pull` |
 | **2** | Main | Kompositionen aus Layer-0/1 Skills | `grill-with-docs` |
 | **3** | Domain | Domänen-spezifisch (finance, coding, analysis) | — |
-| **4** | Project | Projekt-spezifisch, nicht wiederverwendbar | — |
+| **4** | Project | Projekt-spezifisch, nicht wiederverwendbar | `stonky-report-writer` |
 
 **Dependency-Regeln:**
 - Layer 0 hat keine Deps
@@ -70,6 +70,27 @@ dependencies: ["grilling"]
 
 Skill-Inhalt hier...
 ```
+
+**Dateiname:** Genau `SKILL.md` (Großschreibung). Linux ist case-sensitiv —
+`skill.md` o.ä. wird vom Generator zwar erfasst, aber als Warnung gemeldet.
+Generierte/lokale Artefakte (`__pycache__/`, `*.pyc`, `*.backup`, `*.db`) gehören
+nicht ins Skill-Verzeichnis und werden ignoriert (`.gitignore`, Update-Vergleich).
+
+---
+
+## `projects/` vs `layer-4-project/` — klare Abgrenzung
+
+| Verzeichnis | Enthält | Enthält NICHT |
+|------------|---------|---------------|
+| `projects/{name}/` | `skills.json`, `config.json` — **Profil**: welche Skills ein Projekt braucht | SKILL.md-Dateien |
+| `layer-4-project/{name}/` | SKILL.md-Dateien — **Implementierung**: projekt-spezifische Skills | Profile oder JSON-Config |
+
+**Regel:** `projects/` ist reine Konfiguration (Pull-Profile). Jede SKILL.md die nicht Layer 0–3 taugt gehört nach `layer-4-project/`.
+
+**Entscheidungsbaum für neue Stonky-Skills:**
+1. Ist der Skill in anderen Projekten wiederverwendbar? → Layer 3-Domain (`layer-3-domain/finance/`)
+2. Stonky-spezifisch (Template, Reportformat, eigene Logik)? → `layer-4-project/Stonky/`
+3. Nur Konfiguration (welche Skills pullen)? → `projects/Stonky/skills.json`
 
 ---
 

@@ -11,7 +11,26 @@
 
 AGENT_DIR="${1}"
 REPO_ROOT="$(dirname "$0")/.."
-RAW_BASE="https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main"
+
+# RAW_BASE-Reihenfolge:
+#   1. Env AISKILLSET_RAW_BASE (explizit überschreibbar)
+#   2. aus dem git-Remote von REPO_ROOT abgeleitet (GitHub https/ssh)
+#   3. hartkodierter Default als letzter Ausweg
+# Greift nur, wenn der lokale docs/-Pfad fehlt (siehe _fetch_doc).
+default_raw_base="https://raw.githubusercontent.com/is-noname/ai-SKILL-set/main"
+RAW_BASE="${AISKILLSET_RAW_BASE:-}"
+if [ -z "$RAW_BASE" ]; then
+  remote_url="$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)"
+  if [ -n "$remote_url" ]; then
+    branch="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+    [ "$branch" = "HEAD" ] && branch=main
+    # owner/repo aus https- oder ssh-Form extrahieren, .git entfernen
+    slug="$(printf '%s' "$remote_url" \
+      | sed -E -e 's#^git@[^:]+:##' -e 's#^https?://[^/]+/##' -e 's#\.git$##')"
+    [ -n "$slug" ] && RAW_BASE="https://raw.githubusercontent.com/$slug/$branch"
+  fi
+  RAW_BASE="${RAW_BASE:-$default_raw_base}"
+fi
 
 if [ -z "$AGENT_DIR" ]; then
   echo "Usage: bash setup_global_tickets.sh <agent-dir>" >&2
@@ -45,18 +64,26 @@ _fetch_doc() {
   local name="$1" dest="$2"
   if [ -f "$REPO_ROOT/docs/$name" ]; then
     cp "$REPO_ROOT/docs/$name" "$dest"
-  else
-    curl -fsSL "$RAW_BASE/docs/$name" -o "$dest"
+    return 0
   fi
+  if command -v curl >/dev/null 2>&1 && curl -fsSL "$RAW_BASE/docs/$name" -o "$dest"; then
+    return 0
+  fi
+  rm -f "$dest"  # curl -o legt bei Fehler ggf. eine leere Datei an
+  echo "Error: '$name' konnte weder lokal ($REPO_ROOT/docs/$name) noch via Remote" >&2
+  echo "       ($RAW_BASE/docs/$name) bezogen werden." >&2
+  echo "       Repo lokal auschecken oder AISKILLSET_RAW_BASE auf eine erreichbare Quelle setzen." >&2
+  return 1
 }
 
 for doc in tickets.md doc-ids.md; do
   dest="$AGENT_DIR/$doc"
   if [ -f "$dest" ]; then
     echo "  $dest already exists — skipped"
-  else
-    _fetch_doc "$doc" "$dest"
+  elif _fetch_doc "$doc" "$dest"; then
     echo "  deployed: $dest"
+  else
+    exit 1
   fi
 done
 

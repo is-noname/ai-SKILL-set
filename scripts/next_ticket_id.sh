@@ -15,16 +15,28 @@ if [ ! -d "$TICKETS_DIR" ]; then
   exit 1
 fi
 
-# Zählerwert (0 wenn Datei fehlt oder nicht-numerisch)
+# Atomares Increment: exklusiver Lock serialisiert Lesen-Rechnen-Schreiben.
+# Ohne das bekämen zwei gleichzeitig laufende Agenten (Claude/Gemini/Codex)
+# dieselbe ID. flock hält den Lock über fd 9 bis Skriptende. Fehlt flock,
+# läuft es ohne Lock weiter (selbstheilende max_existing-Logik fängt Drift ab).
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$COUNTER_FILE.lock"
+  flock 9
+fi
+
+# Zählerwert (0 wenn Datei fehlt oder nicht-numerisch; Nicht-Ziffern werden
+# entfernt, daher kein Crash bei kaputtem Counter)
 counter=0
 if [ -f "$COUNTER_FILE" ]; then
   c="$(tr -dc '0-9' < "$COUNTER_FILE")"
   [ -n "$c" ] && counter=$((10#$c))
 fi
 
-# Höchste bereits vergebene Nummer für dieses Präfix über alle Ordner
+# Höchste bereits vergebene Nummer für dieses Präfix über alle Ordner.
+# || true: leeres grep liefert Exit 1 und würde unter pipefail das Skript beim
+# allerersten Ticket (noch keine Treffer) abbrechen.
 max_existing="$(grep -rhoE "^id: ${PREFIX}-T-[0-9]+" "$TICKETS_DIR" 2>/dev/null \
-  | grep -oE '[0-9]+$' | sort -n | tail -1)"
+  | grep -oE '[0-9]+$' | sort -n | tail -1 || true)"
 max_existing=$((10#${max_existing:-0}))
 
 floor=$counter

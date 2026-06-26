@@ -36,6 +36,14 @@ target_dir="$tickets_root/$status"
 filename=$(basename "$file_path")
 
 mkdir -p "$target_dir"
-mv "$file_path" "$target_dir/$filename"
+
+# Kollisionsschutz: nie ein vorhandenes Ziel überschreiben (z.B. gleiche ID in
+# zwei Ordnern durch manuelles Verschieben). Lieber stehen lassen und warnen.
+if [[ -e "$target_dir/$filename" ]]; then
+  echo "[ticket-mover] $filename: Ziel $status/ existiert bereits — nicht verschoben (Kollision)" >&2
+  exit 0
+fi
+
+mv -n "$file_path" "$target_dir/$filename"
 
 echo "[ticket-mover] $filename: $current_folder/ → $status/" >&2
