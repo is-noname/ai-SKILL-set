@@ -43,8 +43,8 @@ project/
 ├── hooks/
 │   └── ticket-mover.sh          # moves tickets on status change
 ├── docs/
-│   ├── tickets.md               # convention (deployed into projects)
-│   ├── doc-ids.md               # project prefix + doc-id scheme (deployed)
+│   ├── tickets.md               # convention (deployed into the agent dir)
+│   ├── doc-ids.md               # project prefix + doc-id scheme (deployed globally too)
 │   └── ticket-system-architecture.en.md  # this document
 └── tickets/
     ├── .counter                 # highest number assigned so far
@@ -189,7 +189,7 @@ The system is set up at two levels — easy to confuse:
 |---|---|---|
 | **Level** | per AI agent (global) | per project |
 | **How often** | once per agent/machine | once per project |
-| **What** | deploys `tickets.md` + `doc-ids.md` into the agent dir and patches its config | creates the `tickets/` folder structure, `.counter`, `PROTOCOL.md` and `next_ticket_id.sh` |
+| **What** | deploys `tickets.md` + `doc-ids.md` **and** `init_tickets.sh` into the agent dir and patches its config | creates the `tickets/` folder structure, `.counter`, `PROTOCOL.md` and `next_ticket_id.sh` |
 | **Target** | `~/.claude`, `~/.codex`, `~/.gemini`, `~/.vibe` | any project folder |
 | **Config file** | `CLAUDE.md` / `instructions.md` / `GEMINI.md` / `AGENTS.md` | — |
 
@@ -198,13 +198,18 @@ The system is set up at two levels — easy to confuse:
 bash scripts/setup_global_tickets.sh ~/.claude
 bash scripts/setup_global_tickets.sh ~/.codex
 ```
-The script obtains the convention docs in this order:
-1. locally from `docs/` (when the repo is checked out) — the normal case
+The script obtains the convention docs **and** `init_tickets.sh` in this order:
+1. locally from the repo (when checked out) — the normal case
 2. via `curl` from `RAW_BASE` (derived from `git remote`, overridable via
    `AISKILLSET_RAW_BASE`)
 3. if neither is reachable → clear error message + exit 1 (no silent skip)
 
-**Project level** — a concrete project gets its `tickets/`:
+`init_tickets.sh` is placed into `$AGENT_DIR/scripts/` so the bootstrap hint patched
+into the agent config below actually points at an existing script (each agent in its
+own dir, not hard-coded `~/.claude`).
+
+**Project level** — a concrete project gets its `tickets/` (the path points at the
+agent's own dir, `~/.claude` shown as an example):
 ```bash
 bash ~/.claude/scripts/init_tickets.sh /path/to/project
 ```
