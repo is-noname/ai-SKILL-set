@@ -48,18 +48,24 @@ python3 /path/to/ai-SKILL-set/scripts/pull_skill.py pull izg-ai-repo-pull --targ
 ```
 It lists available skills, resolves dependencies, and installs into `.claude/skills/`. No more manual script calls.
 
-**4. Optionally bootstrap a ticket system and convention docs for your project:**
+**4. Optionally set up the ticket system. Two levels:**
+
+*a) Global, once per machine per agent* — deploys the convention docs
+`tickets.md` + `doc-ids.md` into your agent dir and patches your global config
+(`~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, …) to load them:
+```bash
+bash /path/to/ai-SKILL-set/scripts/setup_global_tickets.sh ~/.claude
+```
+
+*b) Per project* — run from within the target project:
 ```bash
 bash /path/to/ai-SKILL-set/scripts/init_tickets.sh
 ```
-This creates `tickets/` and deploys `docs/tickets.md` and `docs/doc-ids.md` into your project.
-
-**5. Link the convention docs in your project's `CLAUDE.md`:**
-```markdown
-@docs/tickets.md
-@docs/doc-ids.md
-```
-Claude will load these automatically at session start.
+This creates `tickets/` (with subfolders), `.counter`, a project-local
+`tickets/PROTOCOL.md`, and `scripts/next_ticket_id.sh`. It does **not** copy the
+convention docs into the project — `PROTOCOL.md` points back to the global
+`tickets.md`/`doc-ids.md` from step a). So there is nothing to `@`-link in the
+project's `CLAUDE.md`; the global config already loads the conventions.
 
 To understand *how* the ticket system works internally (ID assignment, status hook,
 bootstrap levels), see the architecture guide:

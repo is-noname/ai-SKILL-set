@@ -60,32 +60,46 @@ if [ -z "$cfg_file" ]; then
   exit 1
 fi
 
-_fetch_doc() {
-  local name="$1" dest="$2"
-  if [ -f "$REPO_ROOT/docs/$name" ]; then
-    cp "$REPO_ROOT/docs/$name" "$dest"
+# Holt eine Datei aus dem Repo: erst lokal aus REPO_ROOT/<relpath>, sonst via curl
+# aus RAW_BASE/<relpath>. relpath ist repo-relativ (z.B. "docs/tickets.md").
+_fetch() {
+  local relpath="$1" dest="$2"
+  if [ -f "$REPO_ROOT/$relpath" ]; then
+    cp "$REPO_ROOT/$relpath" "$dest"
     return 0
   fi
-  if command -v curl >/dev/null 2>&1 && curl -fsSL "$RAW_BASE/docs/$name" -o "$dest"; then
+  if command -v curl >/dev/null 2>&1 && curl -fsSL "$RAW_BASE/$relpath" -o "$dest"; then
     return 0
   fi
   rm -f "$dest"  # curl -o legt bei Fehler ggf. eine leere Datei an
-  echo "Error: '$name' konnte weder lokal ($REPO_ROOT/docs/$name) noch via Remote" >&2
-  echo "       ($RAW_BASE/docs/$name) bezogen werden." >&2
+  echo "Error: '$relpath' konnte weder lokal ($REPO_ROOT/$relpath) noch via Remote" >&2
+  echo "       ($RAW_BASE/$relpath) bezogen werden." >&2
   echo "       Repo lokal auschecken oder AISKILLSET_RAW_BASE auf eine erreichbare Quelle setzen." >&2
   return 1
 }
 
+# Konventionsdocs ins Agent-Verzeichnis (überschreibt vorhandene nicht)
 for doc in tickets.md doc-ids.md; do
   dest="$AGENT_DIR/$doc"
   if [ -f "$dest" ]; then
     echo "  $dest already exists — skipped"
-  elif _fetch_doc "$doc" "$dest"; then
+  elif _fetch "docs/$doc" "$dest"; then
     echo "  deployed: $dest"
   else
     exit 1
   fi
 done
+
+# Bootstrap-Script bereitstellen, damit der unten gepatchte Hinweis
+# "$AGENT_DIR/scripts/init_tickets.sh" auch wirklich existiert. Immer (neu)
+# schreiben, damit Bestands-Agents die aktuelle Logik bekommen (idempotent).
+mkdir -p "$AGENT_DIR/scripts"
+if _fetch "scripts/init_tickets.sh" "$AGENT_DIR/scripts/init_tickets.sh"; then
+  chmod +x "$AGENT_DIR/scripts/init_tickets.sh"
+  echo "  deployed: $AGENT_DIR/scripts/init_tickets.sh"
+else
+  exit 1
+fi
 
 cfg="$AGENT_DIR/$cfg_file"
 if [ ! -f "$cfg" ]; then
@@ -118,7 +132,7 @@ Status-Feld im Frontmatter ändern — Hook verschiebt die Datei automatisch.
 
 Neues Projekt bootstrappen:
 \`\`\`bash
-bash ~/.claude/scripts/init_tickets.sh /pfad/zum/projekt
+bash $AGENT_DIR/scripts/init_tickets.sh /pfad/zum/projekt
 \`\`\`
 BLOCK
     echo "  patched: $cfg (inline Ticketsystem block)"
