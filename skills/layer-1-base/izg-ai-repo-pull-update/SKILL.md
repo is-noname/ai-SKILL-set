@@ -10,6 +10,11 @@ disable-model-invocation: true
 
 Vergleicht installierte Skills mit der Repo-Version und aktualisiert veraltete.
 
+> **Architektur:** Dünner Wrapper um die zentrale Engine `pull_skill.py` (`scripts/` im
+> Repo, **nicht** im Skill — sie braucht `registry.json` und den `skills/`-Baum). Setzt
+> voraus, dass das Repo unter `REPO` existiert; fehlt es, zuerst via `izg-ai-repo-pull`
+> bootstrappen (der klont es bei Bedarf). Voraussetzung: `python3`.
+
 ## Ablauf
 
 ```bash

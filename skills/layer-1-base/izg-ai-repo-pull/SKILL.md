@@ -10,6 +10,11 @@ disable-model-invocation: true
 
 Installiert Skills aus `~/Dokumente/AI/ai-SKILL-set` in das aktuelle Projekt (`.claude/skills/`).
 
+> **Architektur:** Dieser Skill ist ein dünner Wrapper. Die Engine `pull_skill.py` liegt
+> zentral im Repo (`scripts/`), **nicht** im Skill — sie braucht `registry.json` und den
+> `skills/`-Baum, die nur dort existieren. Fehlt das Repo unter dem unten gesetzten
+> `REPO`-Pfad, wird es automatisch geklont. Voraussetzung: `python3` + `git`.
+
 ## Ablauf
 
 **Ohne Argumente aufgerufen:** Liste ausgeben und fragen was gepullt werden soll.
