@@ -114,6 +114,7 @@ def main() -> int:
 
     skills: dict = {}
     parse_errors: list[str] = []
+    skipped_outside: list[str] = []
 
     for skill_file in skill_files:
         text = skill_file.read_text(encoding="utf-8")
@@ -124,12 +125,29 @@ def main() -> int:
             continue
 
         inferred_layer = infer_layer(skill_file)
+        rel = skill_file.parent.relative_to(REPO_ROOT)
+
+        # Nur Skills innerhalb der layer-*-Verzeichnisse gehören in die geteilte Registry.
+        # Alles unter projects/, sets/ etc. ist projekt-/profilspezifisch und darf nicht
+        # pullbar werden.
+        if inferred_layer is None:
+            if "layer" in fm:
+                parse_errors.append(
+                    f"{name}: liegt außerhalb skills/layer-*/ ({rel}), deklariert aber "
+                    f"layer={fm['layer']} — nicht registriert. Nach layer-N/ verschieben "
+                    f"oder das layer-Feld entfernen."
+                )
+            else:
+                skipped_outside.append(f"{name} ({rel})")
+            continue
+
         layer = fm.get("layer", inferred_layer)
 
-        if layer != inferred_layer and inferred_layer is not None:
+        if "layer" in fm and fm["layer"] != inferred_layer:
             parse_errors.append(
-                f"{name}: frontmatter layer={layer} conflicts with directory layer={inferred_layer}"
+                f"{name}: frontmatter layer={fm['layer']} conflicts with directory layer={inferred_layer}"
             )
+            layer = inferred_layer
 
         skills[name] = {
             "name": name,
@@ -151,6 +169,11 @@ def main() -> int:
 
     REGISTRY_OUT.write_text(json.dumps(registry, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"registry.json written — {len(skills)} skills")
+
+    if skipped_outside:
+        print(f"\nSkipped (außerhalb skills/layer-*/, nicht registriert):")
+        for entry in skipped_outside:
+            print(f"  - {entry}")
 
     if all_errors:
         print("\nValidation errors:")

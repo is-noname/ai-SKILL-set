@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-25",
+  "generated": "2026-06-26",
   "skills": {
     "grilling": {
       "name": "grilling",
@@ -100,14 +100,6 @@
       "layer": 3,
       "dependencies": [],
       "path": "skills/layer-3-domain/coding/improve-codebase-architecture",
-      "disable-model-invocation": true
-    },
-    "sector-rotation": {
-      "name": "sector-rotation",
-      "description": "Sector rotation analysis framework for identifying sector momentum, relative strength, and rotation opportunities. Use when analyzing sector performance trends, comparing sector momentum across timeframes (1M/3M/6M), generating sector allocation recommendations, or identifying sector rotation signals for tactical asset allocation.",
-      "layer": 4,
-      "dependencies": [],
-      "path": "skills/projects/Stonky/sector-rotation",
       "disable-model-invocation": true
     }
   }
