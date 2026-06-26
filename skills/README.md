@@ -22,7 +22,10 @@ ai-SKILL-set/
 ├── registry.json                    # Auto-generierter Index (scripts/generate_registry.py)
 ├── scripts/
 │   ├── generate_registry.py         # Scannt SKILL.md, validiert, schreibt registry.json
-│   └── pull_skill.py                # Backend für den izg-ai-repo-pull Skill
+│   ├── pull_skill.py                # Backend für den izg-ai-repo-pull Skill
+│   ├── init_tickets.sh              # Ticketsystem in einem Projekt bootstrappen
+│   ├── next_ticket_id.sh            # Nächste Ticket-ID (selbstheilend, mit Lock)
+│   └── setup_global_tickets.sh      # Konventionsdocs global pro Agent deployen
 ├── skills/
 │   ├── layer-0-core/                # Skill-Primitives (nur als Dependency, nie direkt aufgerufen)
 │   ├── layer-1-base/                # Direkt nutzbare Basis-Skills
@@ -123,14 +126,23 @@ pull grill-with-docs
 
 ## Verfügbare Skills
 
-| Skill | Layer | Beschreibung |
-|-------|-------|-------------|
-| `grilling` | 0 | Relentless interview prompt (Primitive) |
-| `grill-me` | 1 | Plan/Design-Review via Interview |
-| `izg-ai-repo-pull` | 1 | Skills aus diesem Repo in ein Projekt pullen |
-| `izg-domain-modeling` | 1 | Domänenmodell aufbauen — Begriffe, ADRs, CONTEXT.md |
-| `izg-starter-icon-mkr` | 1 | Desktop-Startericon für lokale Server-Apps |
-| `grill-with-docs` | 2 | Review + ADR/Glossar-Erstellung in einer Session |
+> Maßgebliche Quelle ist `registry.json` bzw. `python3 scripts/pull_skill.py list`.
+> Diese Tabelle ist nur eine Momentaufnahme und kann driften.
+
+| Skill | Layer | Beschreibung | Deps |
+|-------|-------|-------------|------|
+| `grilling` | 0 | Relentless interview prompt (Primitive) | — |
+| `handoff` | 0 | Konversation in ein Handoff-Dokument für einen anderen Agent komprimieren | — |
+| `izg-create-fixplan` | 0 | Umsetzbaren Fix-Plan erstellen | — |
+| `grill-me` | 1 | Plan/Design-Review via Interview | `grilling` |
+| `izg-ai-repo-pull` | 1 | Skills aus diesem Repo in ein Projekt pullen | — |
+| `izg-ai-repo-pull-update` | 1 | Bereits installierte Skills im Projekt aktualisieren | — |
+| `izg-domain-modeling` | 1 | Domänenmodell aufbauen — Begriffe, ADRs, CONTEXT.md | — |
+| `izg-starter-icon-mkr` | 1 | Desktop-Startericon für lokale Server-Apps | — |
+| `prototype` | 1 | Wegwerf-Prototyp zum Ausarbeiten eines Designs | — |
+| `teach` | 1 | Nutzer ein Konzept/Skill im Workspace beibringen | — |
+| `grill-with-docs` | 2 | Review + ADR/Glossar-Erstellung in einer Session | `grilling`, `izg-domain-modeling` |
+| `improve-codebase-architecture` | 3 | Codebase auf Vertiefungs-Chancen scannen, visuell aufbereiten | — |
 
 ---
 

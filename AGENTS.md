@@ -56,6 +56,6 @@ Does NOT touch global agent dirs.
 | Path | Reason |
 |------|--------|
 | `registry.json` | Auto-generated — never edit manually. Updated automatically via pre-commit hook (`scripts/generate_registry.py`). Read `skills/` instead. |
-| `scripts/` | Internal tooling for maintaining this repo — not relevant for skill usage |
+| `scripts/` | Don't scan for *skill usage*. For ticket bootstrap you DO run two of them — see "How to do it" above (`setup_global_tickets.sh`, `init_tickets.sh`). |
 | `AI/` | Planning docs — context only, not actionable |
 | `hooks/` | Optional Claude Code hooks — only relevant if setting up this repo locally |
