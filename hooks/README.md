@@ -126,8 +126,24 @@ Alle anderen sind reine global-Guards ohne Projektbezug.
    ```
 
 3. **`pre-commit-registry.sh`** ist repo-spezifisch (fester Pfad auf `ai-SKILL-set`).
-   Nur registrieren, wenn du in genau diesem Repo arbeitest — als zusätzlicher
-   `Bash`-Eintrag unter `PreToolUse`. Für andere Repos den Pfad im Skript anpassen.
+   Nur registrieren, wenn du in genau diesem Repo arbeitest. Für andere Repos den
+   Pfad im Skript anpassen.
+
+   **Wichtig — Reihenfolge:** `pre-commit-registry.sh` muss **vor** `git-commit-guard.sh`
+   eingetragen werden. `ask` bricht die Hook-Chain ab (der User entscheidet, danach
+   läuft das Tool direkt — keine weiteren Hooks). Steht der Registry-Hook danach, wird
+   er nie ausgeführt und `registry.json` ist veraltet ohne Fehler.
+
+   ```json
+   { "matcher": "Bash", "hooks": [
+     { "type": "command", "command": "/home/USER/.claude/hooks/env-key-guard.sh" },
+     { "type": "command", "command": "/path/to/ai-SKILL-set/hooks/pre-commit-registry.sh" },
+     { "type": "command", "command": "/home/USER/.claude/hooks/git-commit-guard.sh" },
+     { "type": "command", "command": "/home/USER/.claude/hooks/git-push-guard.sh" },
+     { "type": "command", "command": "/home/USER/.claude/hooks/git-destructive-guard.sh" },
+     { "type": "command", "command": "/home/USER/.claude/hooks/gh-cli-guard.sh" }
+   ]}
+   ```
 
 4. **Neustart / neue Session** — Claude Code lädt `settings.json` beim Start.
 
@@ -135,7 +151,8 @@ Alle anderen sind reine global-Guards ohne Projektbezug.
 
 - **`ask` vs. `deny`:** `git-commit-guard` und `git-push` (ohne `--force`) fragen nur
   nach; alles andere blockiert hart. Anpassen über `permissionDecision` im jeweiligen Skript.
-- **Reihenfolge:** Mehrere Hooks pro matcher laufen in Listenreihenfolge; der erste
-  `deny` gewinnt.
+- **Reihenfolge:** Mehrere Hooks pro matcher laufen in Listenreihenfolge. `deny` und `ask`
+  brechen die Chain ab — nachfolgende Hooks laufen nicht mehr. Hooks die Side-Effects
+  brauchen (z. B. `pre-commit-registry.sh`) müssen deshalb **vor** guard-Hooks stehen.
 - **Debugging:** Hooks mit `echo … >&2` schreiben auf stderr (z. B. `ticket-mover`,
   `pre-commit-registry`); diese Ausgabe erscheint im Hook-Log.

@@ -16,7 +16,7 @@ REAL_PATH=$(realpath -m "$FILE_PATH" 2>/dev/null || echo "$FILE_PATH")
 
 for BLOCKED in "${BLOCKED_DIRS[@]}"; do
   REAL_BLOCKED=$(realpath -m "$BLOCKED" 2>/dev/null || echo "$BLOCKED")
-  if [[ "$REAL_PATH" == "$REAL_BLOCKED"* ]]; then
+  if [[ "$REAL_PATH" == "$REAL_BLOCKED" || "$REAL_PATH" == "$REAL_BLOCKED/"* ]]; then
     jq -n --arg path "$FILE_PATH" '{
       hookSpecificOutput: {
         hookEventName: "PreToolUse",

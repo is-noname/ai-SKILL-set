@@ -1,6 +1,7 @@
 #!/bin/bash
 # GLOBAL: Agent Chatbox beim Session-Start pruefen
-PROJECT_DIR=$(echo "$(cat)" | jq -r '.cwd')
+PROJECT_DIR=$(echo "$(cat)" | jq -r '.cwd // empty')
+[[ -z "$PROJECT_DIR" ]] && exit 0
 CHATBOX_DIR="$PROJECT_DIR/agent_chatbox"
 
 if [ ! -d "$CHATBOX_DIR" ]; then
@@ -34,9 +35,9 @@ if [ "$BOARD_COUNT" -gt 0 ]; then
 fi
 
 if [ -n "$OUTPUT" ]; then
-  echo -e "=== AGENT CHATBOX ===$OUTPUT"
+  jq -n --arg msg "$(printf '=== AGENT CHATBOX ===%b' "$OUTPUT")" '{"systemMessage": $msg}'
 else
-  echo "Agent Chatbox: Keine neuen Nachrichten."
+  jq -n '{"systemMessage": "Agent Chatbox: Keine neuen Nachrichten."}'
 fi
 
 exit 0
