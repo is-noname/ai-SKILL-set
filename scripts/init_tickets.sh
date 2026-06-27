@@ -2,7 +2,7 @@
 # Bootstraps tickets/ folder structure in the given directory (default: current dir).
 # Idempotent: kann auf bestehende Projekte erneut angewendet werden, um Counter und
 # next_ticket_id.sh nachzurüsten, ohne vorhandene Tickets/PROTOCOL.md zu überschreiben.
-# For global agent setup (one-time, per machine) use: bash scripts/setup_global_tickets.sh
+# For global agent setup (one-time, per machine) use: bash scripts/setup_global.sh
 TARGET="${1:-.}"
 
 mkdir -p "$TARGET/tickets/open" \

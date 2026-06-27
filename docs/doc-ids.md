@@ -2,7 +2,7 @@
 
 > Diese Datei ist die **globale Konventions-Quelle** für Dokument-IDs. Sie liegt im
 > Verzeichnis deines AI-Agenten (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.vibe`), wird
-> per `scripts/setup_global_tickets.sh` dorthin deployt und in der Agent-Konfig
+> per `scripts/setup_global.sh` dorthin deployt und in der Agent-Konfig
 > (`CLAUDE.md` / `AGENTS.md` / …) eingebunden:
 > ```markdown
 > @doc-ids.md

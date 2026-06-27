@@ -32,10 +32,10 @@ Deploys `tickets.md` + `doc-ids.md` to your own agent dir and patches your globa
 Each agent runs this only for itself — pass your own dir:
 
 ```bash
-bash scripts/setup_global_tickets.sh ~/.vibe    # if you are Vibe
-bash scripts/setup_global_tickets.sh ~/.gemini  # if you are Gemini
-bash scripts/setup_global_tickets.sh ~/.codex   # if you are Codex
-bash scripts/setup_global_tickets.sh ~/.claude  # if you are Claude
+bash scripts/setup_global.sh ~/.vibe    # if you are Vibe
+bash scripts/setup_global.sh ~/.gemini  # if you are Gemini
+bash scripts/setup_global.sh ~/.codex   # if you are Codex
+bash scripts/setup_global.sh ~/.claude  # if you are Claude
 ```
 
 **Bootstrap tickets — per project:**
@@ -56,6 +56,6 @@ Does NOT touch global agent dirs.
 | Path | Reason |
 |------|--------|
 | `registry.json` | Auto-generated — never edit manually. Updated automatically via pre-commit hook (`scripts/generate_registry.py`). Read `skills/` instead. |
-| `scripts/` | Don't scan for *skill usage*. For ticket bootstrap you DO run two of them — see "How to do it" above (`setup_global_tickets.sh`, `init_tickets.sh`). |
+| `scripts/` | Don't scan for *skill usage*. For ticket bootstrap you DO run two of them — see "How to do it" above (`setup_global.sh`, `init_tickets.sh`). |
 | `AI/` | Planning docs — context only, not actionable |
 | `hooks/` | Optional Claude Code hooks — only relevant if setting up this repo locally |

@@ -40,7 +40,7 @@ projekt/
 ├── scripts/
 │   ├── init_tickets.sh          # Bootstrap pro PROJEKT (legt tickets/ an)
 │   ├── next_ticket_id.sh        # vergibt die nächste freie ID (atomar)
-│   └── setup_global_tickets.sh  # Bootstrap pro AGENT (deployt Konvention global)
+│   └── setup_global.sh  # Bootstrap pro AGENT (deployt Konvention global)
 ├── hooks/
 │   └── ticket-mover.sh          # verschiebt Tickets bei Status-Änderung
 ├── docs/
@@ -63,7 +63,7 @@ projekt/
 | `next_ticket_id.sh` | berechnet & reserviert die nächste ID | manuell vor Ticket-Anlage |
 | `ticket-mover.sh` (Hook) | hält Ordner und `status:` synchron | automatisch nach jedem Edit/Write |
 | `init_tickets.sh` | baut `tickets/` in einem Projekt auf | einmal pro Projekt |
-| `setup_global_tickets.sh` | deployt Konvention ins Agent-Verzeichnis | einmal pro Agent/Maschine |
+| `setup_global.sh` | deployt Konvention ins Agent-Verzeichnis | einmal pro Agent/Maschine |
 | `doc-ids.md` | liefert das Projekt-Kürzel `PRJ` | bei ID-Vergabe |
 
 ---
@@ -186,7 +186,7 @@ Edit/Write auf eine Datei
 
 Das System wird auf zwei Ebenen eingerichtet — leicht zu verwechseln:
 
-| | `setup_global_tickets.sh` | `init_tickets.sh` |
+| | `setup_global.sh` | `init_tickets.sh` |
 |---|---|---|
 | **Ebene** | pro AI-Agent (global) | pro Projekt |
 | **Wie oft** | einmal pro Agent/Maschine | einmal pro Projekt |
@@ -196,8 +196,8 @@ Das System wird auf zwei Ebenen eingerichtet — leicht zu verwechseln:
 
 **Globale Ebene** — jeder Agent kennt die Konvention systemweit:
 ```bash
-bash scripts/setup_global_tickets.sh ~/.claude
-bash scripts/setup_global_tickets.sh ~/.codex
+bash scripts/setup_global.sh ~/.claude
+bash scripts/setup_global.sh ~/.codex
 ```
 Die Konvention-Docs **und** `init_tickets.sh` bezieht das Skript in dieser Reihenfolge:
 1. lokal aus dem Repo (wenn ausgecheckt) — der Normalfall

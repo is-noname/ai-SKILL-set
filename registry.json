@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-26",
+  "generated": "2026-06-27",
   "skills": {
     "grilling": {
       "name": "grilling",
@@ -33,6 +33,14 @@
         "grilling"
       ],
       "path": "skills/layer-1-base/grill-me",
+      "disable-model-invocation": true
+    },
+    "izg-ai-repo-global-update": {
+      "name": "izg-ai-repo-global-update",
+      "description": "Checks and updates the global agent conventions (tickets.md, doc-ids.md, init_tickets.sh, ticket-mover hook) deployed in agent dirs (~/.claude etc.) against the ai-SKILL-set repo. Use when the user wants to update, refresh, sync, or drift-check their global conventions/tickets/doc-ids setup.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/izg-ai-repo-global-update",
       "disable-model-invocation": true
     },
     "izg-ai-repo-pull": {

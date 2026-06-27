@@ -25,7 +25,7 @@ ai-SKILL-set/
 │   ├── pull_skill.py                # Backend für den izg-ai-repo-pull Skill
 │   ├── init_tickets.sh              # Ticketsystem in einem Projekt bootstrappen
 │   ├── next_ticket_id.sh            # Nächste Ticket-ID (selbstheilend, mit Lock)
-│   └── setup_global_tickets.sh      # Konventionsdocs global pro Agent deployen
+│   └── setup_global.sh      # Konventionsdocs global pro Agent deployen
 ├── skills/
 │   ├── layer-0-core/                # Skill-Primitives (nur als Dependency, nie direkt aufgerufen)
 │   ├── layer-1-base/                # Direkt nutzbare Basis-Skills

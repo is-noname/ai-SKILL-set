@@ -39,7 +39,7 @@ project/
 ├── scripts/
 │   ├── init_tickets.sh          # bootstrap per PROJECT (creates tickets/)
 │   ├── next_ticket_id.sh        # hands out the next free ID (atomic)
-│   └── setup_global_tickets.sh  # bootstrap per AGENT (deploys convention globally)
+│   └── setup_global.sh  # bootstrap per AGENT (deploys convention globally)
 ├── hooks/
 │   └── ticket-mover.sh          # moves tickets on status change
 ├── docs/
@@ -62,7 +62,7 @@ project/
 | `next_ticket_id.sh` | computes & reserves the next ID | manually, before creating a ticket |
 | `ticket-mover.sh` (hook) | keeps folder and `status:` in sync | automatically after each Edit/Write |
 | `init_tickets.sh` | builds `tickets/` in a project | once per project |
-| `setup_global_tickets.sh` | deploys the convention into the agent dir | once per agent/machine |
+| `setup_global.sh` | deploys the convention into the agent dir | once per agent/machine |
 | `doc-ids.md` | provides the project prefix `PRJ` | on ID assignment |
 
 ---
@@ -185,7 +185,7 @@ Edit/Write on a file
 
 The system is set up at two levels — easy to confuse:
 
-| | `setup_global_tickets.sh` | `init_tickets.sh` |
+| | `setup_global.sh` | `init_tickets.sh` |
 |---|---|---|
 | **Level** | per AI agent (global) | per project |
 | **How often** | once per agent/machine | once per project |
@@ -195,8 +195,8 @@ The system is set up at two levels — easy to confuse:
 
 **Global level** — each agent knows the convention system-wide:
 ```bash
-bash scripts/setup_global_tickets.sh ~/.claude
-bash scripts/setup_global_tickets.sh ~/.codex
+bash scripts/setup_global.sh ~/.claude
+bash scripts/setup_global.sh ~/.codex
 ```
 The script obtains the convention docs **and** `init_tickets.sh` in this order:
 1. locally from the repo (when checked out) — the normal case
