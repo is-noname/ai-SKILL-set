@@ -42,7 +42,7 @@ tickets/
 {PRJ}-T-{NNN}_{kurz-beschreibung}.md
 ```
 
-`{PRJ}` = Projekt-Kürzel aus `doc-ids.md` im globalen Agent-Verzeichnis.  
+`{PRJ}` = Projekt-Kürzel aus der Registry `project-identifier.md` im globalen Agent-Verzeichnis.  
 Nächste ID immer via Script abfragen — nie manuell zählen:
 
 ```bash

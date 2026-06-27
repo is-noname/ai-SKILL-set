@@ -1,0 +1,18 @@
+{
+  "name": "project-identifier",
+  "description": "Geteilte Registry der Projekt-Kuerzel ({PRJ}). User-spezifischer State, einmal pro Agent/Maschine, wird bei Konventions-Updates nie ueberschrieben.",
+  "depends_on": [],
+  "consumed_by": ["doc-ids", "ticket-system"],
+  "components": {
+    "registry": [
+      { "path": "docs/project-identifier.md", "role": "Die Kuerzel-Tabelle (IZG -> ai-SKILL-set usw.). Einzige Quelle der Wahrheit fuer {PRJ}. Wird per @project-identifier.md aus doc-ids.md eingebunden." }
+    ],
+    "deploy": [
+      { "path": "scripts/setup_global.sh", "role": "Legt project-identifier.md im Agent-Dir an, falls fehlend. Ueberschreibt nie eine vorhandene Registry. Enthaelt die Migration, die Kuerzel aus altem inline-doc-ids.md rettet.", "shared": true }
+    ]
+  },
+  "notes": [
+    "Leaf des Setup-DAG: haengt an nichts, wird aber von doc-ids und ticket-system konsumiert.",
+    "User-State: setup_global.sh schreibt diese Datei nur wenn sie fehlt (nie Overwrite), damit lokal eingetragene Kuerzel erhalten bleiben."
+  ]
+}

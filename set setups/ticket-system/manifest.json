@@ -1,0 +1,41 @@
+{
+  "name": "ticket-system",
+  "description": "File-basiertes, pro-Projekt Ticket-Tracking (open/in-progress/blocked/done) mit Status-Hook und globaler Konvention.",
+  "depends_on": ["project-identifier"],
+  "bootstrap": "bash scripts/init_tickets.sh /pfad/zum/projekt",
+  "components": {
+    "convention": [
+      { "path": "docs/tickets.md", "role": "Konvention: Felder, Frontmatter, Status-Lifecycle, Regeln. Wird per @tickets.md in die Agent-Configs eingebunden." }
+    ],
+    "architecture": [
+      { "path": "docs/ticketsystem-architektur.md", "role": "Architektur-Guide (DE): ID-Vergabe, Status-Hook, Bootstrap-Ebenen." },
+      { "path": "docs/ticket-system-architecture.en.md", "role": "Architektur-Guide (EN)." }
+    ],
+    "hook": [
+      { "path": "hooks/ticket-mover.sh", "event": "PostToolUse(Edit|Write)", "role": "Verschiebt Ticket-Datei in den Ordner, der ihrem status:-Frontmatter entspricht. Gibt additionalContext-Feedback (IZG-T-039)." },
+      { "path": "hooks/README.md", "role": "Doku-Eintrag + settings.json-Registrierungsbeispiel fuer den Hook.", "shared": true }
+    ],
+    "scripts": [
+      { "path": "scripts/init_tickets.sh", "role": "Bootstrappt die tickets/-Struktur + PROTOCOL.md in einem Projekt." },
+      { "path": "scripts/next_ticket_id.sh", "role": "Naechste Ticket-ID (selbstheilend, mit Lock)." }
+    ],
+    "deploy": [
+      { "path": "scripts/setup_global.sh", "role": "Deployt Konvention + Hook global pro Agent-Dir. Deployt auch doc-ids.", "shared": true },
+      { "path": "scripts/setup_global_tickets.sh", "role": "Alias-Wrapper auf setup_global.sh (Altname).", "shared": true },
+      { "path": "scripts/check_global_drift.sh", "role": "Prueft deployte Konventionsdateien gegen den Repo-Stand.", "shared": true }
+    ],
+    "skill": [
+      { "name": "izg-ai-repo-global-update", "path": "skills/layer-1-base/izg-ai-repo-global-update", "role": "Drift-Check + Update der global deployten Konventionen (tickets.md, doc-ids.md, init_tickets.sh, ticket-mover).", "shared": true }
+    ],
+    "agent_config": [
+      { "target": ["CLAUDE.md", "AGENTS.md", "GEMINI.md"], "role": "@tickets.md-Include — bindet die Konvention in die jeweilige Agent-Config ein. Wird von setup_global.sh gepatcht." }
+    ],
+    "runtime_state": [
+      { "path": "tickets/", "role": "Pro Projekt im Repo-Root. Nicht versioniert (internes Tracking). Enthaelt .counter + open/in-progress/blocked/done/." }
+    ]
+  },
+  "notes": [
+    "depends_on project-identifier: Die Ticket-ID {PRJ}-T-{NNN} braucht das Projekt-Kuerzel {PRJ} aus der Registry docs/project-identifier.md. Das ist eine geteilte Registry (auch von doc-ids genutzt), kein Bestandteil von doc-ids selbst — ticket-system und doc-ids sind Geschwister, beide haengen an project-identifier.",
+    "shared:true markiert Komponenten, die zugleich das doc-ids-Setup bedienen (gemeinsame Deploy-/Update-Mechanik) — sie gehoeren nicht exklusiv zum ticket-system."
+  ]
+}
