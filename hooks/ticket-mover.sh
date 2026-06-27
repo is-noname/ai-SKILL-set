@@ -40,10 +40,16 @@ mkdir -p "$target_dir"
 # Kollisionsschutz: nie ein vorhandenes Ziel überschreiben (z.B. gleiche ID in
 # zwei Ordnern durch manuelles Verschieben). Lieber stehen lassen und warnen.
 if [[ -e "$target_dir/$filename" ]]; then
-  echo "[ticket-mover] $filename: Ziel $status/ existiert bereits — nicht verschoben (Kollision)" >&2
+  msg="[ticket-mover] $filename: Ziel $status/ existiert bereits — nicht verschoben (Kollision). Bitte Konflikt manuell prüfen."
+  echo "$msg" >&2
+  jq -n --arg m "$msg" '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $m}}'
   exit 0
 fi
 
 mv -n "$file_path" "$target_dir/$filename"
 
-echo "[ticket-mover] $filename: $current_folder/ → $status/" >&2
+# Stdout-Feedback an den Agent: ohne dies sieht er nur stderr nicht und versucht
+# einen manuellen mv auf die bereits verschobene Datei (siehe IZG-T-039).
+msg="[ticket-mover] $filename automatisch von $current_folder/ nach $status/ verschoben. Datei liegt jetzt unter $target_dir/ — kein manueller mv nötig."
+echo "$msg" >&2
+jq -n --arg m "$msg" '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $m}}'

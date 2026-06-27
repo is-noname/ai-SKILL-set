@@ -117,6 +117,7 @@ open    in-progress
 
 **Regeln:**
 - `status:`-Feld ändern = Status setzen — Hook verschiebt die Datei automatisch
+- **Niemals manuell `mv` auf eine Ticket-Datei.** Status-Wechsel = ausschließlich das `status:`-Feld im Frontmatter editieren. Der `ticket-mover`-Hook verschiebt die Datei danach selbst in den passenden Ordner. Ein eigener `mv` schlägt fehl, weil die Datei bereits verschoben wurde.
 - Jeder Statuswechsel erfordert einen Verlaufseintrag
 - `blocked/` → immer zurück nach `open/`, nie direkt nach `in-progress/`
 - `done/` ist finales Archiv, nicht löschen
