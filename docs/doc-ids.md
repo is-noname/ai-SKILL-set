@@ -55,9 +55,11 @@ ADR-20260625-001_Counter_statt_grep.md
 ## Sonderfall: CONTEXT.md
 
 Lebendes Glossar — **kein doc-ids-Typ, kein Datum, keine SEQ-Nummer**.
-Liegt im Repo-Root.
+Liegt im Repo-Root (oder im jeweiligen Kontext-Ordner bei Multi-Context-Repos).
 
 ## Ablage
+
+Dokumente liegen im projektspezifischen Ordner — keine zentrale Registry.
 
 ```
 docs/
