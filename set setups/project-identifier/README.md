@@ -19,7 +19,7 @@ project-identifier  ← dieses Setup
 ## User-State, nicht Konvention
 
 `docs/project-identifier.md` ist **kein** Konventionsdokument, sondern gepflegter
-User-State. `setup_global.sh` legt es nur an, wenn es fehlt — eine vorhandene Registry
+User-State. `setup_global_conventions.sh` legt es nur an, wenn es fehlt — eine vorhandene Registry
 wird **nie** überschrieben, damit lokal eingetragene Kürzel erhalten bleiben. Deshalb ist
 es bewusst aus `doc-ids.md` ausgelagert (das als reine Konvention bei jedem Update neu
 geschrieben wird).

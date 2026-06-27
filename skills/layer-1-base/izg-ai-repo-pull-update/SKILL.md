@@ -31,7 +31,7 @@ python3 $REPO/scripts/pull_skill.py update --target .claude/skills
 
 1. `--dry-run` ausführen
 2. Ausgabe zeigen
-3. Fragen: alle updaten oder nur bestimmte?
+3. Fragen: alle veralteten updaten? (Einzelnen gezielt → `pull <name> --force`)
 4. Dann updaten
 
 ## Nach dem Update

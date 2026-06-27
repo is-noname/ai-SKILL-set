@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Drift-Check für global deployte Konventionen/Artefakte (Inverse von
-# setup_global.sh). Vergleicht die deployten Dateien in einem Agent-Dir
+# setup_global_conventions.sh). Vergleicht die deployten Dateien in einem Agent-Dir
 # gegen die Quelle im Repo und meldet pro Datei: ok / drift / missing.
 #
-# Read-only — schreibt nie. Zum Re-Deploy: setup_global.sh <agent-dir>.
+# Read-only — schreibt nie. Zum Re-Deploy: setup_global_conventions.sh <agent-dir>.
 #
 # Usage:
 #   bash check_global_drift.sh                # alle bekannten Agent-Dirs unter $HOME
@@ -15,13 +15,13 @@
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # project-identifier.md ist User-State → NICHT geprüft. Alles hier sind die von
-# setup_global.sh stets überschriebenen (= managed) Dateien.
+# setup_global_conventions.sh stets überschriebenen (= managed) Dateien.
 # Format: "<repo-relpath>|<agent-relpath>"
 MANAGED=(
   "docs/tickets.md|tickets.md"
   "docs/doc-ids.md|doc-ids.md"
   "scripts/init_tickets.sh|scripts/init_tickets.sh"
-  "hooks/ticket-mover.sh|hooks/ticket-mover.sh"
+  "hooks/global/ticket-mover.sh|hooks/ticket-mover.sh"
 )
 
 KNOWN_AGENT_DIRS=(".claude" ".codex" ".gemini" ".vibe")
@@ -72,7 +72,7 @@ done
 
 if [ "$drift_found" -ne 0 ]; then
   echo
-  echo "Drift/Fehlend gefunden. Re-Deploy: bash $REPO_ROOT/scripts/setup_global.sh <agent-dir>"
+  echo "Drift/Fehlend gefunden. Re-Deploy: bash $REPO_ROOT/scripts/setup_global_conventions.sh <agent-dir>"
 fi
 
 exit "$drift_found"

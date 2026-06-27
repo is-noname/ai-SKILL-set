@@ -11,18 +11,24 @@ Exit-Code (`exit 2` = harter Abbruch).
 
 ---
 
-## Global vs. Projekt
+## Ordnerstruktur — global/ vs. repo-local/
 
-Die meisten Hooks sind **global** sinnvoll (Sicherheit, Git-Schutz) und gehören nach
-`~/.claude/settings.json` mit absoluten Pfaden auf `~/.claude/hooks/`. Zwei Hooks sind
-**projektgebunden**:
+Die Hooks liegen im Repo in zwei Unterordnern nach **Default-Deploy-Ort**:
 
-| Hook | Scope | Grund |
-|------|-------|-------|
-| `pre-commit-registry.sh` | nur dieses Repo | Hardcodierter Pfad auf `ai-SKILL-set`, regeneriert `registry.json` |
-| `ticket-mover.sh` | global ODER pro Projekt | Funktioniert in jedem Repo mit `tickets/`-Struktur |
+| Ordner | Hooks | Bedeutung |
+|--------|-------|-----------|
+| `hooks/global/` | alle Guards (`protect-env`, `dir-scope-guard` +`dir-scope.conf`, `env-key-guard`, `gh-cli-guard`, `git-*-guard`, `read-size-guard`) sowie `piper-notify`, `check-chatbox`, `ticket-mover` | einmal in `~/.claude/hooks/` aufgesetzt, feuert überall, wird nie neu aufgesetzt |
+| `hooks/repo-local/` | `pre-commit-registry`, `pre-commit-agentdocs` | hardcodierter Pfad auf `ai-SKILL-set`, nie global deployt |
 
-Alle anderen sind reine global-Guards ohne Projektbezug.
+**Wichtig:** Die Unterordner gibt es nur im **Repo**. Beim Deploy landen die Skripte
+flach in `~/.claude/hooks/` — die `settings.json`-Pfade unten zeigen deshalb auf
+`~/.claude/hooks/<skript>.sh` (ohne `global/`).
+
+Sonderfall `ticket-mover.sh`: Default ist global, funktioniert aber in jedem Repo mit
+`tickets/`-Struktur, weil er den Pfad aus dem Hook-Input ableitet (kein hardcodierter
+Pfad). Eine **einzige globale Registrierung deckt alle Projekte ab** — eine zusätzliche
+Pro-Projekt-Registrierung wäre kein Zusatz, sondern würde nur doppelt feuern. Pro-Projekt
+nur sinnvoll als **Ersatz**, falls man ihn bewusst nicht global will.
 
 ---
 
@@ -48,6 +54,7 @@ Alle anderen sind reine global-Guards ohne Projektbezug.
 | `git-destructive-guard.sh` | Blockt `reset --hard`, `clean -f`, `checkout .`, `branch -D`, `rebase`. | Bei destruktiven Git-Operationen. |
 | `gh-cli-guard.sh` | Blockt Repo-Visibility-Änderung, `repo create --public`, `pr/issue create`, `repo delete` / `api … DELETE`. | Bei riskanten `gh`-Befehlen. |
 | `pre-commit-registry.sh` | Regeneriert `registry.json`, wenn `SKILL.md`-Dateien gestaged sind; bricht den Commit ab (`exit 2`), falls die Validierung fehlschlägt. | Bei `git commit` in diesem Repo. |
+| `pre-commit-agentdocs.sh` | Regeneriert `CLAUDE.md`/`GEMINI.md` aus `AGENTS.md` (Source of Truth) und stagt sie nach, wenn eine der drei Root-Configs gestaged ist; bricht ab (`exit 2`) bei Fehler. | Bei `git commit` in diesem Repo. |
 
 ### PostToolUse — Edit / Write
 
@@ -77,10 +84,31 @@ Alle anderen sind reine global-Guards ohne Projektbezug.
 
 ## Installation
 
+### Automatisch (empfohlen): `setup_global_hooks.sh`
+
+Statt manuell zu kopieren und `settings.json` zu editieren, deployt
+`scripts/setup_global_hooks.sh` die Guard-/Helfer-Hooks aus `hooks/global/` **interaktiv**
+nach `~/.claude/hooks/` und registriert die gewählten in `settings.json` (Event/Matcher
+pro Hook bereits hinterlegt). `ticket-mover` ist hier bewusst **nicht** dabei — der
+gehört zum Konventions-Deployer `setup_global_conventions.sh`.
+
+```bash
+bash scripts/setup_global_hooks.sh            # interaktive Auswahl, Ziel ~/.claude
+bash scripts/setup_global_hooks.sh --check    # read-only: zeigt ok/drift/missing pro Hook
+bash scripts/setup_global_hooks.sh --all      # alle Guards (nicht-interaktiv)
+bash scripts/setup_global_hooks.sh --hooks git-push-guard,protect-env   # gezielt
+```
+
+Eigenschaften: idempotent, fragt bei Drift vor dem Überschreiben (`--force` umgeht das),
+überschreibt eine vorhandene `dir-scope.conf` nie (user-editiert). Registrierung nur für
+`.claude` (Hook-Format ist Claude-spezifisch).
+
+### Manuell
+
 1. **Skripte ablegen** (global) und ausführbar machen:
 
    ```bash
-   cp hooks/*.sh hooks/dir-scope.conf ~/.claude/hooks/
+   cp hooks/global/*.sh hooks/global/dir-scope.conf ~/.claude/hooks/
    chmod +x ~/.claude/hooks/*.sh
    ```
 
@@ -137,7 +165,7 @@ Alle anderen sind reine global-Guards ohne Projektbezug.
    ```json
    { "matcher": "Bash", "hooks": [
      { "type": "command", "command": "/home/USER/.claude/hooks/env-key-guard.sh" },
-     { "type": "command", "command": "/path/to/ai-SKILL-set/hooks/pre-commit-registry.sh" },
+     { "type": "command", "command": "/path/to/ai-SKILL-set/hooks/repo-local/pre-commit-registry.sh" },
      { "type": "command", "command": "/home/USER/.claude/hooks/git-commit-guard.sh" },
      { "type": "command", "command": "/home/USER/.claude/hooks/git-push-guard.sh" },
      { "type": "command", "command": "/home/USER/.claude/hooks/git-destructive-guard.sh" },

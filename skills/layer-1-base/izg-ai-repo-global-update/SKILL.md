@@ -13,9 +13,9 @@ Repo — das Pendant zu `izg-ai-repo-pull-update`, nur für `~/.claude`, `~/.cod
 `~/.gemini`, `~/.vibe` statt für Projekt-Skills.
 
 > **Architektur:** Dünner Wrapper um zwei zentrale Skripte im Repo (`scripts/`, **nicht**
-> im Skill): `check_global_drift.sh` (read-only Drift-Check) und `setup_global.sh`
+> im Skill): `check_global_drift.sh` (read-only Drift-Check) und `setup_global_conventions.sh`
 > (idempotenter Re-Deploy). Setzt voraus, dass das Repo unter `REPO` existiert. Managed:
-> `tickets.md`, `doc-ids.md`, `scripts/init_tickets.sh`, `hooks/ticket-mover.sh`.
+> `tickets.md`, `doc-ids.md`, `scripts/init_tickets.sh`, `hooks/global/ticket-mover.sh`.
 > `project-identifier.md` (User-State / Kürzel-Registry) wird **nie** angefasst.
 
 ## Ablauf
@@ -30,9 +30,9 @@ bash $REPO/scripts/check_global_drift.sh
 bash $REPO/scripts/check_global_drift.sh ~/.claude
 
 # 2. Re-Deploy (idempotent) — gezielt, mehrere, oder alle
-bash $REPO/scripts/setup_global.sh ~/.claude          # ein Dir
-bash $REPO/scripts/setup_global.sh ~/.claude ~/.codex # mehrere
-bash $REPO/scripts/setup_global.sh --all              # alle bekannten Agent-Dirs
+bash $REPO/scripts/setup_global_conventions.sh ~/.claude          # ein Dir
+bash $REPO/scripts/setup_global_conventions.sh ~/.claude ~/.codex # mehrere
+bash $REPO/scripts/setup_global_conventions.sh --all              # alle bekannten Agent-Dirs
 ```
 
 ## Ohne Argumente aufgerufen
@@ -41,7 +41,7 @@ bash $REPO/scripts/setup_global.sh --all              # alle bekannten Agent-Dir
 2. Ausgabe zeigen (ok / drift / missing pro Datei)
 3. Ist alles aktuell → melden und fertig
 4. Gibt es Drift → fragen, welche Agent-Dirs re-deployt werden sollen
-5. Für die gewählten Dirs `setup_global.sh <dir>` ausführen
+5. Für die gewählten Dirs `setup_global_conventions.sh <dir>` ausführen
 
 ## Nach dem Update
 

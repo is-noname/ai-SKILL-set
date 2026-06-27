@@ -19,6 +19,6 @@ nicht voneinander abhängig.
 
 ## Konvention vs. State
 
-`docs/doc-ids.md` ist **reine Konvention** und wird bei jedem `setup_global.sh`-Lauf neu
+`docs/doc-ids.md` ist **reine Konvention** und wird bei jedem `setup_global_conventions.sh`-Lauf neu
 geschrieben. Der einzige veränderliche Teil — die Kürzel — ist bewusst in das separate
 Setup `project-identifier` ausgelagert, damit Updates es nie überschreiben.

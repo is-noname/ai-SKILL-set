@@ -54,7 +54,7 @@ It lists available skills, resolves dependencies, and installs into `.claude/ski
 `tickets.md` + `doc-ids.md` into your agent dir and patches your global config
 (`~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, …) to load them:
 ```bash
-bash /path/to/ai-SKILL-set/scripts/setup_global.sh ~/.claude
+bash /path/to/ai-SKILL-set/scripts/setup_global_conventions.sh ~/.claude
 ```
 
 *b) Per project* — run from within the target project:
