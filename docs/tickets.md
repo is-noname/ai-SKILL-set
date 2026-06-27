@@ -1,10 +1,14 @@
 # Ticketsystem Konvention
 
-> Diese Datei wird von `scripts/init_tickets.sh` in neue Projekte deployt.
-> In `CLAUDE.md` einbinden damit Claude die Konvention bei jedem Session-Start kennt:
+> Diese Datei ist die **globale Konventions-Quelle**. Sie liegt im Verzeichnis deines
+> AI-Agenten (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.vibe`), wird per
+> `scripts/setup_global_tickets.sh` dorthin deployt und in der Agent-Konfig
+> (`CLAUDE.md` / `AGENTS.md` / …) eingebunden:
 > ```markdown
-> @docs/tickets.md
+> @tickets.md
 > ```
+> Einzelne Projekte tragen **keine** eigene Kopie — ihre `tickets/PROTOCOL.md`
+> verweist auf diese Datei. Global = Konvention, pro Projekt = die Tickets selbst.
 
 Leichtgewichtiges, file-basiertes Tracking für Bugs, Tasks, Features und Fragen.
 
@@ -16,9 +20,10 @@ Leichtgewichtiges, file-basiertes Tracking für Bugs, Tasks, Features und Fragen
 
 `tickets/` liegt immer im **Repo-Root**.
 
-Falls `tickets/` noch nicht existiert (nach Bootstrap liegt das Script lokal):
+Falls `tickets/` noch nicht existiert, einmal pro Projekt bootstrappen
+(das Script liegt im globalen Agent-Verzeichnis):
 ```bash
-bash scripts/init_tickets.sh
+bash ~/.claude/scripts/init_tickets.sh /pfad/zum/projekt
 ```
 
 ```
@@ -37,7 +42,7 @@ tickets/
 {PRJ}-T-{NNN}_{kurz-beschreibung}.md
 ```
 
-`{PRJ}` = Projekt-Kürzel aus `docs/doc-ids.md`.  
+`{PRJ}` = Projekt-Kürzel aus `doc-ids.md` im globalen Agent-Verzeichnis.  
 Nächste ID immer via Script abfragen — nie manuell zählen:
 
 ```bash

@@ -78,17 +78,69 @@ _fetch() {
   return 1
 }
 
-# Konventionsdocs ins Agent-Verzeichnis (überschreibt vorhandene nicht)
-for doc in tickets.md doc-ids.md; do
-  dest="$AGENT_DIR/$doc"
-  if [ -f "$dest" ]; then
-    echo "  $dest already exists — skipped"
-  elif _fetch "docs/$doc" "$dest"; then
-    echo "  deployed: $dest"
-  else
-    exit 1
+# tickets.md ist reine Konvention ohne user-spezifischen State → immer (neu)
+# schreiben, damit Bestands-Agents die aktuelle Version bekommen (idempotent).
+dest="$AGENT_DIR/tickets.md"
+if _fetch "docs/tickets.md" "$dest"; then
+  echo "  deployed: $dest"
+else
+  exit 1
+fi
+
+# Einmalige Migration: Älteres doc-ids.md trug die Kürzel-Registry inline. Bevor
+# wir doc-ids.md (jetzt reine Konvention) überschreiben, die Kürzel verlustfrei nach
+# project-identifier.md retten — nur wenn diese noch fehlt und das alte doc-ids.md
+# echte Datenzeilen im "## Projekt-Kürzel"-Abschnitt hat. Idempotent: existiert
+# project-identifier.md schon, passiert nichts.
+old_docids="$AGENT_DIR/doc-ids.md"
+ident="$AGENT_DIR/project-identifier.md"
+if [ ! -f "$ident" ] && [ -f "$old_docids" ]; then
+  # Datenzeilen = |-Zeilen ab der dritten (nach Header + Separator) mit Alphanumerik
+  kuerzel_rows="$(awk '
+    /^## Projekt-K/ {insec=1; n=0; next}
+    /^## / {insec=0}
+    insec && /^\|/ { n++; if (n>2 && $0 ~ /[A-Za-z0-9]/) print }
+  ' "$old_docids")"
+  if [ -n "$kuerzel_rows" ]; then
+    {
+      cat <<'HDR'
+# Projekt-Kürzel-Registry
+
+Zentrale Registry der Projekt-Kürzel — **user-spezifischer State**, einmal pro
+Agent/Maschine. Wird bei Konventions-Updates (`setup_global_tickets.sh`) **nie**
+überschrieben.
+
+Claude trägt beim ersten Einsatz von doc-ids oder Tickets in einem neuen Projekt das
+Kürzel hier ein. Diese Datei ist die einzige Kürzel-Registry.
+
+| Kürzel | Projekt |
+|--------|---------|
+HDR
+      printf '%s\n' "$kuerzel_rows"
+    } > "$ident"
+    echo "  migrated: $ident (Kürzel aus altem doc-ids.md gerettet)"
   fi
-done
+fi
+
+# doc-ids.md ist jetzt reine Konvention (Registry ausgelagert) → immer (neu) schreiben,
+# damit Bestands-Agents Konventions-Updates bekommen.
+dest="$AGENT_DIR/doc-ids.md"
+if _fetch "docs/doc-ids.md" "$dest"; then
+  echo "  deployed: $dest"
+else
+  exit 1
+fi
+
+# project-identifier.md enthält die Kürzel-Registry (User-State) → nur anlegen wenn
+# fehlend (Migration oben kann sie bereits erzeugt haben), nie überschreiben.
+dest="$AGENT_DIR/project-identifier.md"
+if [ -f "$dest" ]; then
+  echo "  $dest already exists — skipped (Kürzel-Registry bleibt erhalten)"
+elif _fetch "docs/project-identifier.md" "$dest"; then
+  echo "  deployed: $dest"
+else
+  exit 1
+fi
 
 # Bootstrap-Script bereitstellen, damit der unten gepatchte Hinweis
 # "$AGENT_DIR/scripts/init_tickets.sh" auch wirklich existiert. Immer (neu)
