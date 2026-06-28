@@ -192,7 +192,7 @@ Das System wird auf zwei Ebenen eingerichtet — leicht zu verwechseln:
 | **Wie oft** | einmal pro Agent/Maschine | einmal pro Projekt |
 | **Was** | deployt `tickets.md` + `doc-ids.md` **und** `init_tickets.sh` ins Agent-Verzeichnis und patcht dessen Konfig | legt `tickets/`-Ordnerstruktur, `.counter`, `PROTOCOL.md` und `next_ticket_id.sh` an |
 | **Ziel** | `~/.claude`, `~/.codex`, `~/.gemini`, `~/.vibe` | beliebiger Projektordner |
-| **Konfig-Datei** | `CLAUDE.md` / `instructions.md` / `GEMINI.md` / `AGENTS.md` | — |
+| **Konfig-Datei** | `CLAUDE.md` / `AGENTS.md` (Codex) / `GEMINI.md` / `AGENTS.md` (Vibe) | — |
 
 **Globale Ebene** — jeder Agent kennt die Konvention systemweit:
 ```bash

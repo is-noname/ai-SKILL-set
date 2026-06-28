@@ -16,7 +16,7 @@
 #
 # Agent dir → config file mapping:
 #   ~/.claude  → CLAUDE.md
-#   ~/.codex   → instructions.md
+#   ~/.codex   → AGENTS.md   (Codex CLI >=0.x liest global AGENTS.md, nicht mehr instructions.md)
 #   ~/.gemini  → GEMINI.md
 #   ~/.vibe    → AGENTS.md
 
@@ -44,7 +44,7 @@ fi
 
 declare -A CFG_MAP=(
   [".claude"]="CLAUDE.md"
-  [".codex"]="instructions.md"
+  [".codex"]="AGENTS.md"
   [".gemini"]="GEMINI.md"
   [".vibe"]="AGENTS.md"
 )
