@@ -21,9 +21,11 @@ Leichtgewichtiges, file-basiertes Tracking für Bugs, Tasks, Features und Fragen
 `tickets/` liegt immer im **Repo-Root**.
 
 Falls `tickets/` noch nicht existiert, einmal pro Projekt bootstrappen
-(das Script liegt im globalen Agent-Verzeichnis):
+(das Script liegt im globalen Agent-Verzeichnis). Das optionale zweite Argument ist
+das Projekt-Prefix — es wird in `tickets/PROTOCOL.md` verankert. Fehlt es, bleibt der
+`{PRJ}`-Platzhalter stehen (bei TTY fragt das Script interaktiv nach):
 ```bash
-bash ~/.claude/scripts/init_tickets.sh /pfad/zum/projekt
+bash ~/.claude/scripts/init_tickets.sh /pfad/zum/projekt PREFIX
 ```
 
 ```
@@ -42,7 +44,7 @@ tickets/
 {PRJ}-T-{NNN}_{kurz-beschreibung}.md
 ```
 
-`{PRJ}` = Projekt-Kürzel aus der Registry `project-identifier.md` im globalen Agent-Verzeichnis.  
+`{PRJ}` = Projekt-Prefix aus der Registry `project-identifier.md` im globalen Agent-Verzeichnis.  
 Nächste ID immer via Script abfragen — nie manuell zählen:
 
 ```bash

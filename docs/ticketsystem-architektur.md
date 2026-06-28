@@ -6,8 +6,8 @@ für Funktionsverständnis, nicht als Konvention-Nachschlagewerk.
 > 🇬🇧 English version: [`ticket-system-architecture.en.md`](./ticket-system-architecture.en.md)
 
 > **Platzhalter-Hinweis:** In diesem Dokument steht `PRJ` überall für das
-> **projektspezifische Kürzel**. Jedes Projekt definiert sein eigenes Kürzel in
-> `docs/doc-ids.md` (z.B. ein dreistelliges Kürzel pro Repo). `PRJ`, `NNN` und
+> **projektspezifische Prefix**. Jedes Projekt definiert sein eigenes Prefix in
+> `docs/doc-ids.md` (z.B. ein dreistelliges Prefix pro Repo). `PRJ`, `NNN` und
 > Namen wie `mein-projekt` sind generische Platzhalter — **keine** festen oder
 > reservierten Bezeichnungen.
 
@@ -45,7 +45,7 @@ projekt/
 │   └── ticket-mover.sh          # verschiebt Tickets bei Status-Änderung
 ├── docs/
 │   ├── tickets.md               # Konvention (wird ins Agent-Verzeichnis deployt)
-│   ├── doc-ids.md               # Projekt-Kürzel + Doc-ID-Schema (ebenso global deployt)
+│   ├── doc-ids.md               # Projekt-Prefix + Doc-ID-Schema (ebenso global deployt)
 │   └── ticketsystem-architektur.md  # dieses Dokument
 └── tickets/
     ├── .counter                 # höchste bisher vergebene Nummer
@@ -64,7 +64,7 @@ projekt/
 | `ticket-mover.sh` (Hook) | hält Ordner und `status:` synchron | automatisch nach jedem Edit/Write |
 | `init_tickets.sh` | baut `tickets/` in einem Projekt auf | einmal pro Projekt |
 | `setup_global_conventions.sh` | deployt Konvention ins Agent-Verzeichnis | einmal pro Agent/Maschine |
-| `doc-ids.md` | liefert das Projekt-Kürzel `PRJ` | bei ID-Vergabe |
+| `doc-ids.md` | liefert das Projekt-Prefix `PRJ` | bei ID-Vergabe |
 
 ---
 
@@ -104,7 +104,7 @@ status: done│                       │ status: blocked
 
 ## 4. ID-Vergabe — wie `next_ticket_id.sh` arbeitet
 
-Aufruf (Argument ist das Projekt-Kürzel):
+Aufruf (Argument ist das Projekt-Prefix):
 ```bash
 bash scripts/next_ticket_id.sh PRJ     # → PRJ-T-019
 ```
@@ -135,8 +135,8 @@ Das Skript ist **selbstheilend** und **kollisionssicher**. Ablauf:
   auf dem System, läuft es ohne Lock weiter — die Selbstheilung fängt Drift dann
   nachträglich ab (nur die Echtzeit-Eindeutigkeit ist dann nicht garantiert).
 
-> Das Kürzel `PRJ` ist **kein** Teil des Skripts — es kommt als Argument und stammt
-> aus `docs/doc-ids.md` (Single Source of Truth für Projekt-Kürzel). Jedes Projekt
+> Das Prefix `PRJ` ist **kein** Teil des Skripts — es kommt als Argument und stammt
+> aus `docs/doc-ids.md` (Single Source of Truth für Projekt-Prefix). Jedes Projekt
 > hat sein eigenes.
 
 ---
@@ -221,9 +221,9 @@ Idempotent: erneutes Ausführen rüstet fehlenden Counter / aktuelles
 
 ## 7. Kopplung mit dem doc-ids-System
 
-Das Ticketsystem und die Doc-IDs (`docs/doc-ids.md`) teilen sich das **Projekt-Kürzel**:
+Das Ticketsystem und die Doc-IDs (`docs/doc-ids.md`) teilen sich das **Projekt-Prefix**:
 
-- Ticket-IDs: `PRJ-T-NNN` → `{KÜRZEL}-T-{NUMMER}`
+- Ticket-IDs: `PRJ-T-NNN` → `{PREFIX}-T-{NUMMER}`
 - Doc-IDs: `{TYP}-{DATUM}-{SEQ}` (z.B. `AUD-{YYYYMMDD}-001_…`)
 
 Verknüpfung in beide Richtungen:

@@ -36,7 +36,7 @@
     ]
   },
   "notes": [
-    "depends_on project-identifier: Die Ticket-ID {PRJ}-T-{NNN} braucht das Projekt-Kuerzel {PRJ} aus der Registry docs/project-identifier.md. Das ist eine geteilte Registry (auch von doc-ids genutzt), kein Bestandteil von doc-ids selbst — ticket-system und doc-ids sind Geschwister, beide haengen an project-identifier.",
+    "depends_on project-identifier: Die Ticket-ID {PRJ}-T-{NNN} braucht das Projekt-Prefix {PRJ} aus der Registry docs/project-identifier.md. Das ist eine geteilte Registry (auch von doc-ids genutzt), kein Bestandteil von doc-ids selbst — ticket-system und doc-ids sind Geschwister, beide haengen an project-identifier.",
     "shared:true markiert Komponenten, die zugleich das doc-ids-Setup bedienen (gemeinsame Deploy-/Update-Mechanik) — sie gehoeren nicht exklusiv zum ticket-system."
   ]
 }

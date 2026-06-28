@@ -16,7 +16,7 @@ Repo — das Pendant zu `izg-ai-repo-pull-update`, nur für `~/.claude`, `~/.cod
 > im Skill): `check_global_drift.sh` (read-only Drift-Check) und `setup_global_conventions.sh`
 > (idempotenter Re-Deploy). Setzt voraus, dass das Repo unter `REPO` existiert. Managed:
 > `tickets.md`, `doc-ids.md`, `scripts/init_tickets.sh`, `hooks/global/ticket-mover.sh`.
-> `project-identifier.md` (User-State / Kürzel-Registry) wird **nie** angefasst.
+> `project-identifier.md` (User-State / Prefix-Registry) wird **nie** angefasst.
 
 ## Ablauf
 

@@ -129,39 +129,40 @@ process_agent_dir() {
   local dest="$AGENT_DIR/tickets.md"
   deploy_file "docs/tickets.md" "$dest" || return 1
 
-  # Einmalige Migration: Älteres doc-ids.md trug die Kürzel-Registry inline. Bevor
-  # wir doc-ids.md (jetzt reine Konvention) überschreiben, die Kürzel verlustfrei nach
+  # Einmalige Migration: Älteres doc-ids.md trug die Prefix-Registry inline. Bevor
+  # wir doc-ids.md (jetzt reine Konvention) überschreiben, die Prefixe verlustfrei nach
   # project-identifier.md retten — nur wenn diese noch fehlt und das alte doc-ids.md
-  # echte Datenzeilen im "## Projekt-Kürzel"-Abschnitt hat. Idempotent: existiert
-  # project-identifier.md schon, passiert nichts.
+  # echte Datenzeilen im Registry-Abschnitt hat. Die Überschrift hiess historisch
+  # "## Projekt-Kürzel", heute "## Projekt-Prefix" — der Matcher deckt beide ab.
+  # Idempotent: existiert project-identifier.md schon, passiert nichts.
   local old_docids="$AGENT_DIR/doc-ids.md"
   local ident="$AGENT_DIR/project-identifier.md"
   if [ ! -f "$ident" ] && [ -f "$old_docids" ]; then
     # Datenzeilen = |-Zeilen ab der dritten (nach Header + Separator) mit Alphanumerik
-    local kuerzel_rows
-    kuerzel_rows="$(awk '
-      /^## Projekt-K/ {insec=1; n=0; next}
+    local prefix_rows
+    prefix_rows="$(awk '
+      /^## Projekt-(K|Pr)/ {insec=1; n=0; next}
       /^## / {insec=0}
       insec && /^\|/ { n++; if (n>2 && $0 ~ /[A-Za-z0-9]/) print }
     ' "$old_docids")"
-    if [ -n "$kuerzel_rows" ]; then
+    if [ -n "$prefix_rows" ]; then
       {
         cat <<'HDR'
-# Projekt-Kürzel-Registry
+# Projekt-Prefix-Registry
 
-Zentrale Registry der Projekt-Kürzel — **user-spezifischer State**, einmal pro
+Zentrale Registry der Projekt-Prefixe — **user-spezifischer State**, einmal pro
 Agent/Maschine. Wird bei Konventions-Updates (`setup_global_conventions.sh`) **nie**
 überschrieben.
 
 Claude trägt beim ersten Einsatz von doc-ids oder Tickets in einem neuen Projekt das
-Kürzel hier ein. Diese Datei ist die einzige Kürzel-Registry.
+Prefix hier ein. Diese Datei ist die einzige Prefix-Registry.
 
-| Kürzel | Projekt |
+| Prefix | Projekt |
 |--------|---------|
 HDR
-        printf '%s\n' "$kuerzel_rows"
+        printf '%s\n' "$prefix_rows"
       } > "$ident"
-      echo "  migrated: $ident (Kürzel aus altem doc-ids.md gerettet)"
+      echo "  migrated: $ident (Prefix aus altem doc-ids.md gerettet)"
     fi
   fi
 
@@ -170,11 +171,11 @@ HDR
   dest="$AGENT_DIR/doc-ids.md"
   deploy_file "docs/doc-ids.md" "$dest" || return 1
 
-  # project-identifier.md enthält die Kürzel-Registry (User-State) → nur anlegen wenn
+  # project-identifier.md enthält die Prefix-Registry (User-State) → nur anlegen wenn
   # fehlend (Migration oben kann sie bereits erzeugt haben), nie überschreiben.
   dest="$AGENT_DIR/project-identifier.md"
   if [ -f "$dest" ]; then
-    echo "  $dest already exists — skipped (Kürzel-Registry bleibt erhalten)"
+    echo "  $dest already exists — skipped (Prefix-Registry bleibt erhalten)"
   elif _fetch "docs/project-identifier.md" "$dest"; then
     echo "  deployed: $dest"
   else
@@ -264,9 +265,10 @@ Lookup-Reihenfolge:
 Ticket-ID via \`bash scripts/next_ticket_id.sh {PRJ}\`.
 Status-Feld im Frontmatter ändern — Hook verschiebt die Datei automatisch.
 
-Neues Projekt bootstrappen:
+Neues Projekt bootstrappen (zweites Argument = Projekt-Prefix, optional — fehlt es,
+bleibt der \`{PRJ}\`-Platzhalter in \`tickets/PROTOCOL.md\`):
 \`\`\`bash
-bash $AGENT_DIR/scripts/init_tickets.sh /pfad/zum/projekt
+bash $AGENT_DIR/scripts/init_tickets.sh /pfad/zum/projekt PREFIX
 \`\`\`
 BLOCK
       echo "  patched: $cfg (inline Ticketsystem block)"

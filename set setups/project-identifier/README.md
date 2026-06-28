@@ -1,6 +1,6 @@
 # Setup: project-identifier
 
-Die geteilte **Kürzel-Registry**: ordnet jedem Projekt ein kurzes `{PRJ}`-Kürzel zu
+Die geteilte **Prefix-Registry**: ordnet jedem Projekt ein kurzes `{PRJ}`-Prefix zu
 (`IZG` → ai-SKILL-set, `STK` → Stonky_v1, …). Einzige Quelle der Wahrheit für `{PRJ}`.
 
 ## Rolle im Setup-DAG
@@ -20,6 +20,6 @@ project-identifier  ← dieses Setup
 
 `docs/project-identifier.md` ist **kein** Konventionsdokument, sondern gepflegter
 User-State. `setup_global_conventions.sh` legt es nur an, wenn es fehlt — eine vorhandene Registry
-wird **nie** überschrieben, damit lokal eingetragene Kürzel erhalten bleiben. Deshalb ist
+wird **nie** überschrieben, damit lokal eingetragene Prefix erhalten bleiben. Deshalb ist
 es bewusst aus `doc-ids.md` ausgelagert (das als reine Konvention bei jedem Update neu
 geschrieben wird).

@@ -4,7 +4,7 @@
   "depends_on": ["project-identifier"],
   "components": {
     "convention": [
-      { "path": "docs/doc-ids.md", "role": "Schema, Typ-Codes, ADR-Filter, Ablage. Bindet die Kuerzel-Registry per @project-identifier.md ein. Wird per @doc-ids.md in die Agent-Config eingebunden." }
+      { "path": "docs/doc-ids.md", "role": "Schema, Typ-Codes, ADR-Filter, Ablage. Bindet die Prefix-Registry per @project-identifier.md ein. Wird per @doc-ids.md in die Agent-Config eingebunden." }
     ],
     "deploy": [
       { "path": "scripts/setup_global_conventions.sh", "role": "Deployt doc-ids.md (reine Konvention -> immer neu) und legt project-identifier.md an, falls fehlend.", "shared": true },
@@ -20,7 +20,7 @@
     ]
   },
   "notes": [
-    "depends_on project-identifier: doc-ids vergibt IDs nur projektbezogen ({PRJ}) und bindet die Kuerzel-Registry per @project-identifier.md ein.",
+    "depends_on project-identifier: doc-ids vergibt IDs nur projektbezogen ({PRJ}) und bindet die Prefix-Registry per @project-identifier.md ein.",
     "doc-ids und ticket-system sind Geschwister (beide haengen an project-identifier), nicht voneinander abhaengig.",
     "shared:true markiert Deploy-/Update-Komponenten, die zugleich ticket-system und project-identifier bedienen."
   ]

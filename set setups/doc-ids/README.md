@@ -6,7 +6,7 @@ Typ-Codes (`AUD`, `RPT`, `RFC`, `BT`, `ADR`) und ADR-Eingangsfilter.
 ## Abhängigkeit
 
 `doc-ids` hängt an **`project-identifier`** — IDs werden projektbezogen über `{PRJ}`
-vergeben, und `doc-ids.md` bindet die Kürzel-Registry per `@project-identifier.md` ein.
+vergeben, und `doc-ids.md` bindet die Prefix-Registry per `@project-identifier.md` ein.
 
 ```
 project-identifier
@@ -20,5 +20,5 @@ nicht voneinander abhängig.
 ## Konvention vs. State
 
 `docs/doc-ids.md` ist **reine Konvention** und wird bei jedem `setup_global_conventions.sh`-Lauf neu
-geschrieben. Der einzige veränderliche Teil — die Kürzel — ist bewusst in das separate
+geschrieben. Der einzige veränderliche Teil — die Prefix — ist bewusst in das separate
 Setup `project-identifier` ausgelagert, damit Updates es nie überschreiben.

@@ -7,8 +7,8 @@
 > ```markdown
 > @doc-ids.md
 > ```
-> Die projekt-spezifischen Kürzel sind **kein** Teil dieser Konvention — sie leben in
-> der separaten Registry `@project-identifier.md` (siehe „Projekt-Kürzel"), die bei
+> Die projekt-spezifischen Prefix sind **kein** Teil dieser Konvention — sie leben in
+> der separaten Registry `@project-identifier.md` (siehe „Projekt-Prefix"), die bei
 > Updates nie überschrieben wird. Global = Konvention, Registry = User-State.
 
 ## Schema
@@ -19,9 +19,9 @@
 
 **Gleiche SEQ = gleiche Themen-Kette** (z.B. AUD-001 und die daraus abgeleiteten Tickets gehören zusammen)
 
-## Projekt-Kürzel
+## Projekt-Prefix
 
-Die Registry der Kürzel pro Projekt ist **user-spezifischer State** und wird bei
+Die Registry der Prefix pro Projekt ist **user-spezifischer State** und wird bei
 Konventions-Updates nie überschrieben. Sie liegt in der separaten Datei und wird
 hier eingebunden:
 

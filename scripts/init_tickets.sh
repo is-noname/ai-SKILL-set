@@ -3,23 +3,23 @@
 # Idempotent: kann auf bestehende Projekte erneut angewendet werden, um Counter und
 # next_ticket_id.sh nachzurüsten, ohne vorhandene Tickets/PROTOCOL.md zu überschreiben.
 # For global agent setup (one-time, per machine) use: bash scripts/setup_global_conventions.sh
-# Usage: bash scripts/init_tickets.sh [ziel-pfad] [KUERZEL]
-#   KUERZEL (optional): 2-6 Grossbuchstaben. Wird in tickets/PROTOCOL.md als
+# Usage: bash scripts/init_tickets.sh [ziel-pfad] [PREFIX]
+#   PREFIX (optional): 2-6 Grossbuchstaben. Wird in tickets/PROTOCOL.md als
 #   projekt-lokale Laufzeit-Quelle verankert ({PRJ}-Platzhalter wird ersetzt).
 #   Fehlt das Argument: bei TTY interaktive Nachfrage, sonst Platzhalter belassen
 #   (kein Abbruch). Registry project-identifier.md wird bewusst NICHT angefasst
 #   (agent-neutral; siehe IZG-T-045).
 TARGET="${1:-.}"
 
-# Projekt-Kuerzel bestimmen: Argument > interaktiv (nur bei TTY) > leer (Platzhalter).
+# Projekt-Prefix bestimmen: Argument > interaktiv (nur bei TTY) > leer (Platzhalter).
 PRJ="$(printf '%s' "${2:-}" | tr '[:lower:]' '[:upper:]')"
 if [ -z "$PRJ" ] && [ -t 0 ]; then
-  printf 'Projekt-Kuerzel (2-6 Grossbuchstaben, Enter = spaeter eintragen): ' > /dev/tty
+  printf 'Projekt-Prefix (2-6 Grossbuchstaben, Enter = spaeter eintragen): ' > /dev/tty
   read -r _ans < /dev/tty || _ans=""
   PRJ="$(printf '%s' "$_ans" | tr '[:lower:]' '[:upper:]')"
 fi
 if [ -n "$PRJ" ] && ! printf '%s' "$PRJ" | grep -qE '^[A-Z]{2,6}$'; then
-  echo "Warnung: Kuerzel '$PRJ' ungueltig (erwartet 2-6 Grossbuchstaben). Ignoriert, Platzhalter {PRJ} bleibt." >&2
+  echo "Warnung: Prefix '$PRJ' ungueltig (erwartet 2-6 Grossbuchstaben). Ignoriert, Platzhalter {PRJ} bleibt." >&2
   PRJ=""
 fi
 
@@ -47,7 +47,7 @@ Vollständige Konvention: `tickets.md` im globalen Verzeichnis deines AI-Agenten
 
 ## Dateiname
 `{PRJ}-T-{NNN}_{kurz-beschreibung}.md`
-Projekt-Kürzel aus `doc-ids.md` im globalen Agent-Verzeichnis.
+Projekt-Prefix aus `doc-ids.md` im globalen Agent-Verzeichnis.
 
 ## Ticket-ID vergeben
 ```bash
@@ -60,7 +60,7 @@ Verlaufseintrag pflegen: wann, warum, was erledigt/offen.
 EOF
 fi
 
-# Kuerzel in PROTOCOL.md verankern: {PRJ}-Platzhalter durch das echte Kuerzel
+# Prefix in PROTOCOL.md verankern: {PRJ}-Platzhalter durch das echte Prefix
 # ersetzen. Greift bei frisch erstellter UND bestehender PROTOCOL.md (Nachruesten),
 # solange dort noch Platzhalter stehen. PRJ ist auf [A-Z]{2,6} validiert -> sed-sicher.
 if [ -n "$PRJ" ] && [ -f "$TARGET/tickets/PROTOCOL.md" ]; then
@@ -132,8 +132,8 @@ if [ "$SELF" != "$DEST" ]; then
 fi
 
 if [ -n "$PRJ" ]; then
-  echo "tickets/ ready in $TARGET (Kuerzel $PRJ in PROTOCOL.md verankert, scripts deployed)"
+  echo "tickets/ ready in $TARGET (Prefix $PRJ in PROTOCOL.md verankert, scripts deployed)"
 else
-  echo "tickets/ ready in $TARGET (Kuerzel nicht gesetzt, Platzhalter {PRJ} bleibt, scripts deployed)"
-  echo "Hinweis: Kuerzel nachtragen via 'bash scripts/init_tickets.sh $TARGET KUERZEL' oder {PRJ} in tickets/PROTOCOL.md manuell ersetzen." >&2
+  echo "tickets/ ready in $TARGET (Prefix nicht gesetzt, Platzhalter {PRJ} bleibt, scripts deployed)"
+  echo "Hinweis: Prefix nachtragen via 'bash scripts/init_tickets.sh $TARGET PREFIX' oder {PRJ} in tickets/PROTOCOL.md manuell ersetzen." >&2
 fi

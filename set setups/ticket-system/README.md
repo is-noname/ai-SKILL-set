@@ -16,16 +16,16 @@ die orthogonale Achse: „welche Teile gehören zu *einem* Feature".
 
 ## Abhängigkeit
 
-`ticket-system` hängt an **`project-identifier`** — der geteilten Kürzel-Registry
-(`docs/project-identifier.md`). Die Ticket-ID `{PRJ}-T-{NNN}` braucht das Projekt-Kürzel
+`ticket-system` hängt an **`project-identifier`** — der geteilten Prefix-Registry
+(`docs/project-identifier.md`). Die Ticket-ID `{PRJ}-T-{NNN}` braucht das Projekt-Prefix
 `{PRJ}`, das dort gepflegt wird.
 
-Wichtig: Das ist **nicht** dasselbe wie eine Abhängigkeit auf `doc-ids`. Die Kürzel-Registry
+Wichtig: Das ist **nicht** dasselbe wie eine Abhängigkeit auf `doc-ids`. Die Prefix-Registry
 ist seit dem Split eine eigenständige, geteilte Datei — `doc-ids` und `ticket-system` nutzen
 sie beide und sind dadurch **Geschwister**, nicht voneinander abhängig:
 
 ```
-project-identifier  (Kürzel-Registry, shared user-state)
+project-identifier  (Prefix-Registry, shared user-state)
         ↑                 ↑
    doc-ids          ticket-system
 ```
