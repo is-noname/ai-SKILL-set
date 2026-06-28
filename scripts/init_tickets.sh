@@ -3,7 +3,25 @@
 # Idempotent: kann auf bestehende Projekte erneut angewendet werden, um Counter und
 # next_ticket_id.sh nachzurüsten, ohne vorhandene Tickets/PROTOCOL.md zu überschreiben.
 # For global agent setup (one-time, per machine) use: bash scripts/setup_global_conventions.sh
+# Usage: bash scripts/init_tickets.sh [ziel-pfad] [KUERZEL]
+#   KUERZEL (optional): 2-6 Grossbuchstaben. Wird in tickets/PROTOCOL.md als
+#   projekt-lokale Laufzeit-Quelle verankert ({PRJ}-Platzhalter wird ersetzt).
+#   Fehlt das Argument: bei TTY interaktive Nachfrage, sonst Platzhalter belassen
+#   (kein Abbruch). Registry project-identifier.md wird bewusst NICHT angefasst
+#   (agent-neutral; siehe IZG-T-045).
 TARGET="${1:-.}"
+
+# Projekt-Kuerzel bestimmen: Argument > interaktiv (nur bei TTY) > leer (Platzhalter).
+PRJ="$(printf '%s' "${2:-}" | tr '[:lower:]' '[:upper:]')"
+if [ -z "$PRJ" ] && [ -t 0 ]; then
+  printf 'Projekt-Kuerzel (2-6 Grossbuchstaben, Enter = spaeter eintragen): ' > /dev/tty
+  read -r _ans < /dev/tty || _ans=""
+  PRJ="$(printf '%s' "$_ans" | tr '[:lower:]' '[:upper:]')"
+fi
+if [ -n "$PRJ" ] && ! printf '%s' "$PRJ" | grep -qE '^[A-Z]{2,6}$'; then
+  echo "Warnung: Kuerzel '$PRJ' ungueltig (erwartet 2-6 Grossbuchstaben). Ignoriert, Platzhalter {PRJ} bleibt." >&2
+  PRJ=""
+fi
 
 mkdir -p "$TARGET/tickets/open" \
          "$TARGET/tickets/in-progress" \
@@ -40,6 +58,13 @@ bash scripts/next_ticket_id.sh {PRJ}
 `status:`-Feld im Frontmatter ändern — Hook verschiebt die Datei automatisch.
 Verlaufseintrag pflegen: wann, warum, was erledigt/offen.
 EOF
+fi
+
+# Kuerzel in PROTOCOL.md verankern: {PRJ}-Platzhalter durch das echte Kuerzel
+# ersetzen. Greift bei frisch erstellter UND bestehender PROTOCOL.md (Nachruesten),
+# solange dort noch Platzhalter stehen. PRJ ist auf [A-Z]{2,6} validiert -> sed-sicher.
+if [ -n "$PRJ" ] && [ -f "$TARGET/tickets/PROTOCOL.md" ]; then
+  sed -i "s/{PRJ}/$PRJ/g" "$TARGET/tickets/PROTOCOL.md"
 fi
 
 mkdir -p "$TARGET/scripts"
@@ -106,4 +131,9 @@ if [ "$SELF" != "$DEST" ]; then
   chmod +x "$TARGET/scripts/init_tickets.sh"
 fi
 
-echo "tickets/ ready in $TARGET (counter present, scripts deployed)"
+if [ -n "$PRJ" ]; then
+  echo "tickets/ ready in $TARGET (Kuerzel $PRJ in PROTOCOL.md verankert, scripts deployed)"
+else
+  echo "tickets/ ready in $TARGET (Kuerzel nicht gesetzt, Platzhalter {PRJ} bleibt, scripts deployed)"
+  echo "Hinweis: Kuerzel nachtragen via 'bash scripts/init_tickets.sh $TARGET KUERZEL' oder {PRJ} in tickets/PROTOCOL.md manuell ersetzen." >&2
+fi
