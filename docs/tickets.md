@@ -50,6 +50,10 @@ bash scripts/next_ticket_id.sh IZG
 # → IZG-T-007
 ```
 
+> `next_ticket_id.sh` liegt **projekt-lokal** (`<projekt>/scripts/`, von
+> `init_tickets.sh` erzeugt) — **nicht** im Agent-Dir. Global deployt sind nur
+> `init_tickets.sh` und der `ticket-mover`-Hook.
+
 Beispiele:
 ```
 IZG-T-001_fix-auth-bug.md
@@ -119,6 +123,7 @@ open    in-progress
 - `status:`-Feld ändern = Status setzen — Hook verschiebt die Datei automatisch
 - **Niemals manuell `mv` auf eine Ticket-Datei.** Status-Wechsel = ausschließlich das `status:`-Feld im Frontmatter editieren. Der `ticket-mover`-Hook verschiebt die Datei danach selbst in den passenden Ordner. Ein eigener `mv` schlägt fehl, weil die Datei bereits verschoben wurde.
 - Jeder Statuswechsel erfordert einen Verlaufseintrag
+- **`status:`-Flip immer als letzten Edit.** Beim Statuswechsel fallen zwei Änderungen an (Verlaufseintrag + `status:`). Den Verlaufseintrag zuerst schreiben, den `status:`-Flip zuletzt — der Hook verschiebt die Datei beim Flip, und danach ist kein weiterer Edit auf dem (neuen) Pfad nötig. Andersherum müsste die verschobene Datei erst neu gelesen werden (kostet Token).
 - `blocked/` → immer zurück nach `open/`, nie direkt nach `in-progress/`
 - `done/` ist finales Archiv, nicht löschen
 
