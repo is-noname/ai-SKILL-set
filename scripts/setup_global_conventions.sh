@@ -54,23 +54,54 @@ KNOWN_AGENT_DIRS=(".claude" ".codex" ".gemini" ".vibe")
 # aus RAW_BASE/<relpath>. relpath ist repo-relativ (z.B. "docs/tickets.md").
 _fetch() {
   local relpath="$1" dest="$2"
-  if [ -f "$REPO_ROOT/$relpath" ]; then
+  local src="$REPO_ROOT/$relpath"
+  if [ -f "$src" ]; then
     # Quelle und Ziel können dieselbe Datei sein (z.B. ~/.claude/scripts ist ins
     # Repo gelinkt) — cp meckert dann, ist aber bereits korrekt. Tolerieren.
-    if [ "$REPO_ROOT/$relpath" -ef "$dest" ]; then
+    if [ "$src" -ef "$dest" ]; then
       return 0
     fi
-    cp "$REPO_ROOT/$relpath" "$dest"
+    # Clobber-Schutz: ein existierendes Ziel, das inhaltlich abweicht UND neuer ist
+    # als die Repo-Quelle, ist vermutlich eine lokale Anpassung (z.B. von Hand am
+    # deployten Hook). Nicht überschreiben — Rückgabe 2 signalisiert "übersprungen".
+    # Identische Dateien (cmp gleich) werden nie übersprungen, egal welche mtime.
+    if [ -f "$dest" ] && ! cmp -s "$src" "$dest" && [ "$dest" -nt "$src" ]; then
+      return 2
+    fi
+    cp "$src" "$dest"
     return 0
   fi
-  if command -v curl >/dev/null 2>&1 && curl -fsSL "$RAW_BASE/$relpath" -o "$dest"; then
-    return 0
+  if command -v curl >/dev/null 2>&1; then
+    local tmp="$dest.tmp.$$"
+    if curl -fsSL "$RAW_BASE/$relpath" -o "$tmp"; then
+      if [ -f "$dest" ] && ! cmp -s "$tmp" "$dest" && [ "$dest" -nt "$tmp" ]; then
+        rm -f "$tmp"
+        return 2
+      fi
+      mv "$tmp" "$dest"
+      return 0
+    fi
+    rm -f "$tmp"  # curl legt bei Fehler ggf. eine leere Datei an
   fi
-  rm -f "$dest"  # curl -o legt bei Fehler ggf. eine leere Datei an
-  echo "Error: '$relpath' konnte weder lokal ($REPO_ROOT/$relpath) noch via Remote" >&2
+  echo "Error: '$relpath' konnte weder lokal ($src) noch via Remote" >&2
   echo "       ($RAW_BASE/$relpath) bezogen werden." >&2
   echo "       Repo lokal auschecken oder AISKILLSET_RAW_BASE auf eine erreichbare Quelle setzen." >&2
   return 1
+}
+
+# Wrapper um _fetch für die "immer (neu) schreiben"-Konventionsdateien: behandelt
+# den Clobber-Schutz (Rückgabe 2) einheitlich. 0 = deployed ODER übersprungen
+# (beides kein Fehler), 1 = echter Fehler.
+deploy_file() {
+  local relpath="$1" dest="$2"
+  _fetch "$relpath" "$dest"
+  local rc=$?
+  case "$rc" in
+    0) echo "  deployed: $dest" ;;
+    2) echo "  WARNUNG: $dest ist lokal neuer als die Repo-Quelle ($relpath) und weicht ab — NICHT überschrieben (Clobber-Schutz). Lokale Änderung prüfen und ggf. nach $relpath ins Repo zurückführen, sonst geht sie beim nächsten echten Update verloren." >&2 ;;
+    *) return 1 ;;
+  esac
+  return 0
 }
 
 # Setup/Update für genau ein Agent-Dir. Rückgabe 0 = ok, 1 = Fehler.
@@ -96,11 +127,7 @@ process_agent_dir() {
   # tickets.md ist reine Konvention ohne user-spezifischen State → immer (neu)
   # schreiben, damit Bestands-Agents die aktuelle Version bekommen (idempotent).
   local dest="$AGENT_DIR/tickets.md"
-  if _fetch "docs/tickets.md" "$dest"; then
-    echo "  deployed: $dest"
-  else
-    return 1
-  fi
+  deploy_file "docs/tickets.md" "$dest" || return 1
 
   # Einmalige Migration: Älteres doc-ids.md trug die Kürzel-Registry inline. Bevor
   # wir doc-ids.md (jetzt reine Konvention) überschreiben, die Kürzel verlustfrei nach
@@ -141,11 +168,7 @@ HDR
   # doc-ids.md ist jetzt reine Konvention (Registry ausgelagert) → immer (neu) schreiben,
   # damit Bestands-Agents Konventions-Updates bekommen.
   dest="$AGENT_DIR/doc-ids.md"
-  if _fetch "docs/doc-ids.md" "$dest"; then
-    echo "  deployed: $dest"
-  else
-    return 1
-  fi
+  deploy_file "docs/doc-ids.md" "$dest" || return 1
 
   # project-identifier.md enthält die Kürzel-Registry (User-State) → nur anlegen wenn
   # fehlend (Migration oben kann sie bereits erzeugt haben), nie überschreiben.
@@ -162,23 +185,15 @@ HDR
   # "$AGENT_DIR/scripts/init_tickets.sh" auch wirklich existiert. Immer (neu)
   # schreiben, damit Bestands-Agents die aktuelle Logik bekommen (idempotent).
   mkdir -p "$AGENT_DIR/scripts"
-  if _fetch "scripts/init_tickets.sh" "$AGENT_DIR/scripts/init_tickets.sh"; then
-    chmod +x "$AGENT_DIR/scripts/init_tickets.sh"
-    echo "  deployed: $AGENT_DIR/scripts/init_tickets.sh"
-  else
-    return 1
-  fi
+  deploy_file "scripts/init_tickets.sh" "$AGENT_DIR/scripts/init_tickets.sh" || return 1
+  [ -f "$AGENT_DIR/scripts/init_tickets.sh" ] && chmod +x "$AGENT_DIR/scripts/init_tickets.sh"
 
   # ticket-mover Hook bereitstellen — er ist das Kernversprechen der Konvention
   # ("Hook verschiebt die Datei automatisch", siehe tickets.md). Ohne ihn ist die
   # Status-Automatik tot. Immer (neu) schreiben (idempotent).
   mkdir -p "$AGENT_DIR/hooks"
-  if _fetch "hooks/global/ticket-mover.sh" "$AGENT_DIR/hooks/ticket-mover.sh"; then
-    chmod +x "$AGENT_DIR/hooks/ticket-mover.sh"
-    echo "  deployed: $AGENT_DIR/hooks/ticket-mover.sh"
-  else
-    return 1
-  fi
+  deploy_file "hooks/global/ticket-mover.sh" "$AGENT_DIR/hooks/ticket-mover.sh" || return 1
+  [ -f "$AGENT_DIR/hooks/ticket-mover.sh" ] && chmod +x "$AGENT_DIR/hooks/ticket-mover.sh"
 
   # settings.json um den ticket-mover PostToolUse-Hook ergänzen — nur für Claude,
   # da dieses Hook-Format Claude-spezifisch ist. Idempotent: existiert der Eintrag
