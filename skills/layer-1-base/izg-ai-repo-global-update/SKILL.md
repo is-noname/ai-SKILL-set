@@ -1,6 +1,6 @@
 ---
 name: izg-ai-repo-global-update
-description: Checks and updates the global agent conventions (tickets.md, doc-ids.md, init_tickets.sh, ticket-mover hook) deployed in agent dirs (~/.claude etc.) against the ai-SKILL-set repo. Use when the user wants to update, refresh, sync, or drift-check their global conventions/tickets/doc-ids setup.
+description: Checks and updates the global agent conventions (tickets.md, doc-ids.md, design-tokens.md, init_tickets.sh, ticket-mover hook) deployed in agent dirs (~/.claude etc.) against the ai-SKILL-set repo. Use when the user wants to update, refresh, sync, or drift-check their global conventions/tickets/doc-ids setup.
 layer: 1
 dependencies: []
 disable-model-invocation: true
@@ -15,7 +15,7 @@ Repo — das Pendant zu `izg-ai-repo-pull-update`, nur für `~/.claude`, `~/.cod
 > **Architektur:** Dünner Wrapper um zwei zentrale Skripte im Repo (`scripts/`, **nicht**
 > im Skill): `check_global_drift.sh` (read-only Drift-Check) und `setup_global_conventions.sh`
 > (idempotenter Re-Deploy). Setzt voraus, dass das Repo unter `REPO` existiert. Managed:
-> `tickets.md`, `doc-ids.md`, `scripts/init_tickets.sh`, `hooks/global/ticket-mover.sh`.
+> `tickets.md`, `doc-ids.md`, `design-tokens.md`, `scripts/init_tickets.sh`, `hooks/global/ticket-mover.sh`.
 > `project-identifier.md` (User-State / Prefix-Registry) wird **nie** angefasst.
 
 ## Ablauf

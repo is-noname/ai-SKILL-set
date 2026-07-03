@@ -20,6 +20,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MANAGED=(
   "docs/tickets.md|tickets.md"
   "docs/doc-ids.md|doc-ids.md"
+  "docs/design-tokens.md|design-tokens.md"
   "scripts/init_tickets.sh|scripts/init_tickets.sh"
   "hooks/global/ticket-mover.sh|hooks/ticket-mover.sh"
 )
