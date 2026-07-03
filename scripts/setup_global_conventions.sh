@@ -53,7 +53,7 @@ KNOWN_AGENT_DIRS=(".claude" ".codex" ".gemini" ".vibe")
 # Holt eine Datei aus dem Repo: erst lokal aus REPO_ROOT/<relpath>, sonst via curl
 # aus RAW_BASE/<relpath>. relpath ist repo-relativ (z.B. "docs/tickets.md").
 _fetch() {
-  local relpath="$1" dest="$2"
+  local relpath="$1" dest="$2" force="${3:-}"
   local src="$REPO_ROOT/$relpath"
   if [ -f "$src" ]; then
     # Quelle und Ziel können dieselbe Datei sein (z.B. ~/.claude/scripts ist ins
@@ -65,7 +65,8 @@ _fetch() {
     # als die Repo-Quelle, ist vermutlich eine lokale Anpassung (z.B. von Hand am
     # deployten Hook). Nicht überschreiben — Rückgabe 2 signalisiert "übersprungen".
     # Identische Dateien (cmp gleich) werden nie übersprungen, egal welche mtime.
-    if [ -f "$dest" ] && ! cmp -s "$src" "$dest" && [ "$dest" -nt "$src" ]; then
+    # force=1 überspringt den Schutz (für reine Konventions-Master: Repo gewinnt).
+    if [ -z "$force" ] && [ -f "$dest" ] && ! cmp -s "$src" "$dest" && [ "$dest" -nt "$src" ]; then
       return 2
     fi
     cp "$src" "$dest"
@@ -74,7 +75,7 @@ _fetch() {
   if command -v curl >/dev/null 2>&1; then
     local tmp="$dest.tmp.$$"
     if curl -fsSL "$RAW_BASE/$relpath" -o "$tmp"; then
-      if [ -f "$dest" ] && ! cmp -s "$tmp" "$dest" && [ "$dest" -nt "$tmp" ]; then
+      if [ -z "$force" ] && [ -f "$dest" ] && ! cmp -s "$tmp" "$dest" && [ "$dest" -nt "$tmp" ]; then
         rm -f "$tmp"
         return 2
       fi
@@ -104,6 +105,33 @@ deploy_file() {
   return 0
 }
 
+# Deployt eine reine Konventions-Datei als Single Source: eine physische Datei unter
+# ~/ai-shared/, jeder Agent-Dir verweist per Symlink darauf (IZG-T-054, Muster aus
+# T-045). Kein Kopier-Sync, keine Drift, kein Clobber-Schutz — bei reinen Konventionen
+# gewinnt immer das Repo (im Gegensatz zu project-identifier.md = User-State).
+# Args: relpath (repo-relativ), fname (Zielname), AGENT_DIR.
+deploy_shared_convention() {
+  local relpath="$1" fname="$2" AGENT_DIR="$3"
+  local shared_dir="$HOME/ai-shared"
+  local master="$shared_dir/$fname"
+  local dest="$AGENT_DIR/$fname"
+  mkdir -p "$shared_dir"
+
+  # Master aus dem Repo aktualisieren — Repo gewinnt (force überspringt Clobber-Schutz).
+  # Wird pro Agent-Dir aufgerufen, ist aber idempotent (schreibt denselben Inhalt).
+  _fetch "$relpath" "$master" force || return 1
+
+  # Agent-Dir auf den Master symlinken. Alte physische Kopie (reiner Repo-Inhalt)
+  # gefahrlos ersetzen — sie enthält keinen User-State.
+  if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$master" ]; then
+    echo "  $dest already symlinked -> $master"
+  else
+    [ -e "$dest" ] && [ ! -L "$dest" ] && rm -f "$dest"
+    ln -sf "$master" "$dest"
+    echo "  symlinked: $dest -> $master"
+  fi
+}
+
 # Setup/Update für genau ein Agent-Dir. Rückgabe 0 = ok, 1 = Fehler.
 process_agent_dir() {
   local AGENT_DIR="$1"
@@ -124,10 +152,10 @@ process_agent_dir() {
 
   echo "== $AGENT_DIR =="
 
-  # tickets.md ist reine Konvention ohne user-spezifischen State → immer (neu)
-  # schreiben, damit Bestands-Agents die aktuelle Version bekommen (idempotent).
-  local dest="$AGENT_DIR/tickets.md"
-  deploy_file "docs/tickets.md" "$dest" || return 1
+  # tickets.md ist reine Konvention ohne user-spezifischen State → Single Source via
+  # Symlink auf ~/ai-shared/ (IZG-T-054). Eine physische Datei, kein Kopier-Sync.
+  local dest
+  deploy_shared_convention "docs/tickets.md" "tickets.md" "$AGENT_DIR" || return 1
 
   # Einmalige Migration: Älteres doc-ids.md trug die Prefix-Registry inline. Bevor
   # wir doc-ids.md (jetzt reine Konvention) überschreiben, die Prefixe verlustfrei nach
@@ -166,20 +194,41 @@ HDR
     fi
   fi
 
-  # doc-ids.md ist jetzt reine Konvention (Registry ausgelagert) → immer (neu) schreiben,
-  # damit Bestands-Agents Konventions-Updates bekommen.
-  dest="$AGENT_DIR/doc-ids.md"
-  deploy_file "docs/doc-ids.md" "$dest" || return 1
+  # doc-ids.md ist jetzt reine Konvention (Registry ausgelagert) → Single Source via
+  # Symlink auf ~/ai-shared/ (IZG-T-054).
+  deploy_shared_convention "docs/doc-ids.md" "doc-ids.md" "$AGENT_DIR" || return 1
 
-  # project-identifier.md enthält die Prefix-Registry (User-State) → nur anlegen wenn
-  # fehlend (Migration oben kann sie bereits erzeugt haben), nie überschreiben.
+  # design-tokens.md — globale Designwerte, ebenfalls reine Konvention. Wird ab
+  # IZG-T-054 erstmals an alle Agent-Dirs verteilt (lag zuvor nur in ~/.claude).
+  deploy_shared_convention "docs/design-tokens.md" "design-tokens.md" "$AGENT_DIR" || return 1
+
+  # project-identifier.md enthält die Prefix-Registry (User-State). Statt einer
+  # Kopie pro Agent-Dir gibt es nur eine physische Datei unter ~/ai-shared/, jeder
+  # Agent-Dir verweist per Symlink darauf (IZG-T-045) — kein Sync, keine Drift-Gefahr.
+  local shared_dir="$HOME/ai-shared"
+  local shared_ident="$shared_dir/project-identifier.md"
   dest="$AGENT_DIR/project-identifier.md"
-  if [ -f "$dest" ]; then
-    echo "  $dest already exists — skipped (Prefix-Registry bleibt erhalten)"
-  elif _fetch "docs/project-identifier.md" "$dest"; then
-    echo "  deployed: $dest"
+  mkdir -p "$shared_dir"
+
+  if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$shared_ident" ]; then
+    echo "  $dest already symlinked to $shared_ident — skipped"
+  elif [ ! -e "$shared_ident" ]; then
+    # Noch kein Shared-Master: vorhandene Kopie (Prefix-Registry mit echtem Inhalt)
+    # als Master übernehmen statt sie zu verlieren; sonst frisches Template holen.
+    if [ -f "$dest" ] && [ ! -L "$dest" ]; then
+      mv "$dest" "$shared_ident"
+      echo "  promoted: $dest -> $shared_ident (bestehende Registry wird Master)"
+    elif ! _fetch "docs/project-identifier.md" "$shared_ident"; then
+      return 1
+    fi
+    ln -s "$shared_ident" "$dest"
+    echo "  symlinked: $dest -> $shared_ident"
+  elif [ -f "$dest" ] && [ ! -L "$dest" ] && ! cmp -s "$dest" "$shared_ident"; then
+    echo "  WARNUNG: $dest weicht vom Shared-Master ($shared_ident) ab — nicht automatisch überschrieben. Manuell abgleichen, dann erneut ausführen." >&2
   else
-    return 1
+    [ -e "$dest" ] && [ ! -L "$dest" ] && rm -f "$dest"  # identische Alt-Kopie durch Symlink ersetzen
+    ln -sf "$shared_ident" "$dest"
+    echo "  symlinked: $dest -> $shared_ident"
   fi
 
   # Bootstrap-Script bereitstellen, damit der unten gepatchte Hinweis
