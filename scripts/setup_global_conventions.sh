@@ -298,6 +298,16 @@ PY
     else
       echo "  $cfg already patched — skipped"
     fi
+    # doc-ids.md + design-tokens.md als native Includes (immer im Kontext). Getrennt
+    # geführt, idempotent — Bestands-Configs haben sie ggf. schon manuell (IZG-T-055).
+    if ! grep -q "^@doc-ids.md" "$cfg"; then
+      printf '\n## Dokument-IDs\n\n@doc-ids.md\n' >> "$cfg"
+      echo "  patched: $cfg (@doc-ids.md include)"
+    fi
+    if ! grep -q "^@design-tokens.md" "$cfg"; then
+      printf '\n## Design Tokens\n\n@design-tokens.md\n' >> "$cfg"
+      echo "  patched: $cfg (@design-tokens.md include)"
+    fi
   else
     if ! grep -q "tickets/in-progress" "$cfg"; then
       cat >> "$cfg" << BLOCK
@@ -323,6 +333,23 @@ BLOCK
       echo "  patched: $cfg (inline Ticketsystem block)"
     else
       echo "  $cfg already patched — skipped"
+    fi
+    # doc-ids.md + design-tokens.md als Prosa-Verweis auf den LOKALEN (symgelinkten)
+    # Pfad — nie über andere Agent-Dirs. Separat geguardet, damit Bestands-Configs mit
+    # Ticketsystem-Block trotzdem den Konventionen-Block bekommen (IZG-T-055).
+    if ! grep -q "doc-ids.md" "$cfg"; then
+      cat >> "$cfg" << BLOCK
+
+## Konventionen (Dokument-IDs & Design Tokens)
+
+Dokument-ID-Schema und Typ-Codes: \`$AGENT_DIR/doc-ids.md\`
+Globale Design-Tokens (Farben, Typografie, Spacing) für Outputs/Reports: \`$AGENT_DIR/design-tokens.md\`
+
+Beide sind Symlinks auf die gemeinsame Quelle \`~/ai-shared/\` — bei Bedarf lesen, nie über andere Agent-Dirs (z.B. \`~/.claude/\`) referenzieren.
+BLOCK
+      echo "  patched: $cfg (Konventionen-Block: doc-ids + design-tokens)"
+    else
+      echo "  $cfg Konventionen-Block already present — skipped"
     fi
   fi
 
