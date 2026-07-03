@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-27",
+  "generated": "2026-07-03",
   "skills": {
     "grilling": {
       "name": "grilling",
@@ -25,6 +25,14 @@
       "path": "skills/layer-0-core/izg-create-fixplan",
       "disable-model-invocation": true
     },
+    "codebase-design": {
+      "name": "codebase-design",
+      "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/codebase-design",
+      "disable-model-invocation": true
+    },
     "grill-me": {
       "name": "grill-me",
       "description": "A relentless interview to sharpen a plan or design.",
@@ -34,6 +42,13 @@
       ],
       "path": "skills/layer-1-base/grill-me",
       "disable-model-invocation": true
+    },
+    "html-report-template": {
+      "name": "html-report-template",
+      "description": "Generisches CSS-Skin für selbstständige HTML-Reports (Dark Mode, Desktop-first) auf Basis der globalen Design Tokens. Kein Struktur-Skeleton — nur Variablen und Basis-Komponenten (Cards, Tabellen, Tags, Stat-Grid), die jeder Report-Skill frei anordnet. Use when ein HTML-Report/Dashboard/Analyse-Output erstellt wird und dabei konsistent zu anderen Reports aussehen soll statt eigene Farben/Abstände zu erfinden.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/html-report-template"
     },
     "izg-ai-repo-global-update": {
       "name": "izg-ai-repo-global-update",
@@ -106,7 +121,11 @@
       "name": "improve-codebase-architecture",
       "description": "Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.",
       "layer": 3,
-      "dependencies": [],
+      "dependencies": [
+        "grilling",
+        "codebase-design",
+        "izg-domain-modeling"
+      ],
       "path": "skills/layer-3-domain/coding/improve-codebase-architecture",
       "disable-model-invocation": true
     }

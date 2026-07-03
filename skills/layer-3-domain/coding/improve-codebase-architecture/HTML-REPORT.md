@@ -1,5 +1,11 @@
 # HTML Report Format
 
+> Uses its own editorial color scheme (Tailwind stone/slate/emerald), not the
+> global `html-report-template` skin — the Mermaid/candidate-card structure and
+> muted-editorial tone are specific to this report and don't map cleanly onto the
+> dark-mode design tokens. See `layer-1-base/html-report-template` for the
+> general-purpose skin (CSS variables + base components) used by other reports.
+
 The architectural review is rendered as a single self-contained HTML file in the OS temp directory. Tailwind and Mermaid both come from CDNs. Mermaid handles graph-shaped diagrams reliably; hand-built divs and inline SVG handle the more editorial visuals (mass diagrams, cross-sections). Mix the two — don't lean on Mermaid for everything, it'll start to look generic.
 
 ## Scaffold
@@ -105,7 +111,7 @@ One larger card. Candidate name, one sentence on why, anchor link to its card. T
 
 ## Tone
 
-Plain English, concise — but the architectural nouns and verbs come straight from the `/codebase-design` skill. Concision is not an excuse to drift.
+Plain German, concise — but the architectural nouns and verbs come straight from the `/codebase-design` skill. Concision is not an excuse to drift.
 
 **Use exactly:** module, interface, implementation, depth, deep, shallow, seam, adapter, leverage, locality.
 
