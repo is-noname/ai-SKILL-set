@@ -53,9 +53,22 @@ filename=$(basename "$file_path")
 mkdir -p "$target_dir"
 
 # Kollisionsschutz: nie ein vorhandenes Ziel überschreiben (z.B. gleiche ID in
-# zwei Ordnern durch manuelles Verschieben). Lieber stehen lassen und warnen.
+# zwei Ordnern durch manuelles Verschieben).
 if [[ -e "$target_dir/$filename" ]]; then
-  msg="[ticket-mover] $filename: Ziel $status/ existiert bereits — nicht verschoben (Kollision). Bitte Konflikt manuell prüfen."
+  # Inhalt vergleichen: Ist die Quelle eine exakte Dublette des Ziels, war die
+  # status:-Änderung nur redundant — dann die Quelle löschen. Sonst bliebe der
+  # status:/Ordner-Widerspruch bestehen und JEDER Folge-Edit würde denselben
+  # Kollisions-Warnhinweis re-triggern (IZG-T-050). Unterscheiden sich die
+  # Inhalte, liegt ein echter ID-Konflikt (zwei verschiedene Tickets, gleiche ID)
+  # vor — den lassen wir stehen und warnen weiterhin, da manuelle Prüfung nötig.
+  if cmp -s "$file_path" "$target_dir/$filename"; then
+    rm -f "$file_path"
+    msg="[ticket-mover] $filename: identische Dublette in $status/ gefunden — Quelle in $current_folder/ entfernt. Datei liegt jetzt unter $target_dir/."
+    echo "$msg" >&2
+    jq -n --arg m "$msg" '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $m}}'
+    exit 0
+  fi
+  msg="[ticket-mover] $filename: Ziel $status/ existiert bereits mit ABWEICHENDEM Inhalt — nicht verschoben (echter ID-Konflikt). Bitte manuell zusammenführen: die ID $filename existiert doppelt mit unterschiedlichem Inhalt."
   echo "$msg" >&2
   jq -n --arg m "$msg" '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $m}}'
   exit 0
