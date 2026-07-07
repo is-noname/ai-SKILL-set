@@ -12,6 +12,8 @@ from __future__ import annotations
 import os
 import re
 
+import env_loader  # noqa: F401  (laedt .env in os.environ beim Import)
+
 
 def _patterns_from_env(var: str) -> list[re.Pattern]:
     raw = os.environ.get(var, "")

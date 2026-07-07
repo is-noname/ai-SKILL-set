@@ -19,6 +19,7 @@ import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import env_loader  # noqa: F401  (laedt .env in os.environ beim Import)
 from project_routing import load_known_slugs, route_by_labels
 from redact import Redactor
 from webhook_verify import WebhookVerificationError, verify_signature

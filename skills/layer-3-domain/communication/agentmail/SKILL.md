@@ -13,9 +13,17 @@ CLI-Review-Flow für Drafts ab.
 
 ## Setup
 
-1. API-Key von agentmail.to als `AGENTMAIL_API_KEY` in die Projekt-`.env` legen.
+1. API-Key von agentmail.to als `AGENTMAIL_API_KEY` in die Skill-eigene `.env`
+   legen (`.claude/skills/agentmail/.env`, neben `env.example.txt`).
 2. Inbox-Adresse als `AGENTMAIL_INBOX` in dieselbe `.env` (z.B. `dein-agent@agentmail.to`).
 3. `env.example.txt` in diesem Skill zeigt die erwarteten Variablen.
+4. `.env` wird **nicht** per Shell (`source .env`) geladen, sondern von
+   `scripts/env_loader.py` beim Import direkt geparst (stdlib, kein
+   python-dotenv). Das ist wichtig, weil `bash source` bei Werten mit
+   Leerzeichen (z.B. `OWNER_NAME=Vorname Nachname,...`) unquotiert bricht - der
+   Teil nach dem ersten Leerzeichen wird als eigenes Kommando interpretiert und
+   die Variable kommt leer/abgeschnitten im Prozess an. Werte duerfen optional
+   in Anfuehrungszeichen stehen, muessen es aber nicht.
 
 ## Nutzung
 

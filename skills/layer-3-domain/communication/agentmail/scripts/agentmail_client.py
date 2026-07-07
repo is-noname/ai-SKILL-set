@@ -10,6 +10,7 @@ import os
 
 import requests
 
+import env_loader  # noqa: F401  (laedt .env in os.environ beim Import)
 from redact import Redactor
 
 BASE_URL = "https://api.agentmail.to/v0"
