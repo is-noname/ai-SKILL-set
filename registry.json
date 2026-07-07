@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-03",
+  "generated": "2026-07-07",
   "skills": {
     "grilling": {
       "name": "grilling",
@@ -52,7 +52,7 @@
     },
     "izg-ai-repo-global-update": {
       "name": "izg-ai-repo-global-update",
-      "description": "Checks and updates the global agent conventions (tickets.md, doc-ids.md, init_tickets.sh, ticket-mover hook) deployed in agent dirs (~/.claude etc.) against the ai-SKILL-set repo. Use when the user wants to update, refresh, sync, or drift-check their global conventions/tickets/doc-ids setup.",
+      "description": "Checks and updates the global agent conventions (tickets.md, doc-ids.md, design-tokens.md, init_tickets.sh, ticket-mover hook) deployed in agent dirs (~/.claude etc.) against the ai-SKILL-set repo. Use when the user wants to update, refresh, sync, or drift-check their global conventions/tickets/doc-ids setup.",
       "layer": 1,
       "dependencies": [],
       "path": "skills/layer-1-base/izg-ai-repo-global-update",
@@ -128,6 +128,13 @@
       ],
       "path": "skills/layer-3-domain/coding/improve-codebase-architecture",
       "disable-model-invocation": true
+    },
+    "agentmail": {
+      "name": "agentmail",
+      "description": "REST-Client für die AgentMail-API (agentmail.to) — Postfach, Nachrichten und Drafts per Python ansprechen, inkl. Webhook-Empfang und CLI-Review-Flow für Drafts. Nutzen wenn ein Agent E-Mails über AgentMail lesen, ein Draft anlegen, Labels auf Nachrichten setzen oder eingehende Mails per Webhook verarbeiten soll. Kein autonomes Senden — Drafts durchlaufen `draft_review.py` als Human-in-the-loop-Review.",
+      "layer": 3,
+      "dependencies": [],
+      "path": "skills/layer-3-domain/communication/agentmail"
     }
   }
 }

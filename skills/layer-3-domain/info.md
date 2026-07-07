@@ -12,5 +12,6 @@
 - `finance/` - Finanzanalysen, Marktdaten, Portfolio-Management
 - `coding/` - Code-Analyse, Refactoring, Review
 - `analysis/` - Datenanalyse, Mustererkennung, Statistik
+- `communication/` - E-Mail, Messaging, Webhook-Integrationen
 
 **Hinweis:** Neue Domänen können als Unterordner hinzugefügt werden.
