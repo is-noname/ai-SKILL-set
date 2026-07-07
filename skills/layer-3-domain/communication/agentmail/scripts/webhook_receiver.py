@@ -20,12 +20,15 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from project_routing import load_known_slugs, route_by_labels
+from redact import Redactor
 from webhook_verify import WebhookVerificationError, verify_signature
 
 DEFAULT_PORT = 8787
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
+    redact = Redactor()
+
     def do_POST(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler-API)
         if self.path != "/webhook":
             self.send_response(404)
@@ -67,7 +70,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         known_slugs = load_known_slugs()
         project_slug = route_by_labels(labels, known_slugs)
 
-        message = event.get("message", {})
+        message = self.redact(event.get("message", {}))
         if project_slug is None:
             print(
                 f"[webhook] {event_type}: kein Projekt-Label gefunden "

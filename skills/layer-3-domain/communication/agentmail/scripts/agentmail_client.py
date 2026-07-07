@@ -10,17 +10,27 @@ import os
 
 import requests
 
+from redact import Redactor
+
 BASE_URL = "https://api.agentmail.to/v0"
 
 
 class AgentMailClient:
-    """Client für die AgentMail-API, eine gemeinsame Inbox pro Account."""
+    """Client für die AgentMail-API, eine gemeinsame Inbox pro Account.
+
+    Redaction: Antworten aus Lese-Endpunkten (list_messages, list_threads,
+    list_drafts, get_draft) werden vor der Rückgabe von OWNER_NAME/OWNER_EMAILS
+    (aus der env, siehe env.example.txt) befreit. Damit sieht der Agent nie den
+    echten Namen/die echte Adresse des Inbox-Besitzers, egal in welcher Mail
+    sie auftauchen (Anrede, Signatur, Adressfelder). Siehe SKILL.md.
+    """
 
     def __init__(self, api_key: str | None = None, inbox: str | None = None) -> None:
         self.api_key = api_key or os.environ["AGENTMAIL_API_KEY"]
         self.inbox = inbox or os.environ["AGENTMAIL_INBOX"]
         self._session = requests.Session()
         self._session.headers["Authorization"] = f"Bearer {self.api_key}"
+        self._redact = Redactor()
 
     def _url(self, path: str) -> str:
         return f"{BASE_URL}/inboxes/{self.inbox}{path}"
@@ -41,7 +51,7 @@ class AgentMailClient:
         params = {"labels": labels, "subject": subject, "limit": limit, "page_token": page_token}
         resp = self._session.get(self._url("/messages"), params=_clean(params))
         resp.raise_for_status()
-        return resp.json()
+        return self._redact(resp.json())
 
     def list_threads(
         self,
@@ -52,7 +62,7 @@ class AgentMailClient:
         params = {"subject": subject, "limit": limit, "page_token": page_token}
         resp = self._session.get(self._url("/threads"), params=_clean(params))
         resp.raise_for_status()
-        return resp.json()
+        return self._redact(resp.json())
 
     def send_message(
         self,
@@ -91,12 +101,12 @@ class AgentMailClient:
         params = {"labels": labels, "limit": limit, "page_token": page_token}
         resp = self._session.get(self._url("/drafts"), params=_clean(params))
         resp.raise_for_status()
-        return resp.json()
+        return self._redact(resp.json())
 
     def get_draft(self, draft_id: str) -> dict:
         resp = self._session.get(self._url(f"/drafts/{draft_id}"))
         resp.raise_for_status()
-        return resp.json()
+        return self._redact(resp.json())
 
     def delete_draft(self, draft_id: str) -> None:
         resp = self._session.delete(self._url(f"/drafts/{draft_id}"))

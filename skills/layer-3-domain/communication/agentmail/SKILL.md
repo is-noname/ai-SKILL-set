@@ -115,6 +115,22 @@ python3 draft_review.py reject <draft_id>     # Rückfrage, dann Löschen (kein 
 `confirm`/`reject` fragen interaktiv nach (`[y/N]`), außer `--yes` ist gesetzt.
 Kein Draft wird ohne diese explizite Bestätigung versendet oder gelöscht.
 
+## Redaction personenbezogener Daten
+
+`scripts/redact.py` entfernt Name/E-Mail-Adresse des Inbox-Besitzers aus allem,
+was der Client zurückgibt (`list_messages`, `list_threads`, `list_drafts`,
+`get_draft`) sowie aus dem Webhook-Log (`webhook_receiver.py`) — Anrede,
+Signatur und Adressfelder eingeschlossen.
+
+Konfiguration ausschließlich über `.env` (`OWNER_NAME`, `OWNER_EMAILS`,
+kommagetrennte Varianten, siehe `env.example.txt`). Diese Datei direkt im
+Editor pflegen, nicht im Chat mit dem Agenten nennen — der Agent liest die
+Werte nie, er verifiziert höchstens (per Skript) ob die Felder gesetzt sind,
+nie deren Inhalt. Redaction ist reiner String-Ersatz auf allen Textfeldern der
+JSON-Antwort — keine Named-Entity-Erkennung. Trifft nur exakt eingetragene
+Varianten; wer als "Max M." statt "Max Mustermann" unterschreibt, entkommt der
+Regel, wenn diese Variante nicht in `OWNER_NAME` steht.
+
 ## Offene Punkte (bewusst nicht Teil dieses Skills)
 
 - Routing komplett neuer (nicht Reply-)Mails ohne Projekt-Label ist ungelöst,
