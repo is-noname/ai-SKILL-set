@@ -9,7 +9,7 @@ geschlossen.
 Beispiel:
     make_starter_icon.py \
         --name "Stonky" \
-        --workdir "/home/izg/Dokumente/AI/Stonky" \
+        --workdir "$HOME/Dokumente/AI/Stonky" \
         --start "python3 app.py" \
         --port 8501 \
         --url "http://localhost:8501" \

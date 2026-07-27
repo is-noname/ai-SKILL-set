@@ -52,7 +52,7 @@ schließt der Launcher das Terminal nach dem Start selbst.
 ```bash
 python3 scripts/make_starter_icon.py \
   --name "Stonky" \
-  --workdir "/home/izg/Dokumente/AI/Stonky" \
+  --workdir "$HOME/Dokumente/AI/Stonky" \
   --start "streamlit run app.py --server.port 8501 --server.headless true" \
   --port 8501 \
   --match "app.py"

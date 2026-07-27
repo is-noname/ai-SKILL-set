@@ -18,7 +18,7 @@ Die Hooks liegen im Repo in zwei Unterordnern nach **Default-Deploy-Ort**:
 | Ordner | Hooks | Bedeutung |
 |--------|-------|-----------|
 | `hooks/global/` | alle Guards (`protect-env`, `dir-scope-guard` +`dir-scope.conf`, `env-key-guard`, `gh-cli-guard`, `git-*-guard`, `read-size-guard`) sowie `piper-notify`, `check-chatbox`, `ticket-mover` | einmal in `~/.claude/hooks/` aufgesetzt, feuert überall, wird nie neu aufgesetzt |
-| `hooks/repo-local/` | `pre-commit-registry`, `pre-commit-agentdocs` | hardcodierter Pfad auf `ai-SKILL-set`, nie global deployt |
+| `hooks/repo-local/` | `pre-commit-registry`, `pre-commit-agentdocs` | wirken nur im `ai-SKILL-set`-Repo, nie global deployt |
 
 **Wichtig:** Die Unterordner gibt es nur im **Repo**. Beim Deploy landen die Skripte
 flach in `~/.claude/hooks/` — die `settings.json`-Pfade unten zeigen deshalb auf
@@ -153,9 +153,13 @@ Eigenschaften: idempotent, fragt bei Drift vor dem Überschreiben (`--force` umg
    }
    ```
 
-3. **`pre-commit-registry.sh`** ist repo-spezifisch (fester Pfad auf `ai-SKILL-set`).
-   Nur registrieren, wenn du in genau diesem Repo arbeitest. Für andere Repos den
-   Pfad im Skript anpassen.
+3. **`pre-commit-registry.sh`** ist repo-spezifisch. Das Skript ermittelt das Repo
+   selbst aus dem aktuellen Verzeichnis (`git rev-parse --show-toplevel`) und tut
+   nur etwas, wenn dort `scripts/generate_registry.py` liegt — in fremden Repos
+   läuft es wirkungslos durch. Als Projekt-Hook in `.claude/settings.json` des
+   Repos eintragen (mit absolutem Pfad auf dein Klon-Verzeichnis). Weicht dein
+   Layout ab, lässt sich das Repo per `AI_SKILL_SET_REPO` fest vorgeben.
+   Dasselbe gilt für `pre-commit-agentdocs.sh` (Marker: `scripts/sync_agent_docs.sh`).
 
    **Wichtig — Reihenfolge:** `pre-commit-registry.sh` muss **vor** `git-commit-guard.sh`
    eingetragen werden. `ask` bricht die Hook-Chain ab (der User entscheidet, danach
