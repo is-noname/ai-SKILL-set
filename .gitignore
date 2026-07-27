@@ -9,6 +9,14 @@ AI/
 tickets/
 testing/
 
+# Secrets — .env darf nie ins Repo (Skills legen ihre Keys dort ab, z.B. agentmail).
+# Bisher nur ueber ~/.gitignore_global abgedeckt, also nur auf dieser Maschine.
+# Die Vorlagen (env.example.txt) bleiben getrackt.
+.env
+.env.*
+*.env
+!env.example.txt
+
 # Generierte/lokale Artefakte in Skill-Verzeichnissen
 __pycache__/
 *.pyc

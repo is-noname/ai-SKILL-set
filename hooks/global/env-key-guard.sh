@@ -15,8 +15,9 @@ if echo "$COMMAND" | grep -qE '^\s*(env|printenv)\s*$'; then
   exit 0
 fi
 
-# env mit grep/filter auf Key-Namen
-if echo "$COMMAND" | grep -qE '(env|printenv).*\|\s*grep' ; then
+# env mit grep/filter auf Key-Namen - env/printenv muss als eigenstaendiges Token am
+# Anfang der Pipe stehen, sonst matcht auch z.B. "find ... -iname *protect-env* | grep -v x"
+if echo "$COMMAND" | grep -qE '^\s*(env|printenv)\b.*\|\s*grep' ; then
   jq -n '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",

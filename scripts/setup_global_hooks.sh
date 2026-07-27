@@ -29,6 +29,7 @@ HOOKS_SRC="$REPO_ROOT/hooks/global"
 # Reihenfolge = Registrierungs-Reihenfolge. ticket-mover fehlt absichtlich (Konvention).
 HOOK_SPECS=(
   "protect-env|PreToolUse|Read|Edit|Write"
+  "protect-env|PreToolUse|Bash"
   "dir-scope-guard|PreToolUse|Read|Edit|Write"
   "read-size-guard|PreToolUse|Read"
   "env-key-guard|PreToolUse|Bash"
@@ -47,7 +48,13 @@ _spec_event()   { local r="${1#*|}"; printf '%s' "${r%%|*}"; }
 _spec_matcher() { local r="${1#*|}"; printf '%s' "${r#*|}"; }
 
 ALL_NAMES=()
-for s in "${HOOK_SPECS[@]}"; do ALL_NAMES+=("$(_spec_name "$s")"); done
+for s in "${HOOK_SPECS[@]}"; do
+  n="$(_spec_name "$s")"
+  # dedupe - ein Hook kann mehrfach in HOOK_SPECS stehen (z.B. protect-env unter
+  # zwei Mattern), soll aber nur einmal deployt/gefragt werden.
+  case " ${ALL_NAMES[*]} " in *" $n "*) continue ;; esac
+  ALL_NAMES+=("$n")
+done
 
 # --- Argumente ---
 AGENT_DIR=""
@@ -215,8 +222,11 @@ added, skipped = [], []
 for item in spec:
     event, matcher, command = item["event"], item["matcher"], item["command"]
     arr = hooks.setdefault(event, [])
+    # Dedupe pro (event, matcher, command) - derselbe Hook kann unter mehreren
+    # Mattern registriert sein (z.B. protect-env unter Read|Edit|Write UND Bash),
+    # das ist kein Duplikat. Nur identische matcher+command ist eins.
     already = any(
-        h.get("command") == command
+        entry.get("matcher", "") == matcher and h.get("command") == command
         for entry in arr
         for h in entry.get("hooks", [])
     )
