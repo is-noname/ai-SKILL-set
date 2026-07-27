@@ -132,6 +132,17 @@ deploy_shared_convention() {
   fi
 }
 
+# Deployt den decision-sheet Renderer nach ~/ai-shared/decision-sheet/ (IZG-T-063).
+# Agent-neutral und bewusst NICHT pro Agent-Dir: der Skill referenziert den Pfad als
+# Konvention, egal welcher Agent das Sheet schreibt. Idempotent.
+deploy_decision_sheet() {
+  local target="$HOME/ai-shared/decision-sheet"
+  mkdir -p "$target"
+  deploy_file "skills/layer-1-base/decision-sheet/assets/index.html" "$target/index.html" || return 1
+  deploy_file "skills/layer-1-base/decision-sheet/scripts/render_sheet.py" "$target/render_sheet.py" || return 1
+  [ -f "$target/render_sheet.py" ] && chmod +x "$target/render_sheet.py"
+}
+
 # Setup/Update für genau ein Agent-Dir. Rückgabe 0 = ok, 1 = Fehler.
 process_agent_dir() {
   local AGENT_DIR="$1"
@@ -281,6 +292,51 @@ with open(settings_path, "w") as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
     f.write("\n")
 print("  patched: settings.json (ticket-mover PostToolUse-Hook)")
+PY
+    fi
+  fi
+
+  # decision-sheet (IZG-T-063): Renderer global bereitstellen, Abhol-Hook je Agent-Dir.
+  deploy_decision_sheet || return 1
+  for ds_hook in decision-answers.sh decision-sheet-open.sh; do
+    deploy_file "hooks/global/$ds_hook" "$AGENT_DIR/hooks/$ds_hook" || return 1
+    [ -f "$AGENT_DIR/hooks/$ds_hook" ] && chmod +x "$AGENT_DIR/hooks/$ds_hook"
+  done
+
+  # Beide Hooks registrieren — Claude-spezifisches settings.json-Format:
+  #   UserPromptSubmit → #answers holt Antworten ab
+  #   Stop             → fertig geschriebenes Sheet geht automatisch auf
+  if [ "$agent_name" = ".claude" ]; then
+    local ds_settings="$AGENT_DIR/settings.json"
+    if [ ! -f "$ds_settings" ]; then
+      echo "  $ds_settings nicht gefunden — decision-sheet-Hooks nicht registriert (liegen bereit)"
+    elif ! command -v python3 >/dev/null 2>&1; then
+      echo "  python3 fehlt — decision-sheet-Hooks nicht registriert (liegen bereit)"
+    else
+      python3 - "$ds_settings" "$AGENT_DIR/hooks" <<'PY'
+import json, sys
+settings_path, hooks_dir = sys.argv[1], sys.argv[2]
+with open(settings_path) as f:
+    data = json.load(f)
+hooks = data.setdefault("hooks", {})
+wanted = [
+    ("UserPromptSubmit", f"{hooks_dir}/decision-answers.sh", "Decision-Sheet-Antworten pruefen..."),
+    ("Stop", f"{hooks_dir}/decision-sheet-open.sh", "Decision Sheet oeffnen..."),
+]
+changed = []
+for event, cmd, msg in wanted:
+    entries = hooks.setdefault(event, [])
+    if any(h.get("command") == cmd for e in entries for h in e.get("hooks", [])):
+        continue
+    entries.append({"hooks": [{"type": "command", "command": cmd, "statusMessage": msg}]})
+    changed.append(event)
+if not changed:
+    print("  settings.json: decision-sheet-Hooks bereits registriert — übersprungen")
+    sys.exit(0)
+with open(settings_path, "w") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+print("  patched: settings.json (decision-sheet: " + ", ".join(changed) + ")")
 PY
     fi
   fi

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision Sheet</title>
+<style>
+:root{
+  --accent:#06fc99; --accent-dim:rgba(6,252,153,.07); --accent-bg:rgba(6,252,153,.13);
+  --bg:#111; --surface:#191919; --raised:#212121; --topbar-bg:#0c0c0c;
+  --border:#272727; --border-mid:#363636; --border-hi:#484848;
+  --text:#ededed; --muted:#888; --faint:#525252;
+  --red:#f87171; --red-bg:rgba(180,58,58,.18); --yellow:#fbbf24;
+  --r:6px; --r-sm:3px;
+  --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);
+  font:13px/1.5 'Manrope','Segoe UI',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:none}
+
+/* --- Topbar --- */
+.topbar{
+  position:sticky;top:0;z-index:10;background:var(--topbar-bg);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:14px;padding:10px 24px;
+}
+.topbar h1{font-size:13px;font-weight:700;white-space:nowrap}
+.slug{font:11px var(--mono);color:var(--faint)}
+.spacer{flex:1}
+.prog{font-size:11px;color:var(--muted);white-space:nowrap}
+.prog b{color:var(--text);font-weight:700}
+.prog .open{color:var(--yellow)}
+.btn{
+  padding:6px 12px;border:1px solid var(--border-mid);border-radius:var(--r-sm);
+  font-size:12px;font-weight:600;background:var(--surface);transition:all .15s ease;
+}
+.btn:hover{border-color:var(--border-hi);background:var(--raised)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#08120d}
+.btn.primary:hover{filter:brightness(1.1);background:var(--accent)}
+.btn.ghost{background:none;color:var(--muted)}
+.btn.ghost:hover{color:var(--text)}
+
+/* --- Layout --- */
+main{max-width:1060px;margin:0 auto;padding:20px 24px 80px}
+.ctx{
+  font-size:12px;color:var(--muted);padding:10px 14px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--r);margin-bottom:18px;
+}
+.ctx code{font:11px var(--mono);color:var(--faint)}
+
+/* --- Dropzone --- */
+#drop{
+  margin:60px auto;max-width:520px;padding:48px 24px;text-align:center;
+  border:1px dashed var(--border-mid);border-radius:var(--r);background:var(--surface);
+  transition:all .15s ease;
+}
+#drop.hot{border-color:var(--accent);background:var(--accent-dim)}
+#drop h2{font-size:15px;font-weight:700;margin-bottom:6px}
+#drop p{font-size:12px;color:var(--muted)}
+#drop label{
+  display:inline-block;margin-top:16px;padding:6px 12px;border:1px solid var(--border-mid);
+  border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer;
+}
+#drop label:hover{border-color:var(--border-hi);background:var(--raised)}
+#drop input{display:none}
+.err{color:var(--red);background:var(--red-bg);padding:8px 12px;border-radius:var(--r-sm);
+  font:11px var(--mono);margin-top:16px;text-align:left;white-space:pre-wrap}
+
+/* --- Fragen --- */
+.list{border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.q{padding:12px 14px;border-bottom:1px solid var(--border);background:var(--surface)}
+.q:last-child{border-bottom:none}
+.q.dim{opacity:.5}
+.q-head{display:flex;gap:9px;align-items:baseline}
+.num{font:11px var(--mono);color:var(--faint);min-width:22px;padding-top:1px}
+.q-text{font-size:13px;font-weight:600;flex:1}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--yellow);flex:none;
+  margin-top:6px;opacity:0}
+.q.unanswered .dot{opacity:1}
+.q.touched .dot{background:var(--accent);opacity:1}
+.why{font-size:12px;color:var(--muted);margin:4px 0 0 31px}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0 0 31px}
+.opt{
+  padding:5px 11px;border:1px solid var(--border-mid);border-radius:var(--r-sm);
+  font-size:12px;background:var(--bg);transition:all .15s ease;text-align:left;
+}
+.opt:hover{border-color:var(--border-hi);background:var(--raised)}
+.opt.on{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:700}
+.opt .rec{font-size:9px;font-weight:700;color:var(--faint);margin-left:6px;letter-spacing:.04em}
+.opt.on .rec{color:var(--accent);opacity:.7}
+textarea{
+  width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border-mid);
+  border-radius:var(--r-sm);padding:7px 10px;font:13px/1.5 inherit;resize:vertical;
+}
+textarea:focus{outline:none;border-color:var(--accent)}
+.free{margin:9px 0 0 31px}
+.free textarea{min-height:56px}
+.note{margin:8px 0 0 31px}
+.note textarea{min-height:40px;font-size:12px}
+.note-btn{font-size:11px;color:var(--faint);margin:8px 0 0 31px;display:block}
+.note-btn:hover{color:var(--accent)}
+h2.sec{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;
+  text-transform:uppercase;margin:18px 0 8px}
+
+/* --- Export-Dialog --- */
+dialog{
+  background:var(--surface);color:var(--text);border:1px solid var(--border-mid);
+  border-radius:var(--r);padding:0;max-width:680px;width:calc(100% - 48px);
+}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+.dlg-head{padding:10px 14px;border-bottom:1px solid var(--border);background:var(--raised);
+  display:flex;align-items:center;gap:10px}
+.dlg-head b{font-size:12px}
+.dlg-body{padding:12px 14px}
+.dlg-body textarea{font:11px/1.5 var(--mono);min-height:200px}
+.hint{font-size:11px;color:var(--faint);margin-top:8px}
+.hint code{font-family:var(--mono);color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1 id="title">Decision Sheet</h1>
+  <span class="slug" id="slug"></span>
+  <span class="spacer"></span>
+  <span class="prog" id="prog"></span>
+  <button class="btn ghost" id="btn-defaults" hidden>Empfehlungen übernehmen</button>
+  <button class="btn ghost" id="btn-reset" hidden>Reset</button>
+  <button class="btn primary" id="btn-export" hidden>Export</button>
+</div>
+
+<main>
+  <div id="drop">
+    <h2>Sheet hier reinziehen</h2>
+    <p><code>.jsonl</code> vom Agenten — oder eine <code>.answers.json</code>, um weiterzuarbeiten.</p>
+    <label>Datei wählen<input type="file" id="file" accept=".jsonl,.json,.txt"></label>
+    <div class="err" id="err" hidden></div>
+  </div>
+  <div id="ctx" class="ctx" hidden></div>
+  <div id="list" class="list" hidden></div>
+</main>
+
+<dialog id="dlg">
+  <div class="dlg-head">
+    <b>Antworten</b>
+    <span class="slug" id="dlg-count"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="dlg-copy">Kopieren</button>
+    <button class="btn primary" id="dlg-save">Datei speichern</button>
+    <button class="btn ghost" id="dlg-close">Schließen</button>
+  </div>
+  <div class="dlg-body">
+    <textarea id="dlg-json" readonly></textarea>
+    <div class="hint">Datei landet in <code>~/Downloads</code>. Danach im Chat
+      <code>#answers</code> tippen — der Hook holt sie ab.</div>
+  </div>
+</dialog>
+
+<!--SHEET-DATA-->
+
+<script>
+"use strict";
+
+/* ============ State ============
+   head  : Header-Objekt des Sheets (v, sheet, title, ctx)
+   qs    : Fragen-Objekte
+   state : { [id]: { a: <Antwort|null>, n: <Notiz> } }  - nur was der User angefasst hat
+================================= */
+let head = {}, qs = [], state = {};
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls, txt) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (txt != null) n.textContent = txt;
+  return n;
+};
+const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const storeKey = () => "ds:" + (head.sheet || "unnamed");
+
+/* ---------- Laden ---------- */
+
+function parseSheet(text) {
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+  const objs = lines.map((l, i) => {
+    try { return JSON.parse(l); }
+    catch (e) { throw new Error("Zeile " + (i + 1) + " ist kein gültiges JSON:\n" + l); }
+  });
+  if (!objs.length) throw new Error("Datei ist leer.");
+  const first = objs[0];
+  const h = first.id === undefined ? objs.shift() : {};
+  if (!objs.length) throw new Error("Keine Fragen gefunden (nur Header).");
+  // yn-Defaults normalisieren, damit ab hier überall gegen die sichtbaren Labels
+  // verglichen werden kann ("y"/true/"ja" sind alle erlaubt).
+  for (const q of objs) {
+    if (q.t !== "yn" || q.d === undefined) continue;
+    const d = String(q.d).toLowerCase();
+    q.d = (d === "y" || d === "yes" || d === "ja" || d === "true") ? "ja" : "nein";
+  }
+  return { head: h, qs: objs };
+}
+
+function load(text, filename) {
+  const trimmed = text.trim();
+  // Eine exportierte .answers.json kann als Fortsetzung eingeworfen werden.
+  if (trimmed.startsWith("{") && !trimmed.includes("\n")) {
+    let o = null;
+    try { o = JSON.parse(trimmed); } catch (e) { /* dann eben als Sheet versuchen */ }
+    if (o && o.a && o.sheet) {
+      if (!qs.length) throw new Error("Erst das Sheet (.jsonl) laden, dann die Antworten.");
+      if (o.sheet !== head.sheet)
+        throw new Error("Antworten gehören zu Sheet '" + o.sheet + "', geladen ist '" + head.sheet + "'.");
+      importAnswers(o.a);
+      render();
+      return;
+    }
+  }
+  const p = parseSheet(text);
+  head = p.head; qs = p.qs; state = {};
+  if (!head.sheet) head.sheet = (filename || "sheet").replace(/\.[^.]+$/, "");
+  restore();
+  render();
+}
+
+function importAnswers(a) {
+  state = {};
+  for (const [id, val] of Object.entries(a)) {
+    if (Array.isArray(val) && val.length === 2 && (typeof val[1] === "string"))
+      state[id] = { a: val[0], n: val[1] };
+    else
+      state[id] = { a: val, n: "" };
+  }
+}
+
+/* ---------- Persistenz (gegen versehentlichen Reload) ---------- */
+
+function persist() {
+  try { localStorage.setItem(storeKey(), JSON.stringify(state)); } catch (e) {}
+}
+function restore() {
+  try {
+    const raw = localStorage.getItem(storeKey());
+    if (raw) state = JSON.parse(raw);
+  } catch (e) {}
+}
+
+/* ---------- Fragen-Logik ---------- */
+
+const answered = q => {
+  const s = state[q.id];
+  return !!s && (s.a !== undefined && s.a !== null && s.a !== "" || (s.n || "").trim() !== "");
+};
+// Effektive Antwort: was der User gewählt hat, sonst die Empfehlung.
+const effective = q => {
+  const s = state[q.id];
+  if (s && s.a !== undefined && s.a !== null && s.a !== "") return s.a;
+  return q.d;
+};
+// dep: [id, wert] oder [id, [wert1, wert2]] - Frage nur zeigen wenn erfüllt.
+function visible(q) {
+  if (!q.dep) return true;
+  const [depId, want] = q.dep;
+  const dq = qs.find(x => String(x.id) === String(depId));
+  if (!dq) return true;
+  if (!visible(dq)) return false;
+  const got = effective(dq);
+  const wants = Array.isArray(want) ? want : [want];
+  if (Array.isArray(got)) return got.some(g => wants.includes(g));
+  return wants.includes(got);
+}
+const options = q => q.t === "yn" ? ["ja", "nein"] : (q.o || []);
+
+function set(id, val) {
+  const s = state[id] || (state[id] = { a: null, n: "" });
+  s.a = val;
+  if ((s.a === null || s.a === "") && !(s.n || "").trim()) delete state[id];
+  persist(); render();
+}
+function setNote(id, txt) {
+  const s = state[id] || (state[id] = { a: null, n: "" });
+  s.n = txt;
+  if (!txt.trim() && (s.a === null || s.a === undefined || s.a === "")) delete state[id];
+  persist(); updateProgress();
+}
+
+/* ---------- Rendering ---------- */
+
+function render() {
+  $("drop").hidden = true;
+  $("btn-export").hidden = $("btn-reset").hidden = $("btn-defaults").hidden = false;
+  $("title").textContent = head.title || "Decision Sheet";
+  $("slug").textContent = head.sheet || "";
+  document.title = (head.title || "Decision Sheet") + " – " + (head.sheet || "");
+
+  const ctx = $("ctx");
+  if (head.ctx) {
+    ctx.hidden = false;
+    ctx.innerHTML = "";
+    ctx.append(document.createTextNode("Kontext: "), el("code", null, head.ctx));
+  } else ctx.hidden = true;
+
+  const list = $("list");
+  list.hidden = false;
+  list.innerHTML = "";
+  for (const q of qs) list.append(renderQ(q));
+  updateProgress();
+}
+
+function renderQ(q) {
+  const vis = visible(q);
+  const wrap = el("div", "q" + (vis ? "" : " dim"));
+  if (vis) {
+    if (answered(q)) wrap.classList.add("touched");
+    else if (q.d === undefined) wrap.classList.add("unanswered");
+  }
+
+  const headRow = el("div", "q-head");
+  headRow.append(el("span", "dot"), el("span", "num", "#" + q.id), el("span", "q-text", q.q));
+  wrap.append(headRow);
+
+  if (q.why) wrap.append(el("div", "why", q.why));
+  if (!vis) {
+    const dq = qs.find(x => String(x.id) === String(q.dep[0]));
+    wrap.append(el("div", "why", "– hängt an #" + q.dep[0] +
+      (dq ? " (" + [].concat(q.dep[1]).join(" / ") + ")" : "")));
+    return wrap;
+  }
+
+  const cur = state[q.id] || {};
+
+  if (q.t === "text") {
+    const box = el("div", "free");
+    const ta = el("textarea");
+    ta.placeholder = q.d ? "Vorschlag: " + q.d : "Antwort…";
+    ta.value = cur.a || "";
+    ta.addEventListener("input", () => {
+      const s = state[q.id] || (state[q.id] = { a: null, n: "" });
+      s.a = ta.value;
+      if (!ta.value.trim() && !(s.n || "").trim()) delete state[q.id];
+      persist(); updateProgress();
+    });
+    box.append(ta);
+    wrap.append(box);
+  } else {
+    const opts = el("div", "opts");
+    const sel = effective(q);
+    const isMulti = q.t === "multi";
+    for (const o of options(q)) {
+      const b = el("button", "opt");
+      b.append(document.createTextNode(o));
+      const isDefault = isMulti
+        ? (Array.isArray(q.d) && q.d.includes(o))
+        : eq(q.d, o);
+      if (isDefault) b.append(el("span", "rec", "EMPF"));
+      const on = isMulti
+        ? (Array.isArray(sel) && sel.includes(o))
+        : eq(sel, o);
+      if (on) b.classList.add("on");
+      b.addEventListener("click", () => {
+        if (isMulti) {
+          const base = Array.isArray(sel) ? sel.slice() : [];
+          const i = base.indexOf(o);
+          if (i >= 0) base.splice(i, 1); else base.push(o);
+          set(q.id, base.length ? base : []);
+        } else {
+          set(q.id, on ? null : o);
+        }
+      });
+      opts.append(b);
+    }
+    wrap.append(opts);
+  }
+
+  // Notiz - immer möglich, auch zusätzlich zu einer Auswahl.
+  const hasNote = (cur.n || "").trim() !== "";
+  if (hasNote) wrap.append(noteBox(q, cur.n));
+  else {
+    const btn = el("button", "note-btn", "+ ergänzen");
+    btn.addEventListener("click", () => {
+      btn.replaceWith(noteBox(q, ""));
+      wrap.querySelector(".note textarea").focus();
+    });
+    wrap.append(btn);
+  }
+  return wrap;
+}
+
+function noteBox(q, val) {
+  const box = el("div", "note");
+  const ta = el("textarea");
+  ta.placeholder = "Ergänzung, Einschränkung, Rückfrage…";
+  ta.value = val;
+  ta.addEventListener("input", () => setNote(q.id, ta.value));
+  box.append(ta);
+  return box;
+}
+
+function updateProgress() {
+  const vis = qs.filter(visible);
+  const done = vis.filter(answered).length;
+  const open = vis.filter(q => !answered(q) && q.d === undefined).length;
+  const p = $("prog");
+  p.innerHTML = "";
+  p.append(el("b", null, String(done)), document.createTextNode(" / " + vis.length + " beantwortet"));
+  if (open) p.append(document.createTextNode(" · "), el("span", "open", open + " offen"));
+}
+
+/* ---------- Export ----------
+   Regel: Empfehlung übernommen und keine Notiz -> Eintrag wird weggelassen.
+   Leere Map = alles wie vorgeschlagen.
+================================= */
+
+function buildExport() {
+  const a = {};
+  for (const q of qs) {
+    if (!visible(q)) continue;
+    const s = state[q.id];
+    if (!s) continue;
+    const note = (s.n || "").trim();
+    const val = (s.a === undefined || s.a === "" ) ? null : s.a;
+    const isDefault = val !== null && eq(val, q.d);
+    if (isDefault && !note) continue;
+    if (val === null && !note) continue;
+    a[q.id] = note ? [val, note] : val;
+  }
+  return { sheet: head.sheet, a };
+}
+
+function openExport() {
+  const out = buildExport();
+  const json = JSON.stringify(out);
+  $("dlg-json").value = json;
+  const n = Object.keys(out.a).length;
+  $("dlg-count").textContent = n === 0
+    ? "leer = alle Empfehlungen übernommen"
+    : n + " Abweichung" + (n === 1 ? "" : "en") + " · " + json.length + " Zeichen";
+  $("dlg").showModal();
+}
+
+function saveFile() {
+  const blob = new Blob([$("dlg-json").value], { type: "application/json" });
+  const a = el("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (head.sheet || "sheet") + ".answers.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- Events ---------- */
+
+function fail(e) {
+  const box = $("err");
+  box.hidden = false;
+  box.textContent = e.message || String(e);
+}
+
+function readFile(f) {
+  $("err").hidden = true;
+  const r = new FileReader();
+  r.onload = () => { try { load(r.result, f.name); } catch (e) { fail(e); } };
+  r.readAsText(f);
+}
+
+const drop = $("drop");
+for (const ev of ["dragenter", "dragover"])
+  document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("hot"); });
+document.addEventListener("dragleave", e => {
+  if (e.relatedTarget === null) drop.classList.remove("hot");
+});
+document.addEventListener("drop", e => {
+  e.preventDefault(); drop.classList.remove("hot");
+  const f = e.dataTransfer.files[0];
+  if (f) readFile(f);
+});
+$("file").addEventListener("change", e => { if (e.target.files[0]) readFile(e.target.files[0]); });
+
+$("btn-export").addEventListener("click", openExport);
+$("dlg-close").addEventListener("click", () => $("dlg").close());
+$("dlg-save").addEventListener("click", saveFile);
+$("dlg-copy").addEventListener("click", async () => {
+  const ta = $("dlg-json");
+  try { await navigator.clipboard.writeText(ta.value); }
+  catch (e) { ta.select(); document.execCommand("copy"); }
+  $("dlg-copy").textContent = "Kopiert";
+  setTimeout(() => { $("dlg-copy").textContent = "Kopieren"; }, 1200);
+});
+$("btn-reset").addEventListener("click", () => {
+  if (!confirm("Alle Antworten dieses Sheets verwerfen?")) return;
+  state = {}; persist(); render();
+});
+$("btn-defaults").addEventListener("click", () => {
+  // Empfehlungen sichtbar machen, ohne sie zu exportieren: Defaults sind ohnehin
+  // vorausgewählt - also nur eigene Auswahlen wegräumen, Notizen behalten.
+  for (const [id, s] of Object.entries(state)) {
+    if ((s.n || "").trim()) s.a = null; else delete state[id];
+  }
+  persist(); render();
+});
+
+/* ---------- Auto-Load (von render_sheet.py injiziert) ---------- */
+const embedded = $("sheet-data");
+if (embedded) {
+  try { load(embedded.textContent, embedded.dataset.name || ""); }
+  catch (e) { $("drop").hidden = false; fail(e); }
+}
+</script>
+</body>
+</html>

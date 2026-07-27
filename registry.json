@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-07",
+  "generated": "2026-07-27",
   "skills": {
     "grilling": {
       "name": "grilling",
@@ -31,6 +31,14 @@
       "layer": 1,
       "dependencies": [],
       "path": "skills/layer-1-base/codebase-design",
+      "disable-model-invocation": true
+    },
+    "decision-sheet": {
+      "name": "decision-sheet",
+      "description": "Bündelt viele Entscheidungsfragen in ein Dokument, das der User ausserhalb der CLI in einem HTML-Renderer beantwortet und als Antwort-Datei zurückgibt. Statt zehn AskUserQuestion-Runden ein Sheet. Dieser Skill sollte verwendet werden, wenn mehr als drei Entscheidungen offen sind, wenn der User sie am Stück oder in Ruhe beantworten will (Fragenkatalog, Entscheidungsliste, Sheet, Fragebogen), oder wenn eine exportierte .answers.json eingelesen werden soll.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/decision-sheet",
       "disable-model-invocation": true
     },
     "grill-me": {
