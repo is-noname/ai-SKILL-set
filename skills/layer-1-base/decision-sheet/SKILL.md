@@ -3,7 +3,7 @@ name: decision-sheet
 description: "Bündelt viele Entscheidungsfragen in ein Dokument, das der User ausserhalb der CLI in einem HTML-Renderer beantwortet und als Antwort-Datei zurückgibt. Statt zehn AskUserQuestion-Runden ein Sheet. Dieser Skill sollte verwendet werden, wenn mehr als drei Entscheidungen offen sind, wenn der User sie am Stück oder in Ruhe beantworten will (Fragenkatalog, Entscheidungsliste, Sheet, Fragebogen), oder wenn eine exportierte .answers.json eingelesen werden soll."
 layer: 1
 dependencies: []
-status: prototype
+status: stable
 disable-model-invocation: true
 ---
 
@@ -17,11 +17,13 @@ Drei bewegliche Teile:
 | Teil | Wo | Wer |
 |------|-----|-----|
 | Sheet `<slug>.jsonl` | `<projekt>/.decisions/` | Agent schreibt |
-| Renderer `index.html` | `~/ai-shared/decision-sheet/` (global, einmal pro Maschine) | User bedient |
+| Renderer `index.html` | im Skill; global gespiegelt nach `~/ai-shared/decision-sheet/` | User bedient |
 | Antworten `<slug>.answers.json` | `<projekt>/.decisions/` | User exportiert |
 
-Der Renderer-Pfad ist **Konvention, nicht Suchergebnis** — nicht danach suchen.
-Fehlt er, ist der globale Setup-Schritt nicht gelaufen (siehe unten).
+Die Scripts im Skill funktionieren überall — auch auf einem System, auf dem der
+globale Setup-Schritt nie gelaufen ist. Die Hooks sind Komfort, keine Voraussetzung:
+sie sparen dir pro Sheet ein paar Tool-Calls, mehr nicht. Du musst nicht wissen, ob
+sie da sind — die Scripts erkennen es selbst.
 
 ## Wann dieser Skill statt AskUserQuestion
 
@@ -43,22 +45,26 @@ Ab etwa vier offenen Entscheidungen, oder sobald Fragen voneinander abhängen
 {"id":5,"q":"Lock via flock oder mkdir?","t":"pick","o":["flock","mkdir"],"dep":[1,"Counter"]}
 ```
 
-**Öffnen musst du nichts.** Der `Stop`-Hook rendert das Sheet und öffnet das Fenster,
-sobald du fertig geredet hast — egal ob du die Datei per Write, Edit oder Bash-Heredoc
-angelegt hast. Also: Sheet schreiben, Antwort abschließen, fertig.
-
-Nur wenn der Hook nicht greift (anderer Agent, kein `settings.json`), von Hand:
+Danach **immer** diesen einen Befehl — unabhängig davon, ob die Hooks eingerichtet
+sind, und egal ob du die Datei per Write, Edit oder Bash-Heredoc angelegt hast:
 
 ```bash
-python3 ~/ai-shared/decision-sheet/render_sheet.py .decisions/<slug>.jsonl
+python3 <skill>/scripts/render_sheet.py .decisions/<slug>.jsonl
 ```
 
-(Der skill-lokale `scripts/render_sheet.py` funktioniert identisch und fällt auf die
-`assets/index.html` daneben zurück — nutze ihn nur, wenn der globale Pfad fehlt.)
-
 Das Script validiert das Sheet (JSON pro Zeile, doppelte ids, fehlende Optionen,
-kaputte `dep`-Verweise), injiziert es in eine Kopie der `index.html` und öffnet sie.
+kaputte oder zyklische `dep`-Verweise), baut die HTML und entscheidet dann selbst:
+
+- **Stop-Hook registriert** → es meldet „Fenster geht auf, sobald du fertig
+  geantwortet hast" und überlässt das Öffnen dem Hook. Nichts weiter zu tun.
+- **Kein Hook** → es öffnet das Fenster sofort.
+
 Bricht es mit einer Fehlermeldung ab: Sheet korrigieren, nicht das Script umgehen.
+Der Aufruf ist auch mit Hook kein Leerlauf — er ist deine einzige Rückmeldung, dass
+das Sheet überhaupt valide ist, bevor dein Turn endet.
+
+Liegt der Skill nicht im Projekt, tut es der globale Spiegel:
+`python3 ~/ai-shared/decision-sheet/render_sheet.py …` — identisches Script.
 
 ### Feldreferenz
 
@@ -102,21 +108,36 @@ Der User tippt `#answers` im Chat. Der `UserPromptSubmit`-Hook holt die neueste
 `*.answers.json` aus dem Download-Ordner, verschiebt sie nach `.decisions/` und
 legt den Inhalt in den Kontext. Optional mit Slug: `#answers ticketsystem-v2`.
 
+**Kommt auf `#answers` nichts zurück**, ist der Hook auf diesem System nicht
+eingerichtet. Dann holst du die Datei selbst — dasselbe Script, das der Hook aufruft:
+
+```bash
+python3 <skill>/scripts/fetch_answers.py [--slug <slug>]
+```
+
+Sag dem User in dem Fall einmal, dass er dir nach dem Export kurz Bescheid gibt,
+statt auf die Automatik zu warten.
+
 Format:
 
 ```json
-{"sheet":"ticketsystem-v2","a":{"1":"Timestamp","3":"archive","4":["claude","codex","vibe"],"5":["flock","prüf ob NFS ein Problem ist"]}}
+{"sheet":"ticketsystem-v2","a":{"1":"Timestamp","3":"archive","4":["claude","codex","vibe"],"5":{"a":"flock","n":"prüf ob NFS ein Problem ist"}}}
 ```
 
 Interpretation:
 
 - **Key fehlt** → Empfehlung (`d`) übernommen. `"a": {}` heisst: alles wie vorgeschlagen.
-- **Wert** → die abweichende Antwort.
-- **`[wert, notiz]`** → Antwort plus Ergänzung des Users. Die Notiz ist verbindlich,
-  nicht Deko — sie enthält oft die eigentliche Einschränkung.
-- **`[null, notiz]`** → keine Auswahl, nur ein Kommentar. Meist eine Rückfrage,
-  die du beantworten musst, bevor du die Entscheidung umsetzt.
+- **Wert** → die abweichende Antwort. Bei `multi` ein Array; `[]` heisst „nichts davon"
+  und ist eine echte Antwort, kein leerer Eintrag.
+- **`{"a": wert, "n": "notiz"}`** → Antwort plus Ergänzung des Users. Die Notiz ist
+  verbindlich, nicht Deko — sie enthält oft die eigentliche Einschränkung.
+- **`{"a": null, "n": "notiz"}`** → keine Auswahl, nur ein Kommentar. Meist eine
+  Rückfrage, die du beantworten musst, bevor du die Entscheidung umsetzt.
 - Fragen, deren `dep` nicht erfüllt war, tauchen nicht auf — die sind gegenstandslos.
+
+Die Notiz steht bewusst im Objekt und nicht als `[wert, notiz]`-Tupel: eine
+`multi`-Antwort mit zwei Optionen (`["claude","codex"]`) wäre sonst nicht von
+Antwort-plus-Notiz zu unterscheiden.
 
 Falls das Sheet nicht mehr im Kontext ist (Kompaktierung), liegt es als
 `.decisions/<slug>.jsonl` daneben — lesen statt raten. Antwort-Dateien tragen bewusst
@@ -130,43 +151,50 @@ sind Wegwerf-Artefakte. Was dauerhaft gilt, gehört als ADR (`doc-ids`) oder in
 
 ## Setup
 
-**Global, einmal pro Maschine** — deployt Renderer und Hook:
+**Pro Projekt: nichts.** `.decisions/` wird beim ersten Sheet angelegt und gehört in
+die `.gitignore`. Der Skill-Pull bringt alles mit, was der Ablauf braucht —
+`assets/index.html`, `scripts/`, `hooks/`.
+
+**Global: optional, aber empfohlen.** Ein Schritt, einmal pro Maschine:
 
 ```bash
 bash <ai-SKILL-set>/scripts/setup_global_conventions.sh ~/.claude
 ```
 
-Legt `~/ai-shared/decision-sheet/{index.html,render_sheet.py}` an und registriert zwei
+Spiegelt Renderer und Scripts nach `~/ai-shared/decision-sheet/` und registriert zwei
 Hooks in `~/.claude/settings.json`:
 
 | Hook | Event | Wirkung |
 |------|-------|---------|
-| `decision-sheet-open.sh` | `Stop` | neu geschriebenes, unbeantwortetes Sheet geht auf |
+| `decision-sheet-open.sh` | `Stop` | neu geschriebenes, unbeantwortetes Sheet geht von selbst auf |
 | `decision-answers.sh` | `UserPromptSubmit` | `#answers` holt die Antworten zurück |
 
-**Pro Projekt:** nichts. `.decisions/` wird beim ersten Sheet angelegt.
+Was die Hooks bringen: der Hinweg funktioniert auch dann, wenn das Sheet an
+`render_sheet.py` vorbei entstanden ist, und der Rückweg kostet dich keinen Tool-Call.
+Ohne sie läuft alles gleich, nur mit zwei bis drei Aufrufen mehr pro Sheet.
 
-### Andere Agents (Codex, Vibe, Gemini)
+### Ohne globales Setup — und andere Agents (Codex, Vibe, Gemini)
 
-Die Hooks sind Claude-spezifisch, das Format ist es nicht. Für die anderen Agents
-liegen Renderer und Script trotzdem unter `~/ai-shared/decision-sheet/` — der
-komplette Ablauf funktioniert manuell:
+Die Hooks sind Claude-spezifisch, das Format und die Scripts sind es nicht. Der
+komplette Ablauf funktioniert aus dem gepullten Skill heraus:
 
 1. Sheet nach `.decisions/<slug>.jsonl` schreiben (identisches Format).
-2. `python3 ~/ai-shared/decision-sheet/render_sheet.py .decisions/<slug>.jsonl` —
-   öffnet das Fenster selbst, kein Hook nötig.
-3. Der User speichert die Antworten und nennt den Pfad; die
-   `<slug>.answers.json` direkt lesen (Interpretation siehe Modus 2).
+2. `python3 <skill>/scripts/render_sheet.py .decisions/<slug>.jsonl` — findet keinen
+   Hook, öffnet das Fenster also selbst. Fehlt der globale Spiegel, fällt das Script
+   auf die `assets/index.html` neben sich zurück.
+3. Nach dem Export `python3 <skill>/scripts/fetch_answers.py` — holt die Datei aus
+   dem Download-Ordner nach `.decisions/` und gibt sie aus (Interpretation: Modus 2).
 
 ## Wenn etwas nicht funktioniert
 
 | Symptom | Ursache |
 |---------|---------|
-| Sheet geschrieben, kein Fenster geht auf | Stop-Hook fehlt in `settings.json`, oder `.decisions/.opened` hat es schon gestempelt (Sheet anfassen ändert die mtime) |
-| `render_sheet.py`: keine index.html gefunden | globaler Setup-Schritt fehlt |
+| Script meldet „Stop-Hook aktiv", aber es geht kein Fenster auf | `.decisions/.opened` hat das Sheet schon gestempelt (Sheet anfassen ändert die mtime), oder der Hook steht zwar in `settings.json`, ist aber nicht ausführbar |
+| Sheet geschrieben, gar nichts passiert | `render_sheet.py` nicht aufgerufen — genau dafür ist der Aufruf Pflicht, auch mit Hook |
+| `render_sheet.py`: keine index.html gefunden | Skill unvollständig gepullt (`assets/` fehlt) und kein globaler Spiegel da |
 | Renderer zeigt Dropzone statt Fragen | Sheet defekt — Fehlermeldung steht in der Box darunter |
-| `#answers` bringt nichts | Hook nicht in `settings.json`, oder Export noch nicht gespeichert (nur „Kopieren" gedrückt) |
+| `#answers` bringt nichts | Hook nicht eingerichtet → `fetch_answers.py` selbst aufrufen; oder Export noch nicht gespeichert (nur „Kopieren" gedrückt) |
 | Export ist `{"sheet":…,"a":{}}` | Kein Fehler — der User hat alle Empfehlungen übernommen |
 
-Manueller Weg ohne Hook: Renderer aus `~/ai-shared/decision-sheet/index.html` öffnen,
-Sheet reinziehen, exportierte Datei selbst nach `.decisions/` legen und den Pfad nennen.
+Letzter Ausweg ganz ohne Scripts: `assets/index.html` im Browser öffnen, Sheet
+reinziehen, exportierte Datei selbst nach `.decisions/` legen und den Pfad nennen.

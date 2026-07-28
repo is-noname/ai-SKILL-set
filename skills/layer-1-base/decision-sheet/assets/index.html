@@ -181,6 +181,15 @@ const el = (tag, cls, txt) => {
 };
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const storeKey = () => "ds:" + (head.sheet || "unnamed");
+// Fingerabdruck der Fragen. Schreibt der Agent das Sheet um, passen die
+// gespeicherten Antworten nicht mehr zu den ids - dann lieber leer starten als
+// eine alte Auswahl unter einer neuen Frage vorbelegen.
+function fingerprint() {
+  const s = qs.map(q => q.id + ":" + q.q + ":" + JSON.stringify(q.o || "")).join("|");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return String(h);
+}
 
 /* ---------- Laden ---------- */
 
@@ -229,8 +238,11 @@ function load(text, filename) {
 function importAnswers(a) {
   state = {};
   for (const [id, val] of Object.entries(a)) {
-    if (Array.isArray(val) && val.length === 2 && (typeof val[1] === "string"))
-      state[id] = { a: val[0], n: val[1] };
+    // {"a":…,"n":…} = Antwort plus Notiz. Alles andere ist die Antwort selbst -
+    // auch Arrays, die aus multi kommen. Deshalb ein Objekt statt eines Tupels:
+    // ["claude","codex"] waere von [Antwort, Notiz] nicht zu unterscheiden.
+    if (val && typeof val === "object" && !Array.isArray(val))
+      state[id] = { a: val.a === undefined ? null : val.a, n: val.n || "" };
     else
       state[id] = { a: val, n: "" };
   }
@@ -239,12 +251,18 @@ function importAnswers(a) {
 /* ---------- Persistenz (gegen versehentlichen Reload) ---------- */
 
 function persist() {
-  try { localStorage.setItem(storeKey(), JSON.stringify(state)); } catch (e) {}
+  try {
+    localStorage.setItem(storeKey(), JSON.stringify({ fp: fingerprint(), s: state }));
+  } catch (e) {}
 }
 function restore() {
+  state = {};
   try {
     const raw = localStorage.getItem(storeKey());
-    if (raw) state = JSON.parse(raw);
+    if (!raw) return;
+    const o = JSON.parse(raw);
+    if (o && o.fp === fingerprint()) state = o.s || {};
+    else localStorage.removeItem(storeKey());
   } catch (e) {}
 }
 
@@ -365,7 +383,9 @@ function renderQ(q) {
           const base = Array.isArray(sel) ? sel.slice() : [];
           const i = base.indexOf(o);
           if (i >= 0) base.splice(i, 1); else base.push(o);
-          set(q.id, base.length ? base : []);
+          // Leeres Array bleibt erhalten: "nichts ausgewaehlt" ist bei multi eine
+          // Antwort und muss die Empfehlung ueberschreiben koennen.
+          set(q.id, base);
         } else {
           set(q.id, on ? null : o);
         }
@@ -425,7 +445,7 @@ function buildExport() {
     const isDefault = val !== null && eq(val, q.d);
     if (isDefault && !note) continue;
     if (val === null && !note) continue;
-    a[q.id] = note ? [val, note] : val;
+    a[q.id] = note ? { a: val, n: note } : val;
   }
   return { sheet: head.sheet, a };
 }

@@ -41,7 +41,9 @@ while read -r sheet; do
   mtime=$(stat -c %.9Y "$sheet" 2>/dev/null || stat -c %Y "$sheet" 2>/dev/null)
   grep -qxF "$sheet $mtime" "$stamp" 2>/dev/null && continue
 
-  render_out=$(python3 "$renderer" "$sheet" 2>&1)
+  # --force-open: das Script erkennt sonst diesen Hook in der settings.json und
+  # ueberliesse ihm das Oeffnen - also sich selbst. Dann ginge nie ein Fenster auf.
+  render_out=$(python3 "$renderer" "$sheet" --force-open 2>&1)
   render_rc=$?
 
   # Stempeln passiert in BEIDEN Faellen: sonst wiederholt ein defektes Sheet seine

@@ -16,13 +16,17 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # project-identifier.md ist User-State → NICHT geprüft. Alles hier sind die von
 # setup_global_conventions.sh stets überschriebenen (= managed) Dateien.
-# Format: "<repo-relpath>|<agent-relpath>"
+# Format: "<repo-relpath>|<agent-relpath>[|<nur-für-agent-dir>]"
+# Das dritte Feld beschränkt den Eintrag auf ein Agent-Dir — für Dateien, die
+# nur dort Sinn ergeben (die decision-sheet-Hooks brauchen Claudes settings.json).
 MANAGED=(
   "docs/tickets.md|tickets.md"
   "docs/doc-ids.md|doc-ids.md"
   "docs/design-tokens.md|design-tokens.md"
   "scripts/init_tickets.sh|scripts/init_tickets.sh"
   "hooks/global/ticket-mover.sh|hooks/ticket-mover.sh"
+  "skills/layer-1-base/decision-sheet/hooks/decision-answers.sh|hooks/decision-answers.sh|.claude"
+  "skills/layer-1-base/decision-sheet/hooks/decision-sheet-open.sh|hooks/decision-sheet-open.sh|.claude"
 )
 
 KNOWN_AGENT_DIRS=(".claude" ".codex" ".gemini" ".vibe")
@@ -53,11 +57,13 @@ drift_found=0
 for adir in "${agent_dirs[@]}"; do
   echo "== $adir =="
   for entry in "${MANAGED[@]}"; do
-    src="$REPO_ROOT/${entry%%|*}"
-    dst="$adir/${entry##*|}"
-    rel="${entry##*|}"
+    IFS='|' read -r src_rel rel only_dir <<< "$entry"
+    # Eintrag ist auf ein Agent-Dir beschränkt und wir sind woanders → überspringen.
+    [ -n "$only_dir" ] && [ "$(basename "$adir")" != "$only_dir" ] && continue
+    src="$REPO_ROOT/$src_rel"
+    dst="$adir/$rel"
     if [ ! -f "$src" ]; then
-      echo "  ?? $rel — Repo-Quelle fehlt (${entry%%|*})"
+      echo "  ?? $rel — Repo-Quelle fehlt ($src_rel)"
       drift_found=1
     elif [ ! -f "$dst" ]; then
       echo "  -- $rel — fehlt (nicht deployt)"

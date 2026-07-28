@@ -137,10 +137,13 @@ deploy_shared_convention() {
 # Konvention, egal welcher Agent das Sheet schreibt. Idempotent.
 deploy_decision_sheet() {
   local target="$HOME/ai-shared/decision-sheet"
+  local src="skills/layer-1-base/decision-sheet"
   mkdir -p "$target"
-  deploy_file "skills/layer-1-base/decision-sheet/assets/index.html" "$target/index.html" || return 1
-  deploy_file "skills/layer-1-base/decision-sheet/scripts/render_sheet.py" "$target/render_sheet.py" || return 1
-  [ -f "$target/render_sheet.py" ] && chmod +x "$target/render_sheet.py"
+  deploy_file "$src/assets/index.html" "$target/index.html" || return 1
+  for py in render_sheet.py fetch_answers.py; do
+    deploy_file "$src/scripts/$py" "$target/$py" || return 1
+    [ -f "$target/$py" ] && chmod +x "$target/$py"
+  done
 }
 
 # Setup/Update für genau ein Agent-Dir. Rückgabe 0 = ok, 1 = Fehler.
@@ -298,10 +301,16 @@ PY
 
   # decision-sheet (IZG-T-063): Renderer global bereitstellen, Abhol-Hook je Agent-Dir.
   deploy_decision_sheet || return 1
-  for ds_hook in decision-answers.sh decision-sheet-open.sh; do
-    deploy_file "hooks/global/$ds_hook" "$AGENT_DIR/hooks/$ds_hook" || return 1
-    [ -f "$AGENT_DIR/hooks/$ds_hook" ] && chmod +x "$AGENT_DIR/hooks/$ds_hook"
-  done
+  # Quelle sind die Hooks IM Skill, nicht hooks/global/: so kommen sie beim
+  # Skill-Pull mit und lassen sich auch ohne dieses Repo einrichten.
+  # Nur nach .claude: die Hooks setzen Claudes settings.json-Format voraus und
+  # wuerden in den anderen Agent-Dirs nur unregistriert herumliegen.
+  if [ "$agent_name" = ".claude" ]; then
+    for ds_hook in decision-answers.sh decision-sheet-open.sh; do
+      deploy_file "skills/layer-1-base/decision-sheet/hooks/$ds_hook" "$AGENT_DIR/hooks/$ds_hook" || return 1
+      [ -f "$AGENT_DIR/hooks/$ds_hook" ] && chmod +x "$AGENT_DIR/hooks/$ds_hook"
+    done
+  fi
 
   # Beide Hooks registrieren — Claude-spezifisches settings.json-Format:
   #   UserPromptSubmit → #answers holt Antworten ab
