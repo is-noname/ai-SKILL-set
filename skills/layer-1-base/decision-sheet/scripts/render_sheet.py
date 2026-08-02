@@ -19,9 +19,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -29,19 +31,112 @@ import sheet_spec  # noqa: E402  - liegt daneben, auch im globalen Spiegel
 import sheet_state  # noqa: E402
 
 MARKER = "<!--SHEET-DATA-->"
-SHARED_TEMPLATE = Path.home() / "ai-shared" / "decision-sheet" / "index.html"
+SHARED_DIR = Path.home() / "ai-shared" / "decision-sheet"
+
+# Was setup_global_conventions.sh spiegelt (deploy_decision_sheet). Steht hier, um
+# die beiden Ablagen vergleichen zu koennen - faellt spaeter eine Datei dazu, deckt
+# der Vergleich sie erst ab, wenn sie auch hier steht.
+MIRRORED = (
+    "index.html",
+    "sheet_spec.py",
+    "sheet_state.py",
+    "render_sheet.py",
+    "fetch_answers.py",
+    "resolve_answers.py",
+)
+
+REDEPLOY = "bash <ai-SKILL-set>/scripts/setup_global_conventions.sh ~/.claude"
+
+
+class TemplateMissing(Exception):
+    """Weder skill-lokal noch global liegt eine index.html."""
+
+
+@dataclass(frozen=True)
+class Copy:
+    """Eine Ablage von Renderer und Scripts - Vorlage plus Fingerabdruck drumherum.
+
+    `files` haelt die sha256 je gespiegelter Datei. Bewusst der Ist-Zustand der
+    Dateien und keine mitgeschriebene VERSION-Datei: eine Versionsnotiz sagt nur,
+    was beim Deployen galt, der Hash sagt, was jetzt dasteht - und faengt damit auch
+    die von Hand angefasste Kopie. Fehlende Dateien fehlen als Schluessel.
+    """
+
+    template: Path
+    files: dict[str, str] = field(default_factory=dict)
+
+
+def choose_template(local: Copy | None, shared: Copy | None) -> tuple[Path, str | None]:
+    """Welche Vorlage gilt - und was ist dazu zu melden?
+
+    Die Skill-Kopie schlaegt den globalen Spiegel: sie kam mit demselben Pull wie das
+    Script, das sie gerade liest, waehrend der Spiegel vom letzten Setup-Lauf auf
+    dieser Maschine stammt und beliebig alt sein darf. Umgekehrt ueberstimmte frueher
+    ein alter Spiegel jeden frisch gepullten Skill, ohne dass es jemand merkte.
+
+    Reine Auswahl ueber zwei Kandidaten - kein Dateisystem, kein Home-Verzeichnis.
+    """
+    if local is None and shared is None:
+        raise TemplateMissing
+    if local is None:
+        return shared.template, None  # Hook-Pfad: es gibt nur den Spiegel
+    if shared is None:
+        return local.template, None
+
+    diff = sorted(n for n in set(local.files) | set(shared.files)
+                  if local.files.get(n) != shared.files.get(n))
+    if not diff:
+        return local.template, None
+    return local.template, (
+        f"Hinweis: der globale Spiegel weicht vom Skill ab ({', '.join(diff)}) - "
+        f"es gilt die Skill-Kopie.\n  Spiegel angleichen: {REDEPLOY}"
+    )
+
+
+def _copy_at(template: Path, files: dict[str, Path]) -> Copy | None:
+    """Eine Ablage einlesen - None, wenn dort keine Vorlage liegt."""
+    if not template.is_file():
+        return None
+    hashes = {}
+    for name, path in files.items():
+        try:
+            hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            continue
+    return Copy(template, hashes)
+
+
+def local_copy() -> Copy | None:
+    """Die Ablage neben diesem Script: assets/index.html plus scripts/*.py.
+
+    Laeuft das Script aus dem Spiegel, gibt es kein assets/ daneben - dann ist hier
+    nichts und der Spiegel bleibt uebrig.
+    """
+    scripts = Path(__file__).resolve().parent
+    assets = scripts.parent / "assets"
+    files = {n: (assets if n.endswith(".html") else scripts) / n for n in MIRRORED}
+    return _copy_at(assets / "index.html", files)
+
+
+def shared_copy() -> Copy | None:
+    """Der globale Spiegel - flach, alles in einem Verzeichnis."""
+    return _copy_at(SHARED_DIR / "index.html", {n: SHARED_DIR / n for n in MIRRORED})
 
 
 def find_template() -> Path:
-    """Global deployte Vorlage bevorzugen, sonst die skill-lokale daneben."""
-    local = Path(__file__).resolve().parent.parent / "assets" / "index.html"
-    for cand in (SHARED_TEMPLATE, local):
-        if cand.is_file():
-            return cand
-    raise SystemExit(
-        f"Fehler: keine index.html gefunden.\n  gesucht: {SHARED_TEMPLATE}\n           {local}\n"
-        "  Renderer global deployen: bash scripts/setup_global_conventions.sh ~/.claude"
-    )
+    """Vorlage waehlen und eine Abweichung der beiden Ablagen melden."""
+    try:
+        template, note = choose_template(local_copy(), shared_copy())
+    except TemplateMissing:
+        local = Path(__file__).resolve().parent.parent / "assets" / "index.html"
+        raise SystemExit(
+            f"Fehler: keine index.html gefunden.\n  gesucht: {local}\n"
+            f"           {SHARED_DIR / 'index.html'}\n"
+            f"  Renderer global deployen: {REDEPLOY}"
+        ) from None
+    if note:
+        print(note)
+    return template
 
 
 def validate(sheet_text: str) -> list[str]:

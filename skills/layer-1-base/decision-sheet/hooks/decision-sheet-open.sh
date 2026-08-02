@@ -25,7 +25,18 @@ project=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
 [[ -n "$project" && -d "$project" ]] || project="$PWD"
 
 shared="$HOME/ai-shared/decision-sheet"
-[[ -f "$shared/render_sheet.py" && -f "$shared/sheet_state.py" ]] || exit 0
+# Kein Spiegel = decision-sheet ist auf dieser Maschine nicht eingerichtet: schweigen,
+# sonst redet der Hook in jedem Projekt bei jedem Turn. Ein halber Spiegel dagegen ist
+# ein Defekt und wurde frueher genauso stillschweigend verschluckt - dann laeuft der
+# Hook als No-Op weiter und niemand merkt, dass die Sheets nicht mehr aufgehen.
+[[ -d "$shared" ]] || exit 0
+for required in render_sheet.py sheet_state.py; do
+  if [[ ! -f "$shared/$required" ]]; then
+    echo "decision-sheet: $shared/$required fehlt - Spiegel unvollstaendig." \
+         "Neu deployen: bash <ai-SKILL-set>/scripts/setup_global_conventions.sh ~/.claude"
+    exit 0
+  fi
+done
 
 sheet=$(python3 "$shared/sheet_state.py" pending "$project" 2>/dev/null) || exit 0
 [[ -n "$sheet" ]] || exit 0

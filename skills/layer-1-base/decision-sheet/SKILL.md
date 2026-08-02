@@ -65,6 +65,11 @@ das Sheet überhaupt valide ist, bevor dein Turn endet.
 Liegt der Skill nicht im Projekt, tut es der globale Spiegel:
 `python3 ~/ai-shared/decision-sheet/render_sheet.py …` — identisches Script.
 
+Gilt es doch mal nicht: der Skill im Projekt kam mit deinem Pull, der Spiegel vom
+letzten Setup-Lauf auf dieser Maschine. Das Script nimmt deshalb die Kopie neben sich
+und meldet eine Zeile, wenn der Spiegel davon abweicht — dann `setup_global_conventions.sh`
+erneut laufen lassen, sonst arbeitet der Hook weiter mit dem alten Stand.
+
 ### Feldreferenz
 
 <!-- Erzeugt aus scripts/sheet_spec.py: python3 scripts/sheet_spec.py --fields
@@ -188,8 +193,8 @@ komplette Ablauf funktioniert aus dem gepullten Skill heraus:
 
 1. Sheet nach `.decisions/<slug>.jsonl` schreiben (identisches Format).
 2. `python3 <skill>/scripts/render_sheet.py .decisions/<slug>.jsonl` — öffnet das
-   Fenster selbst. Fehlt der globale Spiegel, fällt das Script auf die
-   `assets/index.html` neben sich zurück.
+   Fenster selbst — mit der `assets/index.html` neben sich, der globale Spiegel
+   spielt dabei keine Rolle.
 3. Nach dem Export `python3 <skill>/scripts/fetch_answers.py` — holt die Datei aus
    dem Download-Ordner nach `.decisions/` und gibt die aufgelöste Entscheidungstabelle
    aus (`resolve_answers.py` läuft mit, ohne Hook und ohne Zutun).
@@ -201,6 +206,8 @@ komplette Ablauf funktioniert aus dem gepullten Skill heraus:
 | Script meldet „gerendert", aber es geht kein Fenster auf | `xdg-open` fehlt oder hat keinen Browser zugeordnet — der Pfad steht in der Meldung, manuell öffnen |
 | Sheet geschrieben, gar nichts passiert | `render_sheet.py` nicht aufgerufen — genau dafür ist der Aufruf Pflicht, auch mit Hook |
 | `render_sheet.py`: keine index.html gefunden | Skill unvollständig gepullt (`assets/` fehlt) und kein globaler Spiegel da |
+| „globaler Spiegel weicht vom Skill ab" | Skill-Kopie und `~/ai-shared/decision-sheet/` sind auseinandergelaufen — gerendert wird korrekt mit der Skill-Kopie, aber der Hook nutzt den alten Spiegel: `setup_global_conventions.sh ~/.claude` erneut laufen lassen |
+| Hook meldet „Spiegel unvollständig" | Im Spiegel fehlt eine Datei (typisch nach einem Setup-Lauf vor einer neuen Script-Datei) — dasselbe Kommando behebt es |
 | Renderer zeigt Dropzone statt Fragen | Sheet defekt — Fehlermeldung steht in der Box darunter |
 | `#answers` bringt nichts | Hook nicht eingerichtet → `fetch_answers.py` selbst aufrufen; oder Export noch nicht gespeichert (nur „Kopieren" gedrückt) |
 | Export ist `{"sheet":…,"a":{}}` | Kein Fehler — der User hat alle Empfehlungen übernommen |
