@@ -140,7 +140,7 @@ deploy_decision_sheet() {
   local src="skills/layer-1-base/decision-sheet"
   mkdir -p "$target"
   deploy_file "$src/assets/index.html" "$target/index.html" || return 1
-  for py in render_sheet.py fetch_answers.py resolve_answers.py; do
+  for py in sheet_spec.py render_sheet.py fetch_answers.py resolve_answers.py; do
     deploy_file "$src/scripts/$py" "$target/$py" || return 1
     [ -f "$target/$py" ] && chmod +x "$target/$py"
   done

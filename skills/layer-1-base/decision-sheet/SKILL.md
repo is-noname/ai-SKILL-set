@@ -54,7 +54,8 @@ python3 <skill>/scripts/render_sheet.py .decisions/<slug>.jsonl
 ```
 
 Das Script validiert das Sheet (JSON pro Zeile, doppelte ids, fehlende Optionen,
-kaputte oder zyklische `dep`-Verweise), baut die HTML und entscheidet dann selbst:
+kaputte oder zyklische `dep`-Verweise) und nennt dabei **alle** Verstöße auf einmal,
+nicht nur den ersten. Danach baut es die HTML und entscheidet selbst:
 
 - **Stop-Hook registriert** → es meldet „Fenster geht auf, sobald du fertig
   geantwortet hast" und überlässt das Öffnen dem Hook. Nichts weiter zu tun.
@@ -69,6 +70,9 @@ Liegt der Skill nicht im Projekt, tut es der globale Spiegel:
 
 ### Feldreferenz
 
+<!-- Erzeugt aus scripts/sheet_spec.py: python3 scripts/sheet_spec.py --fields
+     Nicht von Hand ändern — ein Test vergleicht diesen Abschnitt mit der Spec. -->
+
 | Feld | Pflicht | Bedeutung |
 |------|---------|-----------|
 | `id` | ja | Zahl oder kurzer String, eindeutig |
@@ -80,8 +84,7 @@ Liegt der Skill nicht im Projekt, tut es der globale Spiegel:
 | `ctx` | nein | Längerer Hintergrund zu **dieser einen Frage** — im Renderer eingeklappt hinter „+ Kontext", nicht standardmäßig sichtbar. Nicht zu verwechseln mit dem Header-`ctx` (Dokumentverweis fürs ganze Sheet) |
 | `dep` | nein | `[id, wert]` oder `[id, [wert1, wert2]]` — Frage wird nur aktiv, wenn die andere so beantwortet ist |
 
-Header: `v` (Format-Version, aktuell 1), `sheet` (Slug = Dateiname ohne Endung),
-`title`, `ctx` (Pfad zum Dokument mit dem Hintergrund, optional).
+Header: `v` (Format-Version, aktuell 1), `sheet` (Slug = Dateiname ohne Endung), `title` (Überschrift im Renderer), `ctx` (Pfad zum Dokument mit dem Hintergrund, optional).
 
 ### Regeln beim Schreiben
 

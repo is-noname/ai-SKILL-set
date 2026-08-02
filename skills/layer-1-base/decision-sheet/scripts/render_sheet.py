@@ -19,11 +19,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sheet_spec  # noqa: E402  - liegt daneben, auch im globalen Spiegel
 
 MARKER = "<!--SHEET-DATA-->"
 SHARED_TEMPLATE = Path.home() / "ai-shared" / "decision-sheet" / "index.html"
@@ -64,63 +66,19 @@ def find_template() -> Path:
     )
 
 
-def validate(sheet_text: str, path: Path) -> dict:
-    """Prueft das Sheet zeilenweise und gibt den Header zurueck."""
-    objs = []
-    for lineno, raw in enumerate(sheet_text.splitlines(), start=1):
-        line = raw.strip()
-        if not line:
-            continue
-        try:
-            objs.append(json.loads(line))
-        except json.JSONDecodeError as exc:
-            raise SystemExit(f"Fehler: {path}:{lineno} ist kein gueltiges JSON - {exc}")
-    if not objs:
-        raise SystemExit(f"Fehler: {path} ist leer.")
+def validate(sheet_text: str) -> list[str]:
+    """Alle Regelverstoesse des Sheets - leere Liste heisst sauber.
 
-    head = objs.pop(0) if "id" not in objs[0] else {}
-    if not objs:
-        raise SystemExit(f"Fehler: {path} enthaelt nur einen Header, keine Fragen.")
-
-    valid_types = {"pick", "multi", "yn", "text"}
-    seen: set[str] = set()
-    for q in objs:
-        qid = str(q.get("id", ""))
-        if not qid:
-            raise SystemExit(f"Fehler: Frage ohne 'id' in {path}: {q}")
-        if qid in seen:
-            raise SystemExit(f"Fehler: doppelte id '{qid}' in {path}")
-        seen.add(qid)
-        if not q.get("q"):
-            raise SystemExit(f"Fehler: Frage #{qid} hat kein 'q' (Fragetext).")
-        qtype = q.get("t", "pick")
-        if qtype not in valid_types:
-            raise SystemExit(
-                f"Fehler: Frage #{qid} hat t='{qtype}' - erlaubt: {', '.join(sorted(valid_types))}"
-            )
-        if qtype in ("pick", "multi") and not q.get("o"):
-            raise SystemExit(f"Fehler: Frage #{qid} ist '{qtype}', hat aber keine Optionen ('o').")
-        if "ctx" in q and not isinstance(q["ctx"], str):
-            raise SystemExit(f"Fehler: Frage #{qid} hat ein 'ctx', das kein String ist.")
-    for q in objs:
-        dep = q.get("dep")
-        if dep is None:
-            continue
-        if not isinstance(dep, list) or len(dep) != 2:
-            raise SystemExit(f"Fehler: Frage #{q['id']} hat ein defektes 'dep' - erwartet [id, wert].")
-        if str(dep[0]) not in seen:
-            raise SystemExit(f"Fehler: Frage #{q['id']} haengt an unbekannter id '{dep[0]}'.")
-
-    # Zyklen: der Renderer wertet dep rekursiv aus - ein Ring haengt den Browser auf.
-    parent = {str(q["id"]): str(q["dep"][0]) for q in objs if q.get("dep")}
-    for start in parent:
-        path, cur = {start}, parent[start]
-        while cur in parent:
-            if cur in path:
-                raise SystemExit(f"Fehler: dep-Zyklus ueber Frage #{cur}.")
-            path.add(cur)
-            cur = parent[cur]
-    return head
+    Die Regeln stehen in sheet_spec, nicht hier: derselbe Datensatz wird in die HTML
+    injiziert, damit ein per Drag&Drop geladenes Sheet gleich beurteilt wird. Kein
+    SystemExit - das uebersetzt der CLI-Wrapper in main(), Aufrufer als Bibliothek
+    bekommen die Liste.
+    """
+    try:
+        _head, _questions, errors = sheet_spec.load(sheet_text)
+    except sheet_spec.SheetError as exc:
+        return [str(exc)]
+    return errors
 
 
 def main() -> int:
@@ -139,7 +97,10 @@ def main() -> int:
         raise SystemExit(f"Fehler: {args.sheet} existiert nicht.")
 
     sheet_text = args.sheet.read_text(encoding="utf-8")
-    head = validate(sheet_text, args.sheet)
+    errors = validate(sheet_text)
+    if errors:
+        raise SystemExit("\n".join(f"Fehler: {args.sheet}: {e}" for e in errors))
+    head, _questions = sheet_spec.parse_lines(sheet_text)
     slug = head.get("sheet") or args.sheet.stem
 
     template = find_template().read_text(encoding="utf-8")
@@ -153,7 +114,9 @@ def main() -> int:
         f'data-name="{slug}">\n{payload}\n</script>'
     )
     out = args.out or Path(tempfile.gettempdir()) / f"sheet-{slug}.html"
-    out.write_text(template.replace(MARKER, block), encoding="utf-8")
+    # Spec mitgeben: der Renderer prueft ein spaeter reingezogenes Sheet gegen
+    # dieselben Regeln, ohne sie zu kennen.
+    out.write_text(sheet_spec.inject(template.replace(MARKER, block)), encoding="utf-8")
     print(f"gerendert: {out}")
 
     open_it = not args.no_open

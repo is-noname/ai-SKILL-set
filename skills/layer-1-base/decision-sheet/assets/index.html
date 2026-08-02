@@ -179,6 +179,13 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 
 <!--SHEET-DATA-->
 
+<!-- Formatregeln als Daten. Erzeugt aus scripts/sheet_spec.py (python3 sheet_spec.py
+     --sync); render_sheet.py schreibt beim Rendern die jeweils aktuelle Fassung hier
+     hinein. Nicht von Hand pflegen. -->
+<script id="sheet-spec" type="application/json">
+{"version": 1, "default_type": "pick", "types": ["pick", "multi", "yn", "text"], "yn_options": ["ja", "nein"], "normalize": {"yn": {"field": "d", "truthy": ["y", "yes", "ja", "true", "1"], "labels": ["ja", "nein"]}}, "fields": [{"name": "id", "kind": "id", "required": true}, {"name": "q", "kind": "text", "required": true, "msg_missing": "missing_q", "msg_invalid": "invalid_q"}, {"name": "t", "kind": "enum", "values": ["pick", "multi", "yn", "text"], "msg_invalid": "invalid_t"}, {"name": "o", "kind": "options", "required_for": ["pick", "multi"], "msg_missing": "missing_o", "msg_invalid": "invalid_o"}, {"name": "d", "kind": "any"}, {"name": "why", "kind": "string", "msg_invalid": "invalid_string"}, {"name": "ctx", "kind": "string", "msg_invalid": "invalid_string"}, {"name": "dep", "kind": "dep", "msg_invalid": "invalid_dep"}], "messages": {"json": "Zeile {line} ist kein gültiges JSON: {detail}", "empty": "Sheet ist leer.", "not_object": "Zeile {line} ist kein JSON-Objekt.", "head_is_question": "Erste Zeile sieht aus wie eine Frage, hat aber keine 'id'.", "only_head": "Sheet enthält nur einen Header, keine Fragen.", "missing_id": "Frage ohne 'id': {value}", "dup_id": "Doppelte id '{id}'.", "missing_q": "Frage #{id} hat keinen Fragetext ('q').", "invalid_q": "Frage #{id}: 'q' muss ein String sein.", "invalid_t": "Frage #{id}: Typ '{value}' — erlaubt: {allowed}.", "missing_o": "Frage #{id} ist '{type}', hat aber keine Optionen ('o').", "invalid_o": "Frage #{id}: 'o' muss eine nicht-leere Liste sein.", "missing_field": "Frage #{id}: Feld '{field}' fehlt.", "invalid_field": "Frage #{id}: Feld '{field}' ist ungültig.", "invalid_string": "Frage #{id}: '{field}' muss ein String sein.", "invalid_dep": "Frage #{id} hat ein defektes 'dep' — erwartet [id, wert].", "unknown_dep": "Frage #{id} hängt an unbekannter id '{value}'.", "dep_cycle": "dep-Zyklus über Frage #{id}."}}
+</script>
+
 <script>
 "use strict";
 
@@ -208,50 +215,131 @@ function fingerprint() {
   return String(h);
 }
 
+/* ============ Format-Regeln ============
+   Kein zweiter Regelsatz: SPEC kommt aus sheet_spec.py und liegt als JSON-Block
+   in dieser Datei (render_sheet.py frischt ihn beim Rendern auf). Was hier steht,
+   ist nur die Schleife darüber - dieselbe wie in Python, damit ein per Drag&Drop
+   geladenes Sheet exakt gleich beurteilt wird wie eines, das durch das Script lief.
+======================================== */
+
+const SPEC = JSON.parse(document.getElementById("sheet-spec").textContent);
+
+function specMsg(key, vals) {
+  const t = SPEC.messages[key] || key;
+  return t.replace(/\{(\w+)\}/g, (m, k) => (vals && vals[k] !== undefined ? String(vals[k]) : m));
+}
+// Leer im Sinne der Spec - false und 0 sind Werte, keine Lücken.
+const specEmpty = v =>
+  v === null || v === undefined || v === "" ||
+  (Array.isArray(v) ? v.length === 0
+                    : typeof v === "object" && Object.keys(v).length === 0);
+
+function checkField(q, qid, qtype, f, ids) {
+  const v = q[f.name];
+  const required = f.required === true || (f.required_for || []).indexOf(qtype) >= 0;
+  if (specEmpty(v))
+    return required ? [specMsg(f.msg_missing || "missing_field", { id: qid, field: f.name, type: qtype })] : [];
+  const bad = f.msg_invalid || "invalid_field";
+  const vals = { id: qid, field: f.name, value: v };
+  if (f.kind === "text" || f.kind === "string") {
+    if (typeof v !== "string") return [specMsg(bad, vals)];
+  } else if (f.kind === "enum") {
+    if (f.values.indexOf(v) < 0)
+      return [specMsg(bad, Object.assign({ allowed: f.values.join(", ") }, vals))];
+  } else if (f.kind === "options") {
+    if (!Array.isArray(v)) return [specMsg(bad, vals)];
+  } else if (f.kind === "dep") {
+    if (!Array.isArray(v) || v.length !== 2) return [specMsg(bad, vals)];
+    if (!ids.has(String(v[0]))) return [specMsg("unknown_dep", { id: qid, value: v[0] })];
+  }
+  return [];
+}
+
+// dep wird rekursiv ausgewertet - ein Ring würde den Browser aufhängen.
+function checkCycles(objs) {
+  const parent = new Map();
+  for (const q of objs)
+    if (Array.isArray(q.dep) && q.dep.length === 2) parent.set(String(q.id), String(q.dep[0]));
+  const errs = [], reported = new Set();
+  for (const start of parent.keys()) {
+    if (reported.has(start)) continue;
+    const path = new Set([start]);
+    let cur = parent.get(start);
+    while (parent.has(cur)) {
+      if (path.has(cur)) {
+        // Ein Ring, eine Meldung: alle beteiligten Fragen gelten als gemeldet.
+        for (const p of path) reported.add(p);
+        errs.push(specMsg("dep_cycle", { id: cur }));
+        break;
+      }
+      path.add(cur);
+      cur = parent.get(cur);
+    }
+  }
+  return errs;
+}
+
+function checkSheet(objs) {
+  const errors = [], ids = new Set(), valid = [];
+  for (const q of objs) {
+    const qid = q.id === null || q.id === undefined ? "" : String(q.id).trim();
+    if (!qid) { errors.push(specMsg("missing_id", { value: JSON.stringify(q) })); continue; }
+    if (ids.has(qid)) { errors.push(specMsg("dup_id", { id: qid })); continue; }
+    ids.add(qid);
+    valid.push(q);
+  }
+  for (const q of valid) {
+    const qid = String(q.id), qtype = String(q.t === undefined ? SPEC.default_type : q.t);
+    for (const f of SPEC.fields) {
+      if (f.kind === "id") continue;
+      for (const e of checkField(q, qid, qtype, f, ids)) errors.push(e);
+    }
+  }
+  for (const e of checkCycles(valid)) errors.push(e);
+  return errors;
+}
+
+// Vereinheitlicht, was sonst jede Seite für sich auslegen müsste - vor allem das
+// yn-'d' ("y"/true/"ja" -> "ja"), damit ab hier gegen die sichtbaren Labels
+// verglichen werden kann.
+function normalizeSheet(objs) {
+  for (const q of objs) {
+    if (q.id !== null && q.id !== undefined) q.id = String(q.id);
+    const rule = SPEC.normalize[String(q.t === undefined ? SPEC.default_type : q.t)];
+    if (rule && q[rule.field] !== undefined)
+      q[rule.field] = rule.labels[rule.truthy.indexOf(String(q[rule.field]).toLowerCase()) >= 0 ? 0 : 1];
+  }
+  return objs;
+}
+
 /* ---------- Laden ---------- */
 
-function parseSheet(text) {
-  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-  const objs = lines.map((l, i) => {
-    try { return JSON.parse(l); }
-    catch (e) { throw new Error("Zeile " + (i + 1) + " ist kein gültiges JSON:\n" + l); }
-  });
-  if (!objs.length) throw new Error("Datei ist leer.");
-  const first = objs[0];
-  const h = first.id === undefined ? objs.shift() : {};
-  if (h.q) throw new Error("Erste Zeile sieht aus wie eine Frage, hat aber keine 'id'.");
-  if (!objs.length) throw new Error("Keine Fragen gefunden (nur Header).");
-  // Dieselben Regeln wie render_sheet.py - das Sheet kann auch per Drag&Drop
-  // hereinkommen und dann laeuft die Python-Validierung nicht.
-  const types = ["pick", "multi", "yn", "text"];
-  const ids = new Set();
-  for (const q of objs) {
-    const id = q.id === undefined || q.id === null ? "" : String(q.id);
-    if (!id) throw new Error("Frage ohne 'id': " + JSON.stringify(q));
-    if (ids.has(id)) throw new Error("Doppelte id '" + id + "'.");
-    ids.add(id);
-    if (!q.q) throw new Error("Frage #" + id + " hat keinen Fragetext ('q').");
-    const t = q.t || "pick";
-    if (!types.includes(t))
-      throw new Error("Frage #" + id + ": Typ '" + t + "' - erlaubt: " + types.join(", ") + ".");
-    if ((t === "pick" || t === "multi") && !(Array.isArray(q.o) && q.o.length))
-      throw new Error("Frage #" + id + " ist '" + t + "', hat aber keine Optionen ('o').");
+function parseLines(text) {
+  const objs = [];
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    let obj;
+    try { obj = JSON.parse(line); }
+    catch (e) { throw new Error(specMsg("json", { line: i + 1, detail: e.message })); }
+    if (obj === null || typeof obj !== "object" || Array.isArray(obj))
+      throw new Error(specMsg("not_object", { line: i + 1 }));
+    objs.push(obj);
   }
-  for (const q of objs) {
-    if (q.dep === undefined) continue;
-    if (!Array.isArray(q.dep) || q.dep.length !== 2)
-      throw new Error("Frage #" + q.id + " hat ein defektes 'dep' - erwartet [id, wert].");
-    if (!ids.has(String(q.dep[0])))
-      throw new Error("Frage #" + q.id + " hängt an unbekannter id '" + q.dep[0] + "'.");
-  }
-  // yn-Defaults normalisieren, damit ab hier überall gegen die sichtbaren Labels
-  // verglichen werden kann ("y"/true/"ja" sind alle erlaubt).
-  for (const q of objs) {
-    if (q.t !== "yn" || q.d === undefined) continue;
-    const d = String(q.d).toLowerCase();
-    q.d = (d === "y" || d === "yes" || d === "ja" || d === "true") ? "ja" : "nein";
-  }
+  if (!objs.length) throw new Error(specMsg("empty"));
+  const h = "id" in objs[0] ? {} : objs.shift();
+  if (h.q) throw new Error(specMsg("head_is_question"));
+  if (!objs.length) throw new Error(specMsg("only_head"));
   return { head: h, qs: objs };
+}
+
+function parseSheet(text) {
+  const p = parseLines(text);
+  const errors = checkSheet(p.qs);
+  if (errors.length) throw new Error(errors.join("\n"));
+  normalizeSheet(p.qs);
+  return p;
 }
 
 function load(text, filename) {
@@ -338,7 +426,7 @@ function visible(q, seen) {
   if (Array.isArray(got)) return got.some(g => wants.includes(g));
   return wants.includes(got);
 }
-const options = q => q.t === "yn" ? ["ja", "nein"] : (q.o || []);
+const options = q => q.t === "yn" ? SPEC.yn_options : (q.o || []);
 
 function set(id, val) {
   const s = state[id] || (state[id] = { a: null, n: "" });

@@ -21,6 +21,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sheet_spec  # noqa: E402  - liegt daneben, auch im globalen Spiegel
+
 # Herkunft eines Werts.
 EMPFEHLUNG = "empfehlung"
 GEWAEHLT = "gewaehlt"
@@ -62,35 +65,28 @@ class Aufloesung:
 
 
 def _normalize_yn(value: Any) -> Any:
-    """'y'/'yes'/'ja'/true -> 'ja', alles andere -> 'nein' (wie im Renderer)."""
-    return "ja" if str(value).lower() in ("y", "yes", "ja", "true") else "nein"
+    """'y'/'yes'/'ja'/true -> 'ja', alles andere -> 'nein' (Regel aus sheet_spec)."""
+    rule = sheet_spec.NORMALIZE["yn"]
+    return rule["labels"][0 if str(value).lower() in rule["truthy"] else 1]
 
 
 def parse_sheet(text: str) -> tuple[dict, list[dict]]:
-    """Zerlegt ein Sheet in (Header, Fragen). Erwartet ein JSON-Objekt pro Zeile."""
-    objs: list[dict] = []
-    for lineno, raw in enumerate(text.splitlines(), start=1):
-        line = raw.strip()
-        if not line:
-            continue
-        try:
-            objs.append(json.loads(line))
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Zeile {lineno} ist kein gueltiges JSON: {exc}") from exc
-    if not objs:
-        raise ValueError("Sheet ist leer.")
+    """Zerlegt ein Sheet in (Header, Fragen) - Format und Normalisierung aus sheet_spec.
 
-    head = objs.pop(0) if "id" not in objs[0] else {}
-    if not objs:
-        raise ValueError("Sheet enthaelt nur einen Header, keine Fragen.")
-
-    for q in objs:
+    Hier wird nur gemeckert, was das Aufloesen unmoeglich macht: ein Sheet ohne ids
+    laesst sich keiner Antwort zuordnen. Die uebrigen Regelverstoesse hat
+    render_sheet.py schon beim Schreiben gemeldet - beim Auswerten waeren sie nur
+    Laerm ueber eine Datei, die der User laengst beantwortet hat.
+    """
+    try:
+        head, questions = sheet_spec.parse_lines(text)
+    except sheet_spec.SheetError as exc:
+        raise ValueError(str(exc)) from exc
+    for q in questions:
         if q.get("id") in (None, ""):
-            raise ValueError(f"Frage ohne 'id': {q}")
-        q["id"] = str(q["id"])
-        if q.get("t") == "yn" and "d" in q:
-            q["d"] = _normalize_yn(q["d"])
-    return head, objs
+            raise ValueError(sheet_spec.msg("missing_id", value=json.dumps(q, ensure_ascii=False)))
+    sheet_spec.normalize(questions)
+    return head, questions
 
 
 def parse_answers(text: str) -> tuple[str, dict[str, Any]]:
