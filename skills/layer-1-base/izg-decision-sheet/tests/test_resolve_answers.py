@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Tests fuer resolve_answers.py - stdlib only (kein pytest noetig).
 
-    python3 -m unittest discover skills/layer-1-base/decision-sheet/tests
-    python3 skills/layer-1-base/decision-sheet/tests/test_resolve_answers.py
+    python3 -m unittest discover skills/layer-1-base/izg-decision-sheet/tests
+    python3 skills/layer-1-base/izg-decision-sheet/tests/test_resolve_answers.py
 """
 
 from __future__ import annotations

@@ -8,7 +8,7 @@
 
 | Skill | Beschreibung | Dependencies |
 |-------|-------------|-------------|
-| `decision-sheet` | Viele Entscheidungsfragen gebündelt ausserhalb der CLI beantworten (JSONL-Sheet + HTML-Renderer) | — |
+| `izg-decision-sheet` | Viele Entscheidungsfragen gebündelt ausserhalb der CLI beantworten (JSONL-Sheet + HTML-Renderer) | — |
 | `grill-me` | Plan/Design-Review via relentless interview | `grilling` |
 | `izg-ai-repo-pull` | Skills aus dem ai-SKILL-set repo in ein Projekt pullen | — |
 | `izg-domain-modeling` | Domänenmodell aufbauen — Begriffe, ADRs (doc-ids), CONTEXT.md | — |

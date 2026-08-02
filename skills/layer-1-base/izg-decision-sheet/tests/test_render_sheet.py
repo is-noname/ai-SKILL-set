@@ -5,8 +5,8 @@ Geprueft wird choose_template als reine Auswahl ueber zwei Kandidaten: kein
 Dateisystem, kein gefaelschtes Home-Verzeichnis. Genau dafuer ist die Funktion von
 `local_copy()`/`shared_copy()` getrennt - die lesen, diese entscheidet.
 
-    python3 -m unittest discover skills/layer-1-base/decision-sheet/tests
-    python3 skills/layer-1-base/decision-sheet/tests/test_render_sheet.py
+    python3 -m unittest discover skills/layer-1-base/izg-decision-sheet/tests
+    python3 skills/layer-1-base/izg-decision-sheet/tests/test_render_sheet.py
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import render_sheet  # noqa: E402
 
-LOKAL = Path("/projekt/.claude/skills/decision-sheet/assets/index.html")
-SPIEGEL = Path("/home/u/ai-shared/decision-sheet/index.html")
+LOKAL = Path("/projekt/.claude/skills/izg-decision-sheet/assets/index.html")
+SPIEGEL = Path("/home/u/ai-shared/izg-decision-sheet/index.html")
 
 
 def copy(template: Path, **files: str) -> render_sheet.Copy:

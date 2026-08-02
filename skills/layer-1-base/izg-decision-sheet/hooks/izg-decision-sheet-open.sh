@@ -15,8 +15,8 @@
 # mtime-Aufloesung, Antwort-ist-neuer, Sortierung - steht in sheet_state.py, damit es
 # testbar und auch fuer Codex/Vibe/Gemini erreichbar ist.
 #
-# Gegenstueck: decision-answers.sh holt die Antworten zurueck (#answers).
-# Gehoert zum Skill skills/layer-1-base/decision-sheet.
+# Gegenstueck: izg-decision-answers.sh holt die Antworten zurueck (#answers).
+# Gehoert zum Skill skills/layer-1-base/izg-decision-sheet.
 
 input=$(cat)
 
@@ -24,15 +24,15 @@ project=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
 [[ -n "$CLAUDE_PROJECT_DIR" ]] && project="$CLAUDE_PROJECT_DIR"
 [[ -n "$project" && -d "$project" ]] || project="$PWD"
 
-shared="$HOME/ai-shared/decision-sheet"
-# Kein Spiegel = decision-sheet ist auf dieser Maschine nicht eingerichtet: schweigen,
+shared="$HOME/ai-shared/izg-decision-sheet"
+# Kein Spiegel = izg-decision-sheet ist auf dieser Maschine nicht eingerichtet: schweigen,
 # sonst redet der Hook in jedem Projekt bei jedem Turn. Ein halber Spiegel dagegen ist
 # ein Defekt und wurde frueher genauso stillschweigend verschluckt - dann laeuft der
 # Hook als No-Op weiter und niemand merkt, dass die Sheets nicht mehr aufgehen.
 [[ -d "$shared" ]] || exit 0
 for required in render_sheet.py sheet_state.py; do
   if [[ ! -f "$shared/$required" ]]; then
-    echo "decision-sheet: $shared/$required fehlt - Spiegel unvollstaendig." \
+    echo "izg-decision-sheet: $shared/$required fehlt - Spiegel unvollstaendig." \
          "Neu deployen: bash <ai-SKILL-set>/scripts/setup_global_conventions.sh ~/.claude"
     exit 0
   fi

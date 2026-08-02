@@ -1,5 +1,5 @@
 ---
-name: decision-sheet
+name: izg-decision-sheet
 description: "Bündelt viele Entscheidungsfragen in ein Dokument, das der User ausserhalb der CLI in einem HTML-Renderer beantwortet und als Antwort-Datei zurückgibt. Statt zehn AskUserQuestion-Runden ein Sheet. Dieser Skill sollte verwendet werden, wenn mehr als drei Entscheidungen offen sind, wenn der User sie am Stück oder in Ruhe beantworten will (Fragenkatalog, Entscheidungsliste, Sheet, Fragebogen), oder wenn eine exportierte .answers.json eingelesen werden soll."
 layer: 1
 dependencies: []
@@ -16,7 +16,7 @@ Drei bewegliche Teile:
 | Teil | Wo | Wer |
 |------|-----|-----|
 | Sheet `<slug>.jsonl` | `<projekt>/.decisions/` | Agent schreibt |
-| Renderer `index.html` | im Skill; global gespiegelt nach `~/ai-shared/decision-sheet/` | User bedient |
+| Renderer `index.html` | im Skill; global gespiegelt nach `~/ai-shared/izg-decision-sheet/` | User bedient |
 | Antworten `<slug>.answers.json` | `<projekt>/.decisions/` | User exportiert |
 
 Die Scripts im Skill funktionieren überall — auch auf einem System, auf dem der
@@ -62,7 +62,7 @@ Der Aufruf ist auch mit Hook kein Leerlauf — er ist deine einzige Rückmeldung
 das Sheet überhaupt valide ist, bevor dein Turn endet.
 
 Liegt der Skill nicht im Projekt, tut es der globale Spiegel:
-`python3 ~/ai-shared/decision-sheet/render_sheet.py …` — identisches Script.
+`python3 ~/ai-shared/izg-decision-sheet/render_sheet.py …` — identisches Script.
 
 Gilt es doch mal nicht: der Skill im Projekt kam mit deinem Pull, der Spiegel vom
 letzten Setup-Lauf auf dieser Maschine. Das Script nimmt deshalb die Kopie neben sich
@@ -173,13 +173,13 @@ die `.gitignore`. Der Skill-Pull bringt alles mit, was der Ablauf braucht —
 bash <ai-SKILL-set>/scripts/setup_global_conventions.sh ~/.claude
 ```
 
-Spiegelt Renderer und Scripts nach `~/ai-shared/decision-sheet/` und registriert zwei
+Spiegelt Renderer und Scripts nach `~/ai-shared/izg-decision-sheet/` und registriert zwei
 Hooks in `~/.claude/settings.json`:
 
 | Hook | Event | Wirkung |
 |------|-------|---------|
-| `decision-sheet-open.sh` | `Stop` | Sheet, das an `render_sheet.py` vorbei entstanden ist, geht trotzdem auf |
-| `decision-answers.sh` | `UserPromptSubmit` | `#answers` holt die Antworten zurück |
+| `izg-decision-sheet-open.sh` | `Stop` | Sheet, das an `render_sheet.py` vorbei entstanden ist, geht trotzdem auf |
+| `izg-decision-answers.sh` | `UserPromptSubmit` | `#answers` holt die Antworten zurück |
 
 Was die Hooks bringen: der Hinweg funktioniert auch dann, wenn das Sheet an
 `render_sheet.py` vorbei entstanden ist, und der Rückweg kostet dich keinen Tool-Call.
@@ -205,7 +205,7 @@ komplette Ablauf funktioniert aus dem gepullten Skill heraus:
 | Script meldet „gerendert", aber es geht kein Fenster auf | `xdg-open` fehlt oder hat keinen Browser zugeordnet — der Pfad steht in der Meldung, manuell öffnen |
 | Sheet geschrieben, gar nichts passiert | `render_sheet.py` nicht aufgerufen — genau dafür ist der Aufruf Pflicht, auch mit Hook |
 | `render_sheet.py`: keine index.html gefunden | Skill unvollständig gepullt (`assets/` fehlt) und kein globaler Spiegel da |
-| „globaler Spiegel weicht vom Skill ab" | Skill-Kopie und `~/ai-shared/decision-sheet/` sind auseinandergelaufen — gerendert wird korrekt mit der Skill-Kopie, aber der Hook nutzt den alten Spiegel: `setup_global_conventions.sh ~/.claude` erneut laufen lassen |
+| „globaler Spiegel weicht vom Skill ab" | Skill-Kopie und `~/ai-shared/izg-decision-sheet/` sind auseinandergelaufen — gerendert wird korrekt mit der Skill-Kopie, aber der Hook nutzt den alten Spiegel: `setup_global_conventions.sh ~/.claude` erneut laufen lassen |
 | Hook meldet „Spiegel unvollständig" | Im Spiegel fehlt eine Datei (typisch nach einem Setup-Lauf vor einer neuen Script-Datei) — dasselbe Kommando behebt es |
 | Renderer zeigt Dropzone statt Fragen | Sheet defekt — Fehlermeldung steht in der Box darunter |
 | `#answers` bringt nichts | Hook nicht eingerichtet → `fetch_answers.py` selbst aufrufen; oder Export noch nicht gespeichert (nur „Kopieren" gedrückt) |

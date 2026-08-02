@@ -5,7 +5,7 @@ Sucht die neueste passende *.answers.json im Download-Ordner, verschiebt sie nac
 <projekt>/.decisions/ und schreibt den Inhalt auf stdout.
 
 Zwei Aufrufer teilen sich diese Logik:
-  - decision-answers.sh (UserPromptSubmit-Hook) bei "#answers" - stdout landet
+  - izg-decision-answers.sh (UserPromptSubmit-Hook) bei "#answers" - stdout landet
     automatisch im Kontext des Agenten.
   - der Agent selbst per Bash, wenn der Hook auf dem System nicht eingerichtet ist.
 

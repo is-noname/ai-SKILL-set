@@ -5,8 +5,8 @@ Geprueft wird der Lebenszyklus, nicht die Dateiformate: was wartet, was ist durc
 was geht nach einer Korrektur wieder auf. Die Nanosekunden-Falle (Korrektur in
 derselben Sekunde wie der Stempel) steht hier als Test statt als Kommentar im Hook.
 
-    python3 -m unittest discover skills/layer-1-base/decision-sheet/tests
-    python3 skills/layer-1-base/decision-sheet/tests/test_sheet_state.py
+    python3 -m unittest discover skills/layer-1-base/izg-decision-sheet/tests
+    python3 skills/layer-1-base/izg-decision-sheet/tests/test_sheet_state.py
 """
 
 from __future__ import annotations

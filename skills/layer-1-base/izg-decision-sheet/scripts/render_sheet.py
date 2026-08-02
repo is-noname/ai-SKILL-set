@@ -31,7 +31,7 @@ import sheet_spec  # noqa: E402  - liegt daneben, auch im globalen Spiegel
 import sheet_state  # noqa: E402
 
 MARKER = "<!--SHEET-DATA-->"
-SHARED_DIR = Path.home() / "ai-shared" / "decision-sheet"
+SHARED_DIR = Path.home() / "ai-shared" / "izg-decision-sheet"
 
 # Was setup_global_conventions.sh spiegelt (deploy_decision_sheet). Steht hier, um
 # die beiden Ablagen vergleichen zu koennen - faellt spaeter eine Datei dazu, deckt

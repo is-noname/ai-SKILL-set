@@ -6,8 +6,8 @@ herauskommen muss. Dieselbe Tabelle laeuft gegen die Python-Schleife und - wenn 
 da ist - gegen die JS-Schleife aus assets/index.html. Genau dort sind die beiden
 Implementierungen frueher auseinandergedriftet.
 
-    python3 -m unittest discover skills/layer-1-base/decision-sheet/tests
-    python3 skills/layer-1-base/decision-sheet/tests/test_sheet_spec.py
+    python3 -m unittest discover skills/layer-1-base/izg-decision-sheet/tests
+    python3 skills/layer-1-base/izg-decision-sheet/tests/test_sheet_spec.py
 """
 
 from __future__ import annotations

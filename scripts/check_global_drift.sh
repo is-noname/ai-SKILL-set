@@ -18,15 +18,15 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # setup_global_conventions.sh stets überschriebenen (= managed) Dateien.
 # Format: "<repo-relpath>|<agent-relpath>[|<nur-für-agent-dir>]"
 # Das dritte Feld beschränkt den Eintrag auf ein Agent-Dir — für Dateien, die
-# nur dort Sinn ergeben (die decision-sheet-Hooks brauchen Claudes settings.json).
+# nur dort Sinn ergeben (die izg-decision-sheet-Hooks brauchen Claudes settings.json).
 MANAGED=(
   "docs/tickets.md|tickets.md"
   "docs/doc-ids.md|doc-ids.md"
   "docs/design-tokens.md|design-tokens.md"
   "scripts/init_tickets.sh|scripts/init_tickets.sh"
   "hooks/global/ticket-mover.sh|hooks/ticket-mover.sh"
-  "skills/layer-1-base/decision-sheet/hooks/decision-answers.sh|hooks/decision-answers.sh|.claude"
-  "skills/layer-1-base/decision-sheet/hooks/decision-sheet-open.sh|hooks/decision-sheet-open.sh|.claude"
+  "skills/layer-1-base/izg-decision-sheet/hooks/izg-decision-answers.sh|hooks/izg-decision-answers.sh|.claude"
+  "skills/layer-1-base/izg-decision-sheet/hooks/izg-decision-sheet-open.sh|hooks/izg-decision-sheet-open.sh|.claude"
 )
 
 KNOWN_AGENT_DIRS=(".claude" ".codex" ".gemini" ".vibe")

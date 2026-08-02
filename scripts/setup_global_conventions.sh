@@ -132,12 +132,12 @@ deploy_shared_convention() {
   fi
 }
 
-# Deployt den decision-sheet Renderer nach ~/ai-shared/decision-sheet/ (IZG-T-063).
+# Deployt den izg-decision-sheet Renderer nach ~/ai-shared/izg-decision-sheet/ (IZG-T-063).
 # Agent-neutral und bewusst NICHT pro Agent-Dir: der Skill referenziert den Pfad als
 # Konvention, egal welcher Agent das Sheet schreibt. Idempotent.
 deploy_decision_sheet() {
-  local target="$HOME/ai-shared/decision-sheet"
-  local src="skills/layer-1-base/decision-sheet"
+  local target="$HOME/ai-shared/izg-decision-sheet"
+  local src="skills/layer-1-base/izg-decision-sheet"
   mkdir -p "$target"
   deploy_file "$src/assets/index.html" "$target/index.html" || return 1
   for py in sheet_spec.py sheet_state.py render_sheet.py fetch_answers.py resolve_answers.py; do
@@ -299,15 +299,15 @@ PY
     fi
   fi
 
-  # decision-sheet (IZG-T-063): Renderer global bereitstellen, Abhol-Hook je Agent-Dir.
+  # izg-decision-sheet (IZG-T-063): Renderer global bereitstellen, Abhol-Hook je Agent-Dir.
   deploy_decision_sheet || return 1
   # Quelle sind die Hooks IM Skill, nicht hooks/global/: so kommen sie beim
   # Skill-Pull mit und lassen sich auch ohne dieses Repo einrichten.
   # Nur nach .claude: die Hooks setzen Claudes settings.json-Format voraus und
   # wuerden in den anderen Agent-Dirs nur unregistriert herumliegen.
   if [ "$agent_name" = ".claude" ]; then
-    for ds_hook in decision-answers.sh decision-sheet-open.sh; do
-      deploy_file "skills/layer-1-base/decision-sheet/hooks/$ds_hook" "$AGENT_DIR/hooks/$ds_hook" || return 1
+    for ds_hook in izg-decision-answers.sh izg-decision-sheet-open.sh; do
+      deploy_file "skills/layer-1-base/izg-decision-sheet/hooks/$ds_hook" "$AGENT_DIR/hooks/$ds_hook" || return 1
       [ -f "$AGENT_DIR/hooks/$ds_hook" ] && chmod +x "$AGENT_DIR/hooks/$ds_hook"
     done
   fi
@@ -318,9 +318,9 @@ PY
   if [ "$agent_name" = ".claude" ]; then
     local ds_settings="$AGENT_DIR/settings.json"
     if [ ! -f "$ds_settings" ]; then
-      echo "  $ds_settings nicht gefunden — decision-sheet-Hooks nicht registriert (liegen bereit)"
+      echo "  $ds_settings nicht gefunden — izg-decision-sheet-Hooks nicht registriert (liegen bereit)"
     elif ! command -v python3 >/dev/null 2>&1; then
-      echo "  python3 fehlt — decision-sheet-Hooks nicht registriert (liegen bereit)"
+      echo "  python3 fehlt — izg-decision-sheet-Hooks nicht registriert (liegen bereit)"
     else
       python3 - "$ds_settings" "$AGENT_DIR/hooks" <<'PY'
 import json, sys
@@ -329,8 +329,8 @@ with open(settings_path) as f:
     data = json.load(f)
 hooks = data.setdefault("hooks", {})
 wanted = [
-    ("UserPromptSubmit", f"{hooks_dir}/decision-answers.sh", "Decision-Sheet-Antworten pruefen..."),
-    ("Stop", f"{hooks_dir}/decision-sheet-open.sh", "Decision Sheet oeffnen..."),
+    ("UserPromptSubmit", f"{hooks_dir}/izg-decision-answers.sh", "Decision-Sheet-Antworten pruefen..."),
+    ("Stop", f"{hooks_dir}/izg-decision-sheet-open.sh", "Decision Sheet oeffnen..."),
 ]
 changed = []
 for event, cmd, msg in wanted:
@@ -340,12 +340,12 @@ for event, cmd, msg in wanted:
     entries.append({"hooks": [{"type": "command", "command": cmd, "statusMessage": msg}]})
     changed.append(event)
 if not changed:
-    print("  settings.json: decision-sheet-Hooks bereits registriert — übersprungen")
+    print("  settings.json: izg-decision-sheet-Hooks bereits registriert — übersprungen")
     sys.exit(0)
 with open(settings_path, "w") as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
     f.write("\n")
-print("  patched: settings.json (decision-sheet: " + ", ".join(changed) + ")")
+print("  patched: settings.json (izg-decision-sheet: " + ", ".join(changed) + ")")
 PY
     fi
   fi

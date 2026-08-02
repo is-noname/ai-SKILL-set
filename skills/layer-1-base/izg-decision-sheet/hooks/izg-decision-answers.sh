@@ -10,7 +10,7 @@
 # Kontext des Agenten. Auf Systemen ohne Hooks ruft der Agent dasselbe Script
 # direkt auf, damit die Logik nur einmal existiert.
 #
-# Gehoert zum Skill skills/layer-1-base/decision-sheet (siehe dessen SKILL.md).
+# Gehoert zum Skill skills/layer-1-base/izg-decision-sheet (siehe dessen SKILL.md).
 
 input=$(cat)
 
@@ -21,9 +21,9 @@ project=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
 [[ -n "$CLAUDE_PROJECT_DIR" ]] && project="$CLAUDE_PROJECT_DIR"
 [[ -n "$project" && -d "$project" ]] || project="$PWD"
 
-fetcher="$HOME/ai-shared/decision-sheet/fetch_answers.py"
+fetcher="$HOME/ai-shared/izg-decision-sheet/fetch_answers.py"
 if [[ ! -f "$fetcher" ]]; then
-  echo "decision-sheet: $fetcher fehlt - globales Setup nicht gelaufen."
+  echo "izg-decision-sheet: $fetcher fehlt - globales Setup nicht gelaufen."
   echo "Fix: bash <ai-SKILL-set>/scripts/setup_global_conventions.sh ~/.claude"
   exit 0
 fi
