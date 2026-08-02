@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sheet_spec  # noqa: E402  - liegt daneben, auch im globalen Spiegel
+import sheet_state  # noqa: E402
 
 MARKER = "<!--SHEET-DATA-->"
 SHARED_TEMPLATE = Path.home() / "ai-shared" / "decision-sheet" / "index.html"
@@ -121,16 +122,17 @@ def main() -> int:
 
     open_it = not args.no_open
     if open_it and not args.force_open:
-        # Projektwurzel = Elternverzeichnis von .decisions/, sonst das Sheet-Verzeichnis.
-        sheet_dir = args.sheet.resolve().parent
-        project = sheet_dir.parent if sheet_dir.name == ".decisions" else sheet_dir
-        if stop_hook_active(project):
-            # Nicht selbst oeffnen und vor allem nicht stempeln: der Stop-Hook
-            # ueberspringt gestempelte Sheets, sonst ginge das Fenster nie auf.
+        if stop_hook_active(sheet_state.project_of(args.sheet)):
+            # Der Hook oeffnet und stempelt gleich selbst - hier passiert beides
+            # nicht, sonst ueberspringt er das gestempelte Sheet und es ginge nie
+            # ein Fenster auf.
             print("Stop-Hook aktiv - das Fenster geht auf, sobald du fertig geantwortet hast.")
             return 0
 
     if open_it:
+        # Wer oeffnet, stempelt: sonst zeigt ein spaeter eingerichteter Hook dasselbe
+        # Sheet ein zweites Mal.
+        sheet_state.mark_opened(sheet_state.Sheet.at(args.sheet))
         try:
             subprocess.Popen(
                 ["xdg-open", str(out)],

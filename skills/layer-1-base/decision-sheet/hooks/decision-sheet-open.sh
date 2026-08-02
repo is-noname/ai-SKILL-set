@@ -2,10 +2,13 @@
 # Stop hook: oeffnet ein neu geschriebenes Decision Sheet, sobald der Agent fertig ist.
 #
 # Bewusst als Stop-Hook und nicht als PostToolUse: so ist es egal, WIE das Sheet
-# entstanden ist (Write, Edit, Bash-Heredoc, Script) - der Hook schaut nur, ob in
-# <projekt>/.decisions/ ein Sheet liegt, das noch nicht beantwortet und noch nicht
-# geoeffnet wurde. Und er feuert erst, wenn der Agent zu Ende geredet hat, statt
+# entstanden ist (Write, Edit, Bash-Heredoc, Script) - der Hook fragt nur, ob eins
+# auf den User wartet. Und er feuert erst, wenn der Agent zu Ende geredet hat, statt
 # mitten im Turn ein Fenster aufzureissen.
+#
+# Der Hook ist nur der Trigger. Was "wartet auf den User" heisst - Stempel,
+# mtime-Aufloesung, Antwort-ist-neuer, Sortierung - steht in sheet_state.py, damit es
+# testbar und auch fuer Codex/Vibe/Gemini erreichbar ist.
 #
 # Gegenstueck: decision-answers.sh holt die Antworten zurueck (#answers).
 # Gehoert zum Skill skills/layer-1-base/decision-sheet.
@@ -16,52 +19,30 @@ project=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
 [[ -n "$CLAUDE_PROJECT_DIR" ]] && project="$CLAUDE_PROJECT_DIR"
 [[ -n "$project" && -d "$project" ]] || project="$PWD"
 
-dir="$project/.decisions"
-[[ -d "$dir" ]] || exit 0
+shared="$HOME/ai-shared/decision-sheet"
+[[ -f "$shared/render_sheet.py" && -f "$shared/sheet_state.py" ]] || exit 0
 
-renderer="$HOME/ai-shared/decision-sheet/render_sheet.py"
-[[ -f "$renderer" ]] || exit 0
+sheet=$(python3 "$shared/sheet_state.py" pending "$project" 2>/dev/null) || exit 0
+[[ -n "$sheet" ]] || exit 0
+slug=$(basename "$sheet" .jsonl)
 
-stamp="$dir/.opened"
-touch "$stamp" 2>/dev/null || exit 0
+# --force-open: das Script erkennt sonst diesen Hook in der settings.json und
+# ueberliesse ihm das Oeffnen - also sich selbst. Dann ginge nie ein Fenster auf.
+render_out=$(python3 "$shared/render_sheet.py" "$sheet" --force-open 2>&1)
+render_rc=$?
 
-# Neuestes Sheet zuerst - pro Turn wird maximal ein Fenster geoeffnet.
-while read -r sheet; do
-  [[ -n "$sheet" ]] || continue
-  slug=$(basename "$sheet" .jsonl)
-  answers="$dir/$slug.answers.json"
+# Beim Oeffnen stempelt das Script selbst; hier steht es noch einmal fuer den
+# Fehlerfall, in dem es vorher abbricht - sonst wiederholt ein defektes Sheet seine
+# Meldung in jedem Turn. Wird es korrigiert, aendert sich die mtime und es kommt
+# erneut dran. Zweimal stempeln schadet nicht, der Eintrag ist derselbe.
+python3 "$shared/sheet_state.py" mark-opened "$sheet" 2>/dev/null
 
-  # Schon beantwortet (Antworten neuer als das Sheet)? Dann ist es durch.
-  [[ -f "$answers" && "$answers" -nt "$sheet" ]] && continue
-
-  # Schon geoeffnet? Der Stempel haelt Pfad + mtime fest, damit ein GEAENDERTES
-  # Sheet wieder aufgeht, ein unveraendertes aber nicht bei jedem Turn erneut.
-  # Nanosekunden-Auflaesung (%.9Y), nicht %Y: eine Korrektur direkt nach dem
-  # Stempeln faellt sonst in dieselbe Sekunde und das Sheet gilt als unveraendert.
-  mtime=$(stat -c %.9Y "$sheet" 2>/dev/null || stat -c %Y "$sheet" 2>/dev/null)
-  grep -qxF "$sheet $mtime" "$stamp" 2>/dev/null && continue
-
-  # --force-open: das Script erkennt sonst diesen Hook in der settings.json und
-  # ueberliesse ihm das Oeffnen - also sich selbst. Dann ginge nie ein Fenster auf.
-  render_out=$(python3 "$renderer" "$sheet" --force-open 2>&1)
-  render_rc=$?
-
-  # Stempeln passiert in BEIDEN Faellen: sonst wiederholt ein defektes Sheet seine
-  # Fehlermeldung in jedem Turn. Wird es korrigiert, aendert sich die mtime und der
-  # Hook nimmt es erneut dran. Alten Eintrag ersetzen, damit der Stempel nicht waechst.
-  grep -vF "$sheet " "$stamp" > "$stamp.tmp" 2>/dev/null
-  mv -f "$stamp.tmp" "$stamp" 2>/dev/null
-  printf '%s %s\n' "$sheet" "$mtime" >> "$stamp"
-
-  if [[ $render_rc -eq 0 ]]; then
-    echo "Decision Sheet geoeffnet: $slug ($(grep -c . "$sheet") Zeilen)"
-  else
-    # Sheet ist defekt - Validator-Meldung durchreichen, damit sie im Transkript steht.
-    echo "Decision Sheet '$slug' konnte nicht gerendert werden:"
-    printf '%s\n' "$render_out" | tail -3
-  fi
-  break
-done < <(find "$dir" -maxdepth 1 -name '*.jsonl' -type f -printf '%T@ %p\n' 2>/dev/null \
-           | sort -rn | cut -d' ' -f2-)
+if [[ $render_rc -eq 0 ]]; then
+  echo "Decision Sheet geoeffnet: $slug ($(grep -c . "$sheet") Zeilen)"
+else
+  # Sheet ist defekt - Validator-Meldung durchreichen, damit sie im Transkript steht.
+  echo "Decision Sheet '$slug' konnte nicht gerendert werden:"
+  printf '%s\n' "$render_out" | tail -3
+fi
 
 exit 0
