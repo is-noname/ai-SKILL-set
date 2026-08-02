@@ -124,30 +124,32 @@ python3 <skill>/scripts/fetch_answers.py [--slug <slug>]
 Sag dem User in dem Fall einmal, dass er dir nach dem Export kurz Bescheid gibt,
 statt auf die Automatik zu warten.
 
-Format:
+### Interpretation: nicht selbst rechnen
 
-```json
-{"sheet":"ticketsystem-v2","a":{"1":"Timestamp","3":"archive","4":["claude","codex","vibe"],"5":{"a":"flock","n":"prüf ob NFS ein Problem ist"}}}
+Die Antwort-Datei ist komprimiert (übernommene Empfehlungen fehlen, `dep`-gefilterte
+Fragen tauchen nie auf) und **ohne das Sheet bedeutungslos** — beides zusammenführen
+tut `resolve_answers.py`, nicht du:
+
+```bash
+python3 <skill>/scripts/resolve_answers.py .decisions/<slug>.jsonl .decisions/<slug>.answers.json
 ```
 
-Interpretation:
+`fetch_answers.py` (und damit auch `#answers`) ruft es selbst auf, sobald das Sheet
+danebenliegt — du bekommst die aufgelöste Tabelle statt der Rohdatei. Jede Zeile nennt
+Frage, effektiven Wert und Herkunft (`Empfehlung` / `gewaehlt` / `offen`); mit `!`
+markierte Zeilen und die `ACHTUNG`-Zeile am Ende sind Fragen ohne belastbare
+Entscheidung — die klärst du, **bevor** du sie umsetzt. Notizen sind verbindlich, nicht
+Deko.
 
-- **Key fehlt** → Empfehlung (`d`) übernommen. `"a": {}` heisst: alles wie vorgeschlagen.
-- **Wert** → die abweichende Antwort. Bei `multi` ein Array; `[]` heisst „nichts davon"
-  und ist eine echte Antwort, kein leerer Eintrag.
-- **`{"a": wert, "n": "notiz"}`** → Antwort plus Ergänzung des Users. Die Notiz ist
-  verbindlich, nicht Deko — sie enthält oft die eigentliche Einschränkung.
-- **`{"a": null, "n": "notiz"}`** → keine Auswahl, nur ein Kommentar. Meist eine
-  Rückfrage, die du beantworten musst, bevor du die Entscheidung umsetzt.
-- Fragen, deren `dep` nicht erfüllt war, tauchen nicht auf — die sind gegenstandslos.
+Nur wenn das Sheet fehlt, kommt die Rohdatei — dann gilt: Key fehlt = Empfehlung `d`
+übernommen, `{"a":wert,"n":…}` = Antwort plus Notiz, `{"a":null,"n":…}` = keine Auswahl,
+nur eine Rückfrage, `[]` bei `multi` = echtes „nichts davon". Das Sheet liegt in dem Fall
+meist trotzdem als `.decisions/<slug>.jsonl` da — lesen statt raten.
 
 Die Notiz steht bewusst im Objekt und nicht als `[wert, notiz]`-Tupel: eine
 `multi`-Antwort mit zwei Optionen (`["claude","codex"]`) wäre sonst nicht von
-Antwort-plus-Notiz zu unterscheiden.
-
-Falls das Sheet nicht mehr im Kontext ist (Kompaktierung), liegt es als
-`.decisions/<slug>.jsonl` daneben — lesen statt raten. Antwort-Dateien tragen bewusst
-keine Fragetexte mit, damit der Rückweg billig bleibt.
+Antwort-plus-Notiz zu unterscheiden. Antwort-Dateien tragen bewusst keine Fragetexte
+mit, damit der Rückweg billig bleibt.
 
 Nach dem Umsetzen: `.decisions/` gehört in die `.gitignore` des Projekts, die Sheets
 sind Wegwerf-Artefakte. Was dauerhaft gilt, gehört als ADR (`doc-ids`) oder in
@@ -189,7 +191,8 @@ komplette Ablauf funktioniert aus dem gepullten Skill heraus:
    Hook, öffnet das Fenster also selbst. Fehlt der globale Spiegel, fällt das Script
    auf die `assets/index.html` neben sich zurück.
 3. Nach dem Export `python3 <skill>/scripts/fetch_answers.py` — holt die Datei aus
-   dem Download-Ordner nach `.decisions/` und gibt sie aus (Interpretation: Modus 2).
+   dem Download-Ordner nach `.decisions/` und gibt die aufgelöste Entscheidungstabelle
+   aus (`resolve_answers.py` läuft mit, ohne Hook und ohne Zutun).
 
 ## Wenn etwas nicht funktioniert
 
@@ -201,6 +204,7 @@ komplette Ablauf funktioniert aus dem gepullten Skill heraus:
 | Renderer zeigt Dropzone statt Fragen | Sheet defekt — Fehlermeldung steht in der Box darunter |
 | `#answers` bringt nichts | Hook nicht eingerichtet → `fetch_answers.py` selbst aufrufen; oder Export noch nicht gespeichert (nur „Kopieren" gedrückt) |
 | Export ist `{"sheet":…,"a":{}}` | Kein Fehler — der User hat alle Empfehlungen übernommen |
+| `fetch_answers.py` gibt die Rohdatei statt der Tabelle aus | Das Sheet liegt nicht als `.decisions/<slug>.jsonl` daneben (anderer Slug?) — `resolve_answers.py` mit beiden Pfaden selbst aufrufen |
 
 Letzter Ausweg ganz ohne Scripts: `assets/index.html` im Browser öffnen, Sheet
 reinziehen, exportierte Datei selbst nach `.decisions/` legen und den Pfad nennen.

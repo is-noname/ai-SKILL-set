@@ -23,6 +23,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Nachbarmodul - liegt sowohl im Skill als auch im globalen Spiegel daneben.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import resolve_answers  # noqa: E402
+
 CHROME_SUFFIX = re.compile(r" \(\d+\)(\.answers\.json)$")
 
 
@@ -91,10 +95,18 @@ def main() -> int:
 
     sheet = answers.with_name(answers.name.removesuffix(".answers.json") + ".jsonl")
     print(f"Decision-Sheet-Antworten aus: {answers}")
+
+    # Die Rohdatei ist ohne das Sheet bedeutungslos (uebernommene Empfehlungen
+    # fehlen darin). Liegt das Sheet daneben, geht die aufgeloeste Tabelle raus.
     if sheet.is_file():
-        print(f"Zugehoeriges Sheet: {sheet}")
-    print('Leere Map in "a" = alle Empfehlungen uebernommen. '
-          '{"a":wert,"n":notiz} = Auswahl plus Ergaenzung.')
+        print(f"Zugehoeriges Sheet: {sheet}\n")
+        try:
+            print(resolve_answers.format_report(resolve_answers.resolve_all(sheet, answers)))
+            return 0
+        except (OSError, ValueError) as exc:
+            print(f"Aufloesung fehlgeschlagen ({exc}) - Rohdatei folgt.")
+
+    print("Kein Sheet daneben - Rohdatei (Interpretation: SKILL.md, Modus 2):")
     print(answers.read_text(encoding="utf-8").strip())
     return 0
 
