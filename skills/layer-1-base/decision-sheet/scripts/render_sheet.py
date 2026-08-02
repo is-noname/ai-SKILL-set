@@ -6,14 +6,14 @@ fetch()/XHR auf lokale Dateien. Das Sheet wird deshalb direkt als
 <script type="application/json"> in eine Kopie der index.html injiziert - kein
 Server, kein Port, kein Prozess der haengen bleibt.
 
-Der Agent ruft immer denselben Befehl auf, egal ob die Hooks eingerichtet sind:
-ist der Stop-Hook registriert, wird nur validiert und gebaut (er oeffnet gleich
-selbst), sonst geht das Fenster sofort auf. So gibt es genau einen Pfad und kein
-Sheet, das unbemerkt liegen bleibt.
+Wer hier landet, bekommt ein Fenster - ohne Ausnahme und ohne zu fragen, ob
+irgendwo ein Hook registriert ist. Das Oeffnen stempelt das Sheet (sheet_state),
+und der Stop-Hook nimmt sich nur ungestempelte Sheets vor. Er ist damit reiner
+Nachzuegler fuer Sheets, die an diesem Script vorbei entstanden sind, und kann
+sich nicht mit ihm ins Gehege kommen.
 
 Usage:
     python3 render_sheet.py .decisions/ticketsystem-v2.jsonl [--no-open] [--out PFAD]
-    python3 render_sheet.py <sheet> --force-open   # Hook-Aufruf: immer oeffnen
 """
 
 from __future__ import annotations
@@ -30,29 +30,6 @@ import sheet_state  # noqa: E402
 
 MARKER = "<!--SHEET-DATA-->"
 SHARED_TEMPLATE = Path.home() / "ai-shared" / "decision-sheet" / "index.html"
-HOOK_NAME = "decision-sheet-open"
-
-
-def stop_hook_active(project: Path) -> bool:
-    """Ist der Stop-Hook registriert, der das Sheet von selbst oeffnet?
-
-    Substring-Suche statt JSON-Auswertung: das Hook-Format unterscheidet sich je
-    Agent und Version, der Skriptname ist das stabile Merkmal. Ein Treffer in einer
-    auskommentierten Zeile gaebe es hier nicht - JSON kennt keine Kommentare.
-    """
-    candidates = [
-        project / ".claude" / "settings.json",
-        project / ".claude" / "settings.local.json",
-        Path.home() / ".claude" / "settings.json",
-        Path.home() / ".claude" / "settings.local.json",
-    ]
-    for path in candidates:
-        try:
-            if HOOK_NAME in path.read_text(encoding="utf-8"):
-                return True
-        except OSError:
-            continue
-    return False
 
 
 def find_template() -> Path:
@@ -87,11 +64,6 @@ def main() -> int:
     ap.add_argument("sheet", type=Path, help="Pfad zur .jsonl-Datei")
     ap.add_argument("--out", type=Path, help="Zielpfad der HTML (Default: Temp-Verzeichnis)")
     ap.add_argument("--no-open", action="store_true", help="nur bauen, nicht oeffnen")
-    ap.add_argument(
-        "--force-open",
-        action="store_true",
-        help="immer oeffnen, Hook-Erkennung ueberspringen (nutzt der Stop-Hook selbst)",
-    )
     args = ap.parse_args()
 
     if not args.sheet.is_file():
@@ -120,18 +92,9 @@ def main() -> int:
     out.write_text(sheet_spec.inject(template.replace(MARKER, block)), encoding="utf-8")
     print(f"gerendert: {out}")
 
-    open_it = not args.no_open
-    if open_it and not args.force_open:
-        if stop_hook_active(sheet_state.project_of(args.sheet)):
-            # Der Hook oeffnet und stempelt gleich selbst - hier passiert beides
-            # nicht, sonst ueberspringt er das gestempelte Sheet und es ginge nie
-            # ein Fenster auf.
-            print("Stop-Hook aktiv - das Fenster geht auf, sobald du fertig geantwortet hast.")
-            return 0
-
-    if open_it:
-        # Wer oeffnet, stempelt: sonst zeigt ein spaeter eingerichteter Hook dasselbe
-        # Sheet ein zweites Mal.
+    if not args.no_open:
+        # Wer oeffnet, stempelt: sonst zeigt der Stop-Hook dasselbe Sheet gleich
+        # noch einmal - der Stempel ist genau das Signal, an dem er vorbeigeht.
         sheet_state.mark_opened(sheet_state.Sheet.at(args.sheet))
         try:
             subprocess.Popen(

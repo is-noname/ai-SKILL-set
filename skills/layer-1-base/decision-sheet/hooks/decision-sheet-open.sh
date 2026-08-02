@@ -1,10 +1,15 @@
 #!/bin/bash
-# Stop hook: oeffnet ein neu geschriebenes Decision Sheet, sobald der Agent fertig ist.
+# Stop hook: oeffnet ein Decision Sheet, das an render_sheet.py vorbei entstanden ist.
+#
+# Nachzuegler, kein Hauptweg: wer render_sheet.py aufruft, hat sein Fenster schon und
+# das Sheet ist gestempelt - sheet_state gibt es dann gar nicht mehr als "pending"
+# heraus. Uebrig bleiben die Faelle, in denen ein Sheet per Write/Edit/Heredoc
+# geschrieben und der Aufruf vergessen wurde.
 #
 # Bewusst als Stop-Hook und nicht als PostToolUse: so ist es egal, WIE das Sheet
-# entstanden ist (Write, Edit, Bash-Heredoc, Script) - der Hook fragt nur, ob eins
-# auf den User wartet. Und er feuert erst, wenn der Agent zu Ende geredet hat, statt
-# mitten im Turn ein Fenster aufzureissen.
+# entstanden ist - der Hook fragt nur, ob eins auf den User wartet. Und er feuert
+# erst, wenn der Agent zu Ende geredet hat, statt mitten im Turn ein Fenster
+# aufzureissen.
 #
 # Der Hook ist nur der Trigger. Was "wartet auf den User" heisst - Stempel,
 # mtime-Aufloesung, Antwort-ist-neuer, Sortierung - steht in sheet_state.py, damit es
@@ -26,9 +31,7 @@ sheet=$(python3 "$shared/sheet_state.py" pending "$project" 2>/dev/null) || exit
 [[ -n "$sheet" ]] || exit 0
 slug=$(basename "$sheet" .jsonl)
 
-# --force-open: das Script erkennt sonst diesen Hook in der settings.json und
-# ueberliesse ihm das Oeffnen - also sich selbst. Dann ginge nie ein Fenster auf.
-render_out=$(python3 "$shared/render_sheet.py" "$sheet" --force-open 2>&1)
+render_out=$(python3 "$shared/render_sheet.py" "$sheet" 2>&1)
 render_rc=$?
 
 # Beim Oeffnen stempelt das Script selbst; hier steht es noch einmal fuer den

@@ -23,7 +23,7 @@ Drei bewegliche Teile:
 Die Scripts im Skill funktionieren überall — auch auf einem System, auf dem der
 globale Setup-Schritt nie gelaufen ist. Die Hooks sind Komfort, keine Voraussetzung:
 sie sparen dir pro Sheet ein paar Tool-Calls, mehr nicht. Du musst nicht wissen, ob
-sie da sind — die Scripts erkennen es selbst.
+sie da sind — der Ablauf ist mit und ohne derselbe.
 
 ## Wann dieser Skill statt AskUserQuestion
 
@@ -55,11 +55,8 @@ python3 <skill>/scripts/render_sheet.py .decisions/<slug>.jsonl
 
 Das Script validiert das Sheet (JSON pro Zeile, doppelte ids, fehlende Optionen,
 kaputte oder zyklische `dep`-Verweise) und nennt dabei **alle** Verstöße auf einmal,
-nicht nur den ersten. Danach baut es die HTML und entscheidet selbst:
-
-- **Stop-Hook registriert** → es meldet „Fenster geht auf, sobald du fertig
-  geantwortet hast" und überlässt das Öffnen dem Hook. Nichts weiter zu tun.
-- **Kein Hook** → es öffnet das Fenster sofort.
+nicht nur den ersten. Danach baut es die HTML und öffnet das Fenster — immer, ob
+Hooks eingerichtet sind oder nicht. Der Stop-Hook merkt das und hält sich raus.
 
 Bricht es mit einer Fehlermeldung ab: Sheet korrigieren, nicht das Script umgehen.
 Der Aufruf ist auch mit Hook kein Leerlauf — er ist deine einzige Rückmeldung, dass
@@ -177,7 +174,7 @@ Hooks in `~/.claude/settings.json`:
 
 | Hook | Event | Wirkung |
 |------|-------|---------|
-| `decision-sheet-open.sh` | `Stop` | neu geschriebenes, unbeantwortetes Sheet geht von selbst auf |
+| `decision-sheet-open.sh` | `Stop` | Sheet, das an `render_sheet.py` vorbei entstanden ist, geht trotzdem auf |
 | `decision-answers.sh` | `UserPromptSubmit` | `#answers` holt die Antworten zurück |
 
 Was die Hooks bringen: der Hinweg funktioniert auch dann, wenn das Sheet an
@@ -190,9 +187,9 @@ Die Hooks sind Claude-spezifisch, das Format und die Scripts sind es nicht. Der
 komplette Ablauf funktioniert aus dem gepullten Skill heraus:
 
 1. Sheet nach `.decisions/<slug>.jsonl` schreiben (identisches Format).
-2. `python3 <skill>/scripts/render_sheet.py .decisions/<slug>.jsonl` — findet keinen
-   Hook, öffnet das Fenster also selbst. Fehlt der globale Spiegel, fällt das Script
-   auf die `assets/index.html` neben sich zurück.
+2. `python3 <skill>/scripts/render_sheet.py .decisions/<slug>.jsonl` — öffnet das
+   Fenster selbst. Fehlt der globale Spiegel, fällt das Script auf die
+   `assets/index.html` neben sich zurück.
 3. Nach dem Export `python3 <skill>/scripts/fetch_answers.py` — holt die Datei aus
    dem Download-Ordner nach `.decisions/` und gibt die aufgelöste Entscheidungstabelle
    aus (`resolve_answers.py` läuft mit, ohne Hook und ohne Zutun).
@@ -201,7 +198,7 @@ komplette Ablauf funktioniert aus dem gepullten Skill heraus:
 
 | Symptom | Ursache |
 |---------|---------|
-| Script meldet „Stop-Hook aktiv", aber es geht kein Fenster auf | `.decisions/.opened` hat das Sheet schon gestempelt (Sheet anfassen ändert die mtime), oder der Hook steht zwar in `settings.json`, ist aber nicht ausführbar |
+| Script meldet „gerendert", aber es geht kein Fenster auf | `xdg-open` fehlt oder hat keinen Browser zugeordnet — der Pfad steht in der Meldung, manuell öffnen |
 | Sheet geschrieben, gar nichts passiert | `render_sheet.py` nicht aufgerufen — genau dafür ist der Aufruf Pflicht, auch mit Hook |
 | `render_sheet.py`: keine index.html gefunden | Skill unvollständig gepullt (`assets/` fehlt) und kein globaler Spiegel da |
 | Renderer zeigt Dropzone statt Fragen | Sheet defekt — Fehlermeldung steht in der Box darunter |
