@@ -114,6 +114,13 @@ textarea:focus{outline:none;border-color:var(--accent)}
 .note textarea{min-height:40px;font-size:12px}
 .note-btn{font-size:11px;color:var(--faint);margin:8px 0 0 31px;display:block}
 .note-btn:hover{color:var(--accent)}
+.ctx-btn{font-size:11px;color:var(--faint);margin:4px 0 0 31px;display:block}
+.ctx-btn:hover{color:var(--accent)}
+.q-ctx{
+  font-size:12px;color:var(--muted);margin:6px 0 0 31px;padding:8px 10px;
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);
+  white-space:pre-wrap;
+}
 
 /* --- Export-Dialog --- */
 dialog{
@@ -384,6 +391,7 @@ function renderQ(q) {
   wrap.append(headRow);
 
   if (q.why) wrap.append(el("div", "why", q.why));
+  if (q.ctx) wrap.append(ctxToggle(q.ctx));
   if (!vis) {
     const dq = qs.find(x => String(x.id) === String(q.dep[0]));
     wrap.append(el("div", "why", "– hängt an #" + q.dep[0] +
@@ -451,6 +459,16 @@ function renderQ(q) {
     wrap.append(btn);
   }
   return wrap;
+}
+
+// Per-Frage-Kontext ist standardmaessig eingeklappt: das Sheet soll auf einen
+// Blick scannbar bleiben, laengerer Hintergrund ist optional statt aufgedraengt.
+function ctxToggle(text) {
+  const btn = el("button", "ctx-btn", "+ Kontext");
+  btn.addEventListener("click", () => {
+    btn.replaceWith(el("div", "q-ctx", text));
+  });
+  return btn;
 }
 
 function noteBox(q, val) {

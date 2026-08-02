@@ -100,6 +100,8 @@ def validate(sheet_text: str, path: Path) -> dict:
             )
         if qtype in ("pick", "multi") and not q.get("o"):
             raise SystemExit(f"Fehler: Frage #{qid} ist '{qtype}', hat aber keine Optionen ('o').")
+        if "ctx" in q and not isinstance(q["ctx"], str):
+            raise SystemExit(f"Fehler: Frage #{qid} hat ein 'ctx', das kein String ist.")
     for q in objs:
         dep = q.get("dep")
         if dep is None:

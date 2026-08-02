@@ -43,6 +43,7 @@ Ab etwa vier offenen Entscheidungen, oder sobald Fragen voneinander abhängen
 {"id":3,"q":"Wie soll der Archiv-Ordner heissen?","t":"text","d":"archiv"}
 {"id":4,"q":"Welche Agents dürfen Tickets schreiben?","t":"multi","o":["claude","codex","gemini","vibe"],"d":["claude","codex"]}
 {"id":5,"q":"Lock via flock oder mkdir?","t":"pick","o":["flock","mkdir"],"dep":[1,"Counter"]}
+{"id":6,"q":"Migrations-Skript synchron oder als Job?","t":"pick","o":["synchron","Job"],"ctx":"Bestand: 40k Zeilen in ticket_legacy, Migration lief 2025 zuletzt bei ticket_archive - synchron dauerte dort 6min und blockte den Import."}
 ```
 
 Danach **immer** diesen einen Befehl — unabhängig davon, ob die Hooks eingerichtet
@@ -76,6 +77,7 @@ Liegt der Skill nicht im Projekt, tut es der globale Spiegel:
 | `o` | bei `pick`/`multi` | Optionen. Bei `yn` implizit ja/nein |
 | `d` | nein | **Empfehlung** — im Renderer vorausgewählt und als `EMPF` markiert. Bei `yn`: `"y"`/`"n"`. Bei `multi`: Array |
 | `why` | nein | Eine Zeile Begründung/Trade-off unter der Frage |
+| `ctx` | nein | Längerer Hintergrund zu **dieser einen Frage** — im Renderer eingeklappt hinter „+ Kontext", nicht standardmäßig sichtbar. Nicht zu verwechseln mit dem Header-`ctx` (Dokumentverweis fürs ganze Sheet) |
 | `dep` | nein | `[id, wert]` oder `[id, [wert1, wert2]]` — Frage wird nur aktiv, wenn die andere so beantwortet ist |
 
 Header: `v` (Format-Version, aktuell 1), `sheet` (Slug = Dateiname ohne Endung),
@@ -88,7 +90,11 @@ Header: `v` (Format-Version, aktuell 1), `sheet` (Slug = Dateiname ohne Endung),
    Nur bei echt offenen Fragen (Namen, Zahlen, Präferenzen) `d` weglassen — die
    markiert der Renderer als „offen".
 2. **`why` nur wenn es das Trade-off wirklich klärt.** Eine Zeile, kein Absatz.
-   Braucht eine Frage mehr Kontext, gehört der in das Dokument hinter `ctx`.
+   Braucht eine Frage mehr Hintergrund als eine Zeile — z.B. weil sie ohne
+   Projekt-Detail (Bestandsgröße, letzter Vorfall, betroffene Komponente) nicht
+   beantwortbar ist — gehört der in das Fragen-`ctx`, nicht in `why` gequetscht.
+   Frage bleibt dadurch kurz, der Kontext ist trotzdem einen Klick entfernt statt
+   in `why` aufgebläht oder ganz weggelassen.
 3. **Eine Zeile pro Frage, kein Pretty-Print.** Zeilenumbrüche im JSON zerstören
    den Parser (ein Objekt = eine Zeile ist die einzige Regel des Formats).
 4. **Fragen sortieren:** grundlegende zuerst, Folgefragen per `dep` dahinter.
