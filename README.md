@@ -19,13 +19,12 @@ A library of reusable Claude Code skills, organized by layer (core primitives �
 | `skills/` | All skills, organized by layer (0–4). Start here. See `skills/README.md`. |
 | `scripts/` | Internal maintenance scripts: `generate_registry.py` (rebuilds registry.json), `init_tickets.sh` (bootstrap ticket system + convention docs in a project) |
 | `hooks/` | Claude Code hooks: `pre-commit-registry.sh` auto-regenerates registry.json when SKILL.md files change |
-| `AI/` | Planning documents (RFCs, ADRs) for this repo itself |
-| `agents/` | Agent definitions (in progress) |
-| `commands/` | Custom slash commands (in progress) |
-| `mcps/` | MCP server configurations (in progress) |
-| `workflows/` | Multi-agent workflows (in progress) |
-| `infra/` | Infrastructure configs (in progress) |
+| `AI/` | Planning documents (RFCs, ADRs) for this repo itself — local only, not in the clone |
 | `registry.json` | Auto-generated skill index — do not edit manually |
+
+**Planned, currently empty** — reserved names, nothing to read there yet:
+`agents/` (agent definitions) · `commands/` (custom slash commands) · `mcps/` (MCP server configs) ·
+`workflows/` (multi-agent workflows) · `infra/` (infrastructure configs) · `testing/` (local only).
 
 ---
 

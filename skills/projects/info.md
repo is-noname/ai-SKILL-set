@@ -1,5 +1,8 @@
 # Projects
 
+> **Noch nicht implementiert.** `pull_skill.py` kennt nur `sets/`, nicht diesen Ordner — das
+> Folgende beschreibt den geplanten Stand, keinen funktionierenden Workflow.
+
 **Zweck:** Projekt-Profile — definieren welche Skills ein bestimmtes Projekt braucht.
 
 **Workflow:** Der `/izg-ai-repo-pull` Skill scannt diesen Ordner dynamisch und zeigt eine Auswahlliste. Du wählst ein Profil, er löst alle Dependencies auf und kopiert die Skills nach `.claude/skills/` im Projekt.

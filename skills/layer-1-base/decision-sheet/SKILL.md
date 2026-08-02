@@ -3,7 +3,6 @@ name: decision-sheet
 description: "Bündelt viele Entscheidungsfragen in ein Dokument, das der User ausserhalb der CLI in einem HTML-Renderer beantwortet und als Antwort-Datei zurückgibt. Statt zehn AskUserQuestion-Runden ein Sheet. Dieser Skill sollte verwendet werden, wenn mehr als drei Entscheidungen offen sind, wenn der User sie am Stück oder in Ruhe beantworten will (Fragenkatalog, Entscheidungsliste, Sheet, Fragebogen), oder wenn eine exportierte .answers.json eingelesen werden soll."
 layer: 1
 dependencies: []
-status: stable
 disable-model-invocation: true
 ---
 
