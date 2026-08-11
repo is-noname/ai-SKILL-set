@@ -357,21 +357,37 @@ PY
   fi
 
   if [ "$cfg_file" = "CLAUDE.md" ]; then
-    if ! grep -q "^@tickets.md" "$cfg"; then
-      printf '\n## Ticketsystem\n\nBei Projektarbeit zuerst `tickets/in-progress/` prüfen — läuft noch etwas?\n\n@tickets.md\n' >> "$cfg"
-      echo "  patched: $cfg (@tickets.md include)"
+    # Inline-Block mit Pfadverweisen statt @-Includes (IZG-T-081) — kein Auto-Scan-Satz,
+    # Lookup reaktiv formuliert. Guard auf neuen Marker, damit ein zweiter Lauf idempotent ist.
+    if ! grep -q "^## Ticketsystem" "$cfg"; then
+      cat >> "$cfg" << BLOCK
+
+## Ticketsystem
+
+- Status wechseln = nur das \`status:\`-Feld im Frontmatter ändern. Nie \`mv\` auf eine
+  Ticketdatei — der \`ticket-mover\`-Hook verschiebt sie selbst.
+- Nächste ID: \`bash scripts/next_ticket_id.sh {PREFIX}\` (projektlokal), nie manuell zählen.
+- Jeder Statuswechsel braucht einen Verlaufseintrag.
+- Tickets liegen in \`tickets/\`. Auf Ansage nachsehen — kein automatischer Scan bei Sessionstart.
+- Volle Konvention bei Bedarf lesen: \`$AGENT_DIR/tickets.md\`
+
+## Dokument-IDs
+
+Typ-Codes, ADR-Filter, Prefix-Registry bei Bedarf: \`$AGENT_DIR/doc-ids.md\`,
+\`~/ai-shared/project-identifier.md\`
+
+## Design Tokens
+
+Farb-, Typo- und Komponentenwerte für UI-Arbeit: \`$AGENT_DIR/design-tokens.md\` — bei
+Frontend-Aufgaben lesen. Nicht ungefragt anwenden: manche Projekte haben eine eigene
+Palette, die ausdrücklich Vorrang hat.
+BLOCK
+      echo "  patched: $cfg (Ticketsystem/Dokument-IDs/Design-Tokens Block)"
     else
       echo "  $cfg already patched — skipped"
     fi
-    # doc-ids.md + design-tokens.md als native Includes (immer im Kontext). Getrennt
-    # geführt, idempotent — Bestands-Configs haben sie ggf. schon manuell (IZG-T-055).
-    if ! grep -q "^@doc-ids.md" "$cfg"; then
-      printf '\n## Dokument-IDs\n\n@doc-ids.md\n' >> "$cfg"
-      echo "  patched: $cfg (@doc-ids.md include)"
-    fi
-    if ! grep -q "^@design-tokens.md" "$cfg"; then
-      printf '\n## Design Tokens\n\n@design-tokens.md\n' >> "$cfg"
-      echo "  patched: $cfg (@design-tokens.md include)"
+    if grep -qE "^@(tickets|doc-ids|design-tokens)\.md" "$cfg"; then
+      echo "  Hinweis: $cfg enthält noch alte @-Includes (@tickets.md/@doc-ids.md/@design-tokens.md) — Script fasst sie nicht an, manuell entfernen."
     fi
   else
     if ! grep -q "tickets/in-progress" "$cfg"; then

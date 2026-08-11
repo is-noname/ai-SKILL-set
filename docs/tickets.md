@@ -36,6 +36,8 @@ tickets/
 ├── in-progress/
 ├── blocked/
 └── done/
+    ├── 2026/       # Archiv nach Jahr (created:-Feld), kuenftig 2027/ usw.
+    └── ...
 ```
 
 ## Dateiname
@@ -54,7 +56,8 @@ bash scripts/next_ticket_id.sh IZG
 
 > `next_ticket_id.sh` liegt **projekt-lokal** (`<projekt>/scripts/`, von
 > `init_tickets.sh` erzeugt) — **nicht** im Agent-Dir. Global deployt sind nur
-> `init_tickets.sh` und der `ticket-mover`-Hook.
+> `init_tickets.sh` und der `ticket-mover`-Hook. `next_ticket_id.sh` delegiert an
+> `tickets.sh next` — beide Skripte liegen nebeneinander in `<projekt>/scripts/`.
 
 Beispiele:
 ```
@@ -111,6 +114,14 @@ Was passiert, was sollte passieren.
 Ticket erstellt.
 ```
 
+**Groessenkonvention:** Ein Ticket beschreibt **was zu tun ist**, nicht **warum die
+Architektur so aussieht**. Richtwert: unter 2 KB. Wird es groesser, steckt meist eine
+Entscheidung mit drin, die nach `docs/adr/` gehoert — Verweis dann ueber das
+`source:`-Feld im Frontmatter. Pflichtabschnitte bleiben Beschreibung,
+Akzeptanzkriterien, Verlauf; optionale Abschnitte wie „Nicht in diesem Ticket" oder
+„Blockiert durch" sind erlaubt. Kein Linter, keine Laengenpruefung im Hook — nur
+Konvention.
+
 ## Status-Lifecycle
 
 ```
@@ -127,18 +138,37 @@ open    in-progress
 - Jeder Statuswechsel erfordert einen Verlaufseintrag
 - **`status:`-Flip immer als letzten Edit.** Beim Statuswechsel fallen zwei Änderungen an (Verlaufseintrag + `status:`). Den Verlaufseintrag zuerst schreiben, den `status:`-Flip zuletzt — der Hook verschiebt die Datei beim Flip, und danach ist kein weiterer Edit auf dem (neuen) Pfad nötig. Andersherum müsste die verschobene Datei erst neu gelesen werden (kostet Token).
 - `blocked/` → immer zurück nach `open/`, nie direkt nach `in-progress/`
-- `done/` ist finales Archiv, nicht löschen
+- `done/` ist finales Archiv, nicht löschen. Nach Jahr unterteilt (`done/2026/`, künftig
+  `done/2027/` usw.) — der Hook legt das Jahr aus `created:` fest (Fallback: aktuelles Jahr)
 
-## Lookup-Reihenfolge
+## Tickets finden
 
-1. `tickets/in-progress/` — läuft noch was?
-2. `tickets/open/` — nächste sinnvolle Arbeit
-3. `tickets/blocked/` — nur wenn gezielt ein Blocker gelöst werden soll
+Nur auf Ansage — kein automatischer Scan bei Sessionstart. Der User gibt vor, ob und an
+welchem Ticket gearbeitet wird.
+
+`scripts/tickets.sh list` ist der Weg, Tickets zu finden — eine Frontmatter-Zeile pro
+Ticket statt N volle Datei-Reads. Ohne `--status` in dieser Reihenfolge, `done/` ausgenommen:
+`in-progress` (angefangene Arbeit) → `open` (nächste sinnvolle Arbeit) → `blocked`
+(nur wenn gezielt ein Blocker gelöst werden soll):
+
+```bash
+bash scripts/tickets.sh list                          # in-progress, open, blocked
+bash scripts/tickets.sh list --status done             # Archiv explizit
+bash scripts/tickets.sh list --group auth-refactor     # nach Gruppe filtern
+bash scripts/tickets.sh list --type bug                # nach Typ filtern
+bash scripts/tickets.sh show IZG-T-001                 # volle Ticketdatei, Ordner egal
+```
+
+**Nie rekursiv über `tickets/` suchen** (`grep -r`, `find`, Volltext-Read über alle
+Unterordner) — `done/` wächst monoton und zahlt sonst bei jeder Abfrage mit. Immer über
+die aktiven Ordner (`open/`, `in-progress/`, `blocked/`) oder `tickets.sh` gehen. Einzige
+Ausnahme: `tickets.sh next` selbst — der greift shell-seitig rekursiv zu, kostet aber
+keinen Token, weil nur die ID als Ausgabe zurückkommt.
 
 ## Gruppenabfrage
 
 ```bash
-grep -rl "^group: auth-refactor" tickets/
+bash scripts/tickets.sh list --group auth-refactor
 ```
 
 ## question-Tickets

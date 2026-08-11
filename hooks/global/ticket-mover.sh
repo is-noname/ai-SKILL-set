@@ -42,13 +42,32 @@ esac
 
 current_dir=$(dirname "$file_path")
 current_folder=$(basename "$current_dir")
-
-# Nichts zu tun wenn Ordner schon stimmt
-[[ "$current_folder" == "$status" ]] && exit 0
-
-tickets_root=$(dirname "$current_dir")
-target_dir="$tickets_root/$status"
 filename=$(basename "$file_path")
+
+if [[ "$status" == "done" ]]; then
+  # done/ ist Archiv, nach Jahr unterteilt (IZG-T-084): Jahr kommt aus dem
+  # created:-Feld des Tickets, Fallback aktuelles Jahr falls das Feld fehlt.
+  year=$(grep -m1 "^created: " "$file_path" | sed 's/^created: //' | grep -oE "^[0-9]{4}" || true)
+  [[ -n "$year" ]] || year=$(date +%Y)
+
+  # tickets_root ermitteln: liegt die Datei schon in done/<jahr>/, ist current_dir
+  # bereits tickets_root/done/<jahr> (zwei Ebenen ueber tickets_root).
+  if [[ "$current_folder" =~ ^[0-9]{4}$ ]] && [[ "$(basename "$(dirname "$current_dir")")" == "done" ]]; then
+    tickets_root=$(dirname "$(dirname "$current_dir")")
+  else
+    tickets_root=$(dirname "$current_dir")
+  fi
+  target_dir="$tickets_root/done/$year"
+
+  # Nichts zu tun wenn Ordner schon stimmt
+  [[ "$current_dir" == "$target_dir" ]] && exit 0
+else
+  # Nichts zu tun wenn Ordner schon stimmt
+  [[ "$current_folder" == "$status" ]] && exit 0
+
+  tickets_root=$(dirname "$current_dir")
+  target_dir="$tickets_root/$status"
+fi
 
 mkdir -p "$target_dir"
 
