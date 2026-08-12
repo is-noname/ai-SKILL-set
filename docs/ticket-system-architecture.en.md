@@ -6,9 +6,10 @@ internally — for understanding the mechanics, not as a convention reference.
 > 🇩🇪 Deutsche Version: [`ticketsystem-architektur.md`](./ticketsystem-architektur.md)
 
 > **Placeholder note:** Throughout this document, `PRJ` is a stand-in for the
-> **per-project prefix**. Every project defines its own prefix in `docs/doc-ids.md`
-> (e.g. a short three-letter code per repo). `PRJ`, `NNN`, and names like
-> `my-project` are generic placeholders — **not** fixed or reserved identifiers.
+> **per-project prefix**. Every project has its own prefix in the registry
+> `project-identifier.md` in the global agent directory (e.g. a short three-letter
+> code per repo). `PRJ`, `NNN`, and names like `my-project` are generic placeholders
+> — **not** fixed or reserved identifiers.
 
 | You want… | Read… |
 |-----------|-------|
@@ -44,7 +45,7 @@ project/
 │   └── ticket-mover.sh          # moves tickets on status change
 ├── docs/
 │   ├── tickets.md               # convention (deployed into the agent dir)
-│   ├── doc-ids.md               # project prefix + doc-id scheme (deployed globally too)
+│   ├── doc-ids.md               # doc-id scheme (deployed globally too; prefix registry is separate)
 │   └── ticket-system-architecture.en.md  # this document
 └── tickets/
     ├── .counter                 # highest number assigned so far
@@ -63,7 +64,7 @@ project/
 | `ticket-mover.sh` (hook) | keeps folder and `status:` in sync | automatically after each Edit/Write |
 | `init_tickets.sh` | builds `tickets/` in a project | once per project |
 | `setup_global_conventions.sh` | deploys the convention into the agent dir | once per agent/machine |
-| `doc-ids.md` | provides the project prefix `PRJ` | on ID assignment |
+| `project-identifier.md` | provides the project prefix `PRJ` (registry, global) | on ID assignment |
 
 ---
 
@@ -135,8 +136,13 @@ The script is **self-healing** and **collision-safe**. Flow:
   is then not guaranteed).
 
 > The prefix `PRJ` is **not** part of the script — it comes in as an argument and
-> originates from `docs/doc-ids.md` (single source of truth for project prefixes).
-> Every project has its own.
+> originates from the registry `project-identifier.md` in the global agent directory
+> (single source of truth for project prefixes). Every project has its own.
+
+> **Standard path:** `scripts/tickets.sh new` calls the same `flock` code path but
+> also creates the file and fills in the frontmatter — one command instead of
+> looking up an ID and creating the file by hand (see `docs/tickets.md`). The flow
+> above (steps 1–7) is the mechanics behind it, unchanged.
 
 ---
 
@@ -179,6 +185,13 @@ Edit/Write on a file
 - **The hook only moves — it never changes content.** The `status:` field is always
   set by a human or agent.
 
+> **Standard path:** `scripts/tickets.sh move <ID> <status> "<history text>"` writes
+> the history entry and the `status:` field in one command and then calls the same
+> `sync` code path the hook uses (see `docs/tickets.md`). The hook remains the safety
+> net for the manual two-edit path (history entry, then `status:` by hand) — automatic
+> for Claude/Vibe, via an explicit `tickets.sh sync` call for Codex/Gemini. The flow
+> above describes that safety-net mechanics, unchanged.
+
 ---
 
 ## 6. Two bootstrap levels
@@ -189,7 +202,7 @@ The system is set up at two levels — easy to confuse:
 |---|---|---|
 | **Level** | per AI agent (global) | per project |
 | **How often** | once per agent/machine | once per project |
-| **What** | deploys `tickets.md` + `doc-ids.md` **and** `init_tickets.sh` into the agent dir and patches its config | creates the `tickets/` folder structure, `.counter`, `PROTOCOL.md` and `next_ticket_id.sh` |
+| **What** | deploys `tickets.md` + `doc-ids.md` + `project-identifier.md` (prefix registry, via symlink) **and** `init_tickets.sh` into the agent dir and patches its config | creates the `tickets/` folder structure, `.counter`, `PROTOCOL.md` and `next_ticket_id.sh` |
 | **Target** | `~/.claude`, `~/.codex`, `~/.gemini`, `~/.vibe` | any project folder |
 | **Config file** | `CLAUDE.md` / `AGENTS.md` (Codex) / `GEMINI.md` / `AGENTS.md` (Vibe) | — |
 
@@ -220,7 +233,8 @@ without overwriting existing tickets or `PROTOCOL.md`.
 
 ## 7. Coupling with the doc-ids system
 
-The ticket system and the doc-ids (`docs/doc-ids.md`) share the **project prefix**:
+The ticket system and the doc-ids share the **project prefix** from the
+`project-identifier.md` registry:
 
 - Ticket IDs: `PRJ-T-NNN` → `{PREFIX}-T-{NUMBER}`
 - Doc IDs: `{TYPE}-{DATE}-{SEQ}` (e.g. `AUD-{YYYYMMDD}-001_…`)

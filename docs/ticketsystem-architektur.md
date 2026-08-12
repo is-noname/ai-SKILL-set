@@ -6,10 +6,10 @@ für Funktionsverständnis, nicht als Konvention-Nachschlagewerk.
 > 🇬🇧 English version: [`ticket-system-architecture.en.md`](./ticket-system-architecture.en.md)
 
 > **Platzhalter-Hinweis:** In diesem Dokument steht `PRJ` überall für das
-> **projektspezifische Prefix**. Jedes Projekt definiert sein eigenes Prefix in
-> `docs/doc-ids.md` (z.B. ein dreistelliges Prefix pro Repo). `PRJ`, `NNN` und
-> Namen wie `mein-projekt` sind generische Platzhalter — **keine** festen oder
-> reservierten Bezeichnungen.
+> **projektspezifische Prefix**. Jedes Projekt hat sein eigenes Prefix in der
+> Registry `project-identifier.md` im globalen Agent-Verzeichnis (z.B. ein
+> dreistelliges Prefix pro Repo). `PRJ`, `NNN` und Namen wie `mein-projekt` sind
+> generische Platzhalter — **keine** festen oder reservierten Bezeichnungen.
 
 | Du willst… | Lies… |
 |------------|-------|
@@ -45,7 +45,7 @@ projekt/
 │   └── ticket-mover.sh          # verschiebt Tickets bei Status-Änderung
 ├── docs/
 │   ├── tickets.md               # Konvention (wird ins Agent-Verzeichnis deployt)
-│   ├── doc-ids.md               # Projekt-Prefix + Doc-ID-Schema (ebenso global deployt)
+│   ├── doc-ids.md               # Doc-ID-Schema (ebenso global deployt; Prefix-Registry separat)
 │   └── ticketsystem-architektur.md  # dieses Dokument
 └── tickets/
     ├── .counter                 # höchste bisher vergebene Nummer
@@ -64,7 +64,7 @@ projekt/
 | `ticket-mover.sh` (Hook) | hält Ordner und `status:` synchron | automatisch nach jedem Edit/Write |
 | `init_tickets.sh` | baut `tickets/` in einem Projekt auf | einmal pro Projekt |
 | `setup_global_conventions.sh` | deployt Konvention ins Agent-Verzeichnis | einmal pro Agent/Maschine |
-| `doc-ids.md` | liefert das Projekt-Prefix `PRJ` | bei ID-Vergabe |
+| `project-identifier.md` | liefert das Projekt-Prefix `PRJ` (Registry, global) | bei ID-Vergabe |
 
 ---
 
@@ -136,8 +136,13 @@ Das Skript ist **selbstheilend** und **kollisionssicher**. Ablauf:
   nachträglich ab (nur die Echtzeit-Eindeutigkeit ist dann nicht garantiert).
 
 > Das Prefix `PRJ` ist **kein** Teil des Skripts — es kommt als Argument und stammt
-> aus `docs/doc-ids.md` (Single Source of Truth für Projekt-Prefix). Jedes Projekt
-> hat sein eigenes.
+> aus der Registry `project-identifier.md` im globalen Agent-Verzeichnis (Single
+> Source of Truth für Projekt-Prefix). Jedes Projekt hat sein eigenes.
+
+> **Standardweg:** `scripts/tickets.sh new` ruft denselben `flock`-Codepfad auf,
+> legt die Datei aber gleich mit an und füllt das Frontmatter — ein Kommando statt
+> ID abfragen und Datei von Hand anlegen (siehe `docs/tickets.md`). Der obige Ablauf
+> (Schritte 1–7) ist die Mechanik dahinter, unverändert.
 
 ---
 
@@ -180,6 +185,14 @@ Edit/Write auf eine Datei
 - **Der Hook verschiebt nur — er ändert nie Inhalt.** Das `status:`-Feld setzt
   immer der Mensch oder Agent.
 
+> **Standardweg:** `scripts/tickets.sh move <ID> <status> "<verlaufstext>"` schreibt
+> Verlaufseintrag und `status:`-Feld in einem Kommando und ruft danach denselben
+> `sync`-Codepfad auf, den der Hook nutzt (siehe `docs/tickets.md`). Der Hook bleibt
+> das Sicherheitsnetz für den manuellen Zwei-Edit-Weg (Verlaufseintrag, dann
+> `status:` per Hand) — bei Claude/Vibe automatisch, bei Codex/Gemini durch
+> expliziten `tickets.sh sync`-Aufruf. Der obige Ablauf beschreibt diese
+> Sicherheitsnetz-Mechanik, unverändert.
+
 ---
 
 ## 6. Zwei Bootstrap-Ebenen
@@ -190,7 +203,7 @@ Das System wird auf zwei Ebenen eingerichtet — leicht zu verwechseln:
 |---|---|---|
 | **Ebene** | pro AI-Agent (global) | pro Projekt |
 | **Wie oft** | einmal pro Agent/Maschine | einmal pro Projekt |
-| **Was** | deployt `tickets.md` + `doc-ids.md` **und** `init_tickets.sh` ins Agent-Verzeichnis und patcht dessen Konfig | legt `tickets/`-Ordnerstruktur, `.counter`, `PROTOCOL.md` und `next_ticket_id.sh` an |
+| **Was** | deployt `tickets.md` + `doc-ids.md` + `project-identifier.md` (Prefix-Registry, per Symlink) **und** `init_tickets.sh` ins Agent-Verzeichnis und patcht dessen Konfig | legt `tickets/`-Ordnerstruktur, `.counter`, `PROTOCOL.md` und `next_ticket_id.sh` an |
 | **Ziel** | `~/.claude`, `~/.codex`, `~/.gemini`, `~/.vibe` | beliebiger Projektordner |
 | **Konfig-Datei** | `CLAUDE.md` / `AGENTS.md` (Codex) / `GEMINI.md` / `AGENTS.md` (Vibe) | — |
 
@@ -221,7 +234,8 @@ Idempotent: erneutes Ausführen rüstet fehlenden Counter / aktuelles
 
 ## 7. Kopplung mit dem doc-ids-System
 
-Das Ticketsystem und die Doc-IDs (`docs/doc-ids.md`) teilen sich das **Projekt-Prefix**:
+Das Ticketsystem und die Doc-IDs teilen sich das **Projekt-Prefix** aus der Registry
+`project-identifier.md`:
 
 - Ticket-IDs: `PRJ-T-NNN` → `{PREFIX}-T-{NUMMER}`
 - Doc-IDs: `{TYP}-{DATUM}-{SEQ}` (z.B. `AUD-{YYYYMMDD}-001_…`)

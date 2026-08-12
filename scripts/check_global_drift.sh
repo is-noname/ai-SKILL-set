@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Drift-Check für global deployte Konventionen/Artefakte (Inverse von
 # setup_global_conventions.sh). Vergleicht die deployten Dateien in einem Agent-Dir
-# gegen die Quelle im Repo und meldet pro Datei: ok / drift / missing.
+# gegen die Quelle im Repo und meldet pro Datei: ok / drift / missing. Prueft
+# zusaetzlich, ob die repo-eigene tickets/PROTOCOL.md noch dem aktuellen
+# scripts/ticket_protocol_template.md entspricht (IZG-T-091), und ob die DE/EN-
+# Architektur-Docs dieselbe Abschnittsstruktur haben (IZG-T-096).
 #
 # Read-only — schreibt nie. Zum Re-Deploy: setup_global_conventions.sh <agent-dir>.
 #
@@ -24,6 +27,7 @@ MANAGED=(
   "docs/doc-ids.md|doc-ids.md"
   "docs/design-tokens.md|design-tokens.md"
   "scripts/init_tickets.sh|scripts/init_tickets.sh"
+  "scripts/ticket_protocol_template.md|scripts/ticket_protocol_template.md"
   "hooks/global/ticket-mover.sh|hooks/ticket-mover.sh"
   "skills/layer-1-base/izg-decision-sheet/hooks/izg-decision-answers.sh|hooks/izg-decision-answers.sh|.claude"
   "skills/layer-1-base/izg-decision-sheet/hooks/izg-decision-sheet-open.sh|hooks/izg-decision-sheet-open.sh|.claude"
@@ -54,6 +58,42 @@ fi
 
 drift_found=0
 
+# tickets/PROTOCOL.md dieses Repos ist selbst ein Bootstrap-Ergebnis von
+# init_tickets.sh (Prefix IZG bereits eingesetzt) — kein global deploytes
+# Artefakt, daher hier statt in MANAGED geprueft (IZG-T-091).
+echo "== $REPO_ROOT/tickets/PROTOCOL.md vs. Template =="
+rendered_template="$(sed 's/{PRJ}/IZG/g' "$REPO_ROOT/scripts/ticket_protocol_template.md")"
+if [ "$rendered_template" = "$(cat "$REPO_ROOT/tickets/PROTOCOL.md")" ]; then
+  echo "  ok tickets/PROTOCOL.md"
+else
+  echo "  !! tickets/PROTOCOL.md — DRIFT (weicht von scripts/ticket_protocol_template.md ab)"
+  drift_found=1
+fi
+
+# DE/EN-Architektur-Docs muessen dieselbe Abschnittsstruktur haben (gleiche
+# Ueberschriften ^##/^### in gleicher Reihenfolge/Anzahl) — kein Textvergleich,
+# sonst schlaegt jede blosse Uebersetzung als Drift an (IZG-T-096).
+echo "== docs/ticketsystem-architektur.md vs. docs/ticket-system-architecture.en.md =="
+de_doc="$REPO_ROOT/docs/ticketsystem-architektur.md"
+en_doc="$REPO_ROOT/docs/ticket-system-architecture.en.md"
+if [ ! -f "$de_doc" ] || [ ! -f "$en_doc" ]; then
+  echo "  ?? Architektur-Doc fehlt (DE oder EN)"
+  drift_found=1
+else
+  # Nur die Ueberschriften-Ebene (##/###) je Zeile, kein Text — so bleibt reine
+  # Uebersetzung unauffaellig, aber Reihenfolge/Anzahl/Ebene muessen matchen.
+  de_pattern="$(grep -o '^#\{2,3\}' "$de_doc")"
+  en_pattern="$(grep -o '^#\{2,3\}' "$en_doc")"
+  de_headings="$(echo -n "$de_pattern" | grep -c '^#')"
+  if [ "$de_pattern" = "$en_pattern" ]; then
+    echo "  ok Abschnitts-Parität ($de_headings Überschriften je Seite, gleiche Reihenfolge)"
+  else
+    en_headings="$(echo -n "$en_pattern" | grep -c '^#')"
+    echo "  !! Abschnitts-Parität — DRIFT (DE: $de_headings, EN: $en_headings Überschriften oder abweichende Reihenfolge)"
+    drift_found=1
+  fi
+fi
+
 for adir in "${agent_dirs[@]}"; do
   echo "== $adir =="
   for entry in "${MANAGED[@]}"; do
@@ -79,7 +119,9 @@ done
 
 if [ "$drift_found" -ne 0 ]; then
   echo
-  echo "Drift/Fehlend gefunden. Re-Deploy: bash $REPO_ROOT/scripts/setup_global_conventions.sh <agent-dir>"
+  echo "Drift/Fehlend gefunden."
+  echo "- Global deployte Dateien: bash $REPO_ROOT/scripts/setup_global_conventions.sh <agent-dir>"
+  echo "- tickets/PROTOCOL.md dieses Repos: manuell an scripts/ticket_protocol_template.md angleichen (Prefix IZG)"
 fi
 
 exit "$drift_found"

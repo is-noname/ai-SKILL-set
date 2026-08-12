@@ -46,8 +46,11 @@ tickets/
 {PRJ}-T-{NNN}_{kurz-beschreibung}.md
 ```
 
-`{PRJ}` = Projekt-Prefix aus der Registry `project-identifier.md` im globalen Agent-Verzeichnis.  
-Nächste ID immer via Script abfragen — nie manuell zählen:
+`{PRJ}` = Projekt-Prefix aus der Registry `project-identifier.md` im globalen Agent-Verzeichnis.
+
+**Standardweg:** `scripts/tickets.sh new` erzeugt ID, Datei und Frontmatter in einem
+Kommando — siehe [Ticket anlegen](#ticket-anlegen). Nur wenn ausschliesslich die naechste
+ID gebraucht wird (kein Ticket entsteht), separat:
 
 ```bash
 bash scripts/next_ticket_id.sh IZG
@@ -88,7 +91,7 @@ source: AUD-20260625-001_Auth-Review.md
 | `id` | ja | `{PRJ}-T-{NNN}` |
 | `title` | ja | Kurze Beschreibung |
 | `type` | ja | `bug` / `task` / `feature` / `question` |
-| `status` | ja | `open` / `in-progress` / `blocked` / `done` — Hook verschiebt die Datei automatisch |
+| `status` | ja | `open` / `in-progress` / `blocked` / `done` — bestimmt den Ordner, siehe [Status-Lifecycle](#status-lifecycle) |
 | `priority` | ja | `high` / `normal` / `low` |
 | `created` | ja | `YYYY-MM-DD` |
 | `created-by` | ja | `claude` / `gemini` / `codex` / `me` |
@@ -96,6 +99,31 @@ source: AUD-20260625-001_Auth-Review.md
 | `started` | nein | `YYYY-MM-DD` — Datum des Wechsels nach `in-progress/` |
 | `group` | nein | Slug der zusammengehörige Tickets bündelt |
 | `source` | nein | Dokument das das Ticket ausgelöst hat |
+
+## Ticket anlegen
+
+**Standardweg:** `scripts/tickets.sh new` — ein Kommando statt ID abfragen, Datei von Hand
+anlegen und alle Frontmatter-Felder von Hand setzen. ID-Vergabe laeuft ueber denselben
+`flock`-Codepfad wie `tickets.sh next`. Enum-Validierung (`--type`, `--priority`) laeuft
+**vor** der ID-Vergabe — ein ungueltiger Aufruf verbraucht keine ID. Landet immer in
+`open/`:
+
+```bash
+bash scripts/tickets.sh new --type task --priority high \
+  --title "Externe Dependencies konventionieren" \
+  --group ticket-token-diaet --by claude [--assigned codex] [--source DOC-ID]
+# → tickets/open/IZG-T-093_externe-dependencies-konventionieren.md
+```
+
+`--body TEXT` fuellt die Beschreibung direkt; `--body -` liest sie von stdin (spart den
+zweiten Edit). Ohne `--body` bleibt der Abschnitt leer, zum spaeteren Ausfuellen.
+Titel wird zum Dateinamens-Slug: Kleinbuchstaben, Umlaute transliteriert, alles ausser
+`[a-z0-9-]` zu `-`, auf ~50 Zeichen gekuerzt. Das Projekt-Prefix wird aus
+`tickets/PROTOCOL.md` gelesen — steht dort noch der `{PRJ}`-Platzhalter, bricht `new` ab
+mit Hinweis auf `init_tickets.sh <pfad> PREFIX`, ohne eine Datei anzulegen.
+
+Die Frontmatter-Tabelle oben bleibt Referenz fuer die Feldbedeutung, nicht Bedienanleitung
+— `new` setzt die Pflichtfelder automatisch und die optionalen nur bei uebergebenem Flag.
 
 ## Ticket-Body
 
@@ -132,14 +160,28 @@ blocked   blocked
 open    in-progress
 ```
 
+**Standardweg:** `scripts/tickets.sh move <ID> <status> "<verlaufstext>" [--by <agent>]`.
+Löst die ID auf, hängt den Verlaufseintrag an, setzt `status:`, ruft `sync_one` auf und
+gibt den neuen Pfad auf stdout aus — ein Kommando statt zwei Edits. Bricht mit Exit 1
+ab (ohne etwas zu ändern) bei fehlendem/leerem Verlaufstext, ungültigem Status, nicht
+gefundener oder mehrfach gefundener ID, oder dem verbotenen Übergang `blocked` →
+`in-progress`. Beispiel:
+
+```bash
+bash scripts/tickets.sh move IZG-T-061 in-progress "Angefangen" --by claude
+# → tickets/in-progress/IZG-T-061_hermes-mistral-provider-plugin.md
+```
+
 **Regeln:**
-- `status:`-Feld ändern = Status setzen — Hook verschiebt die Datei automatisch
-- **Niemals manuell `mv` auf eine Ticket-Datei.** Status-Wechsel = ausschließlich das `status:`-Feld im Frontmatter editieren. Der `ticket-mover`-Hook verschiebt die Datei danach selbst in den passenden Ordner. Ein eigener `mv` schlägt fehl, weil die Datei bereits verschoben wurde.
-- Jeder Statuswechsel erfordert einen Verlaufseintrag
-- **`status:`-Flip immer als letzten Edit.** Beim Statuswechsel fallen zwei Änderungen an (Verlaufseintrag + `status:`). Den Verlaufseintrag zuerst schreiben, den `status:`-Flip zuletzt — der Hook verschiebt die Datei beim Flip, und danach ist kein weiterer Edit auf dem (neuen) Pfad nötig. Andersherum müsste die verschobene Datei erst neu gelesen werden (kostet Token).
-- `blocked/` → immer zurück nach `open/`, nie direkt nach `in-progress/`
+- Der bisherige Weg (zwei Edits: Verlaufseintrag, dann `status:`-Feld) funktioniert
+  weiter — `move` ist additiv, kein Ersatz. Verschiebe-Logik lebt in beiden Fällen in
+  `scripts/tickets.sh sync` (Reconcile `status:` <-> Ordner, inkl. Jahresarchiv für
+  `done/`). Bei manuellem Zwei-Edit-Weg gilt automatisch nur bei Claude/Vibe (Hook);
+  Codex/Gemini rufen `tickets.sh sync` danach selbst auf. Niemals manuell `mv`.
+- Jeder Statuswechsel erfordert einen Verlaufseintrag.
+- `blocked/` → immer zurück nach `open/`, nie direkt nach `in-progress/`.
 - `done/` ist finales Archiv, nicht löschen. Nach Jahr unterteilt (`done/2026/`, künftig
-  `done/2027/` usw.) — der Hook legt das Jahr aus `created:` fest (Fallback: aktuelles Jahr)
+  `done/2027/` usw.) — die Logik legt das Jahr aus `created:` fest (Fallback: aktuelles Jahr).
 
 ## Tickets finden
 
@@ -156,7 +198,8 @@ bash scripts/tickets.sh list                          # in-progress, open, block
 bash scripts/tickets.sh list --status done             # Archiv explizit
 bash scripts/tickets.sh list --group auth-refactor     # nach Gruppe filtern
 bash scripts/tickets.sh list --type bug                # nach Typ filtern
-bash scripts/tickets.sh show IZG-T-001                 # volle Ticketdatei, Ordner egal
+bash scripts/tickets.sh show IZG-T-001                 # Ticketdatei, Ordner egal, Verlauf auf 2 Eintraege gekappt
+bash scripts/tickets.sh show IZG-T-001 --full          # volle Ticketdatei inkl. komplettem Verlauf
 ```
 
 **Nie rekursiv über `tickets/` suchen** (`grep -r`, `find`, Volltext-Read über alle

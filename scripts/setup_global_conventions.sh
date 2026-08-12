@@ -146,6 +146,63 @@ deploy_decision_sheet() {
   done
 }
 
+# Schreibt einen Block content-addressiert in $cfg (IZG-T-092): der Marker-Kommentar
+# traegt einen Hash des Blockinhalts, statt nur "existiert irgendein Block" zu pruefen
+# (das alte Verhalten liess Configs stillschweigend veralten, sobald sich der Block im
+# Script aenderte — siehe IZG-T-087). Aendert sich der Inhalt eines bereits markierten
+# Blocks, ersetzt sync_block ihn automatisch; ist er identisch, passiert nichts.
+#
+# Ein unmarkierter Alt-Block (vor diesem Marker-Schema angelegt oder von Hand ergaenzt,
+# z.B. eigene Bullet-Points unter einer der Ueberschriften) wird NICHT automatisch
+# entfernt/ersetzt — ein simpler Ueberschriften-Match kann echten User-Content nicht von
+# reinem Script-Output unterscheiden und wuerde bei einer Abweichung Daten loeschen.
+# Stattdessen: Hinweis ausgeben und ueberspringen; sobald der Block manuell auf das
+# Marker-Format gehoben wurde, greift der Hash-Vergleich automatisch.
+#
+# Args: cfg, block_id, content, legacy_headings... (Ueberschriften, an denen ein
+# unmarkierter Alt-Block erkannt und gemeldet wird — rein informativ).
+sync_block() {
+  local cfg="$1" block_id="$2" content="$3"; shift 3
+  local hash
+  hash="$(printf '%s' "$content" | sha256sum | cut -d' ' -f1)"
+  local start_marker="<!-- izg-block:$block_id start hash:$hash -->"
+  local start_prefix="<!-- izg-block:$block_id start hash:"
+  local end_marker="<!-- izg-block:$block_id end -->"
+
+  if grep -qF "$start_marker" "$cfg"; then
+    echo "  $cfg: $block_id up to date — skipped"
+    return 0
+  fi
+
+  if grep -qF "$start_prefix" "$cfg"; then
+    local tmp="$cfg.tmp.$$"
+    awk -v start="$start_prefix" -v end="$end_marker" '
+      BEGIN { skip = 0 }
+      index($0, start) == 1 { skip = 1; next }
+      skip && $0 == end { skip = 0; next }
+      !skip { print }
+    ' "$cfg" > "$tmp"
+    mv "$tmp" "$cfg"
+    echo "  $cfg: $block_id changed upstream — replacing"
+  else
+    local heading
+    for heading in "$@"; do
+      if grep -qF "$heading" "$cfg"; then
+        echo "  WARNUNG: $cfg enthält bereits eine \"$heading\"-Sektion ohne izg-block-Marker (vor IZG-T-092 angelegt oder von Hand angepasst) — NICHT automatisch verändert, um keine manuellen Ergänzungen zu verlieren. Block manuell mit dem aktuellen Skript-Inhalt abgleichen und in <!-- izg-block:$block_id start/end --> einfassen, danach übernimmt der Hash-Vergleich automatisch." >&2
+        return 0
+      fi
+    done
+  fi
+
+  {
+    echo ""
+    echo "$start_marker"
+    printf '%s\n' "$content"
+    echo "$end_marker"
+  } >> "$cfg"
+  echo "  patched: $cfg ($block_id)"
+}
+
 # Setup/Update für genau ein Agent-Dir. Rückgabe 0 = ok, 1 = Fehler.
 process_agent_dir() {
   local AGENT_DIR="$1"
@@ -251,6 +308,8 @@ HDR
   mkdir -p "$AGENT_DIR/scripts"
   deploy_file "scripts/init_tickets.sh" "$AGENT_DIR/scripts/init_tickets.sh" || return 1
   [ -f "$AGENT_DIR/scripts/init_tickets.sh" ] && chmod +x "$AGENT_DIR/scripts/init_tickets.sh"
+  # PROTOCOL.md-Vorlage: deployte init_tickets.sh braucht sie als Sibling (IZG-T-091).
+  deploy_file "scripts/ticket_protocol_template.md" "$AGENT_DIR/scripts/ticket_protocol_template.md" || return 1
 
   # ticket-mover Hook bereitstellen — er ist das Kernversprechen der Konvention
   # ("Hook verschiebt die Datei automatisch", siehe tickets.md). Ohne ihn ist die
@@ -296,6 +355,40 @@ with open(settings_path, "w") as f:
     f.write("\n")
 print("  patched: settings.json (ticket-mover PostToolUse-Hook)")
 PY
+    fi
+  fi
+
+  # Vibe-Adapter fuer denselben ticket-mover (IZG-T-088): Vibe hat kein
+  # Claude-settings.json-Format, sondern hooks.toml mit [[hooks]]-Eintraegen
+  # (Typ post_tool). Datei bereitstellen + in hooks.toml registrieren.
+  if [ "$agent_name" = ".vibe" ]; then
+    mkdir -p "$AGENT_DIR/hooks"
+    deploy_file "hooks/global/ticket-mover-vibe.sh" "$AGENT_DIR/hooks/ticket-mover-vibe.sh" || return 1
+    [ -f "$AGENT_DIR/hooks/ticket-mover-vibe.sh" ] && chmod +x "$AGENT_DIR/hooks/ticket-mover-vibe.sh"
+
+    local vibe_hook_cmd="$AGENT_DIR/hooks/ticket-mover-vibe.sh"
+    local vibe_hooks_toml="$AGENT_DIR/hooks.toml"
+    if [ ! -f "$vibe_hooks_toml" ]; then
+      cat > "$vibe_hooks_toml" << TOML
+[[hooks]]
+name = "ticket-mover"
+type = "post_tool"
+command = "$vibe_hook_cmd"
+description = "Ticket-Status pruefen und Datei bei Bedarf verschieben (tickets.sh sync)"
+TOML
+      echo "  created: $vibe_hooks_toml (ticket-mover post_tool-Hook)"
+    elif grep -qF "$vibe_hook_cmd" "$vibe_hooks_toml"; then
+      echo "  $vibe_hooks_toml: ticket-mover bereits registriert — uebersprungen"
+    else
+      {
+        echo ""
+        echo "[[hooks]]"
+        echo "name = \"ticket-mover\""
+        echo "type = \"post_tool\""
+        echo "command = \"$vibe_hook_cmd\""
+        echo "description = \"Ticket-Status pruefen und Datei bei Bedarf verschieben (tickets.sh sync)\""
+      } >> "$vibe_hooks_toml"
+      echo "  patched: $vibe_hooks_toml (ticket-mover post_tool-Hook)"
     fi
   fi
 
@@ -358,15 +451,17 @@ PY
 
   if [ "$cfg_file" = "CLAUDE.md" ]; then
     # Inline-Block mit Pfadverweisen statt @-Includes (IZG-T-081) — kein Auto-Scan-Satz,
-    # Lookup reaktiv formuliert. Guard auf neuen Marker, damit ein zweiter Lauf idempotent ist.
-    if ! grep -q "^## Ticketsystem" "$cfg"; then
-      cat >> "$cfg" << BLOCK
-
+    # Lookup reaktiv formuliert. Content-addressiert (IZG-T-092): sync_block ersetzt den
+    # Block automatisch, sobald sich sein Inhalt hier im Script aendert.
+    local claude_block
+    claude_block="$(cat << BLOCK
 ## Ticketsystem
 
-- Status wechseln = nur das \`status:\`-Feld im Frontmatter ändern. Nie \`mv\` auf eine
-  Ticketdatei — der \`ticket-mover\`-Hook verschiebt sie selbst.
-- Nächste ID: \`bash scripts/next_ticket_id.sh {PREFIX}\` (projektlokal), nie manuell zählen.
+- Ticket anlegen: \`bash scripts/tickets.sh new --type ... --title "..." --by claude\`
+  (Standardweg, ein Kommando statt ID abfragen + Datei von Hand anlegen).
+- Status wechseln: \`bash scripts/tickets.sh move <ID> <status> "<verlaufstext>" --by claude\`
+  (Standardweg). Alternativ das \`status:\`-Feld im Frontmatter direkt ändern — nie \`mv\`
+  auf eine Ticketdatei, der \`ticket-mover\`-Hook verschiebt sie dann selbst.
 - Jeder Statuswechsel braucht einen Verlaufseintrag.
 - Tickets liegen in \`tickets/\`. Auf Ansage nachsehen — kein automatischer Scan bei Sessionstart.
 - Volle Konvention bei Bedarf lesen: \`$AGENT_DIR/tickets.md\`
@@ -382,17 +477,24 @@ Farb-, Typo- und Komponentenwerte für UI-Arbeit: \`$AGENT_DIR/design-tokens.md\
 Frontend-Aufgaben lesen. Nicht ungefragt anwenden: manche Projekte haben eine eigene
 Palette, die ausdrücklich Vorrang hat.
 BLOCK
-      echo "  patched: $cfg (Ticketsystem/Dokument-IDs/Design-Tokens Block)"
-    else
-      echo "  $cfg already patched — skipped"
-    fi
+)"
+    sync_block "$cfg" "ticket-docid-design-tokens" "$claude_block" \
+      "## Ticketsystem" "## Dokument-IDs" "## Design Tokens"
     if grep -qE "^@(tickets|doc-ids|design-tokens)\.md" "$cfg"; then
       echo "  Hinweis: $cfg enthält noch alte @-Includes (@tickets.md/@doc-ids.md/@design-tokens.md) — Script fasst sie nicht an, manuell entfernen."
     fi
   else
-    if ! grep -q "tickets/in-progress" "$cfg"; then
-      cat >> "$cfg" << BLOCK
-
+    # Vibe hat einen registrierten post_tool-Hook (ticket-mover-vibe.sh, s.o.) —
+    # Codex/Gemini haben keine Hook-Mechanik und muessen tickets.sh sync selbst
+    # aufrufen (IZG-T-088).
+    local status_move_hint
+    if [ "$agent_name" = ".vibe" ]; then
+      status_move_hint="Status-Feld im Frontmatter ändern — Hook verschiebt die Datei automatisch."
+    else
+      status_move_hint="Status-Feld im Frontmatter ändern, danach \`bash scripts/tickets.sh sync\` aufrufen — kein Hook verfügbar, die Datei wandert sonst nicht automatisch in den passenden Ordner."
+    fi
+    local ticket_block
+    ticket_block="$(cat << BLOCK
 ## Ticketsystem
 
 Vollständige Konvention: \`$AGENT_DIR/tickets.md\`
@@ -402,8 +504,10 @@ Lookup-Reihenfolge:
 2. \`tickets/open/\` — nächste Arbeit
 3. \`tickets/blocked/\` — nur wenn Blocker gezielt gelöst werden soll
 
-Ticket-ID via \`bash scripts/next_ticket_id.sh {PRJ}\`.
-Status-Feld im Frontmatter ändern — Hook verschiebt die Datei automatisch.
+Ticket anlegen: \`bash scripts/tickets.sh new --type ... --title "..." --by <agent>\`
+(Standardweg, ein Kommando statt ID abfragen + Datei von Hand anlegen).
+Status wechseln: \`bash scripts/tickets.sh move <ID> <status> "<verlaufstext>" --by <agent>\`
+(Standardweg). Alternativ das \`status:\`-Feld direkt ändern: $status_move_hint
 
 Neues Projekt bootstrappen (zweites Argument = Projekt-Prefix, optional — fehlt es,
 bleibt der \`{PRJ}\`-Platzhalter in \`tickets/PROTOCOL.md\`):
@@ -411,16 +515,13 @@ bleibt der \`{PRJ}\`-Platzhalter in \`tickets/PROTOCOL.md\`):
 bash $AGENT_DIR/scripts/init_tickets.sh /pfad/zum/projekt PREFIX
 \`\`\`
 BLOCK
-      echo "  patched: $cfg (inline Ticketsystem block)"
-    else
-      echo "  $cfg already patched — skipped"
-    fi
-    # doc-ids.md + design-tokens.md als Prosa-Verweis auf den LOKALEN (symgelinkten)
-    # Pfad — nie über andere Agent-Dirs. Separat geguardet, damit Bestands-Configs mit
-    # Ticketsystem-Block trotzdem den Konventionen-Block bekommen (IZG-T-055).
-    if ! grep -q "doc-ids.md" "$cfg"; then
-      cat >> "$cfg" << BLOCK
+)"
+    sync_block "$cfg" "ticket-lookup" "$ticket_block" "## Ticketsystem"
 
+    # doc-ids.md + design-tokens.md als Prosa-Verweis auf den LOKALEN (symgelinkten)
+    # Pfad — nie über andere Agent-Dirs.
+    local conventions_block
+    conventions_block="$(cat << BLOCK
 ## Konventionen (Dokument-IDs & Design Tokens)
 
 Dokument-ID-Schema und Typ-Codes: \`$AGENT_DIR/doc-ids.md\`
@@ -428,10 +529,8 @@ Globale Design-Tokens (Farben, Typografie, Spacing) für Outputs/Reports: \`$AGE
 
 Beide sind Symlinks auf die gemeinsame Quelle \`~/ai-shared/\` — bei Bedarf lesen, nie über andere Agent-Dirs (z.B. \`~/.claude/\`) referenzieren.
 BLOCK
-      echo "  patched: $cfg (Konventionen-Block: doc-ids + design-tokens)"
-    else
-      echo "  $cfg Konventionen-Block already present — skipped"
-    fi
+)"
+    sync_block "$cfg" "doc-ids-design-tokens" "$conventions_block" "## Konventionen (Dokument-IDs & Design Tokens)"
   fi
 
   echo "Done: $AGENT_DIR"
