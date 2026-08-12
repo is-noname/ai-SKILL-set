@@ -20,6 +20,19 @@
 #   ~/.gemini  → GEMINI.md
 #   ~/.vibe    → AGENTS.md
 
+# --- Inhaltsverzeichnis (auto) ---
+# Von update_script_toc.py generiert — nicht von Hand pflegen.
+#   _fetch                              Zeile 68
+#   deploy_file                         Zeile 109
+#   deploy_shared_convention            Zeile 126
+#   deploy_decision_sheet               Zeile 151
+#   sync_block                          Zeile 177
+#   render_claude_ticket_block          Zeile 223
+#   render_ticket_lookup_block          Zeile 250
+#   render_doc_ids_design_tokens_block  Zeile 282
+#   process_agent_dir                   Zeile 295
+# --- Ende Inhaltsverzeichnis ---
+
 REPO_ROOT="$(dirname "$0")/.."
 
 # RAW_BASE-Reihenfolge:

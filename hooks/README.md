@@ -19,7 +19,7 @@ Die Hooks liegen im Repo in zwei Unterordnern nach **Default-Deploy-Ort**:
 | Ordner | Hooks | Bedeutung |
 |--------|-------|-----------|
 | `hooks/global/` | alle Guards (`protect-env`, `dir-scope-guard` +`dir-scope.conf`, `env-key-guard`, `file-dump-guard`, `gh-cli-guard`, `git-*-guard`, `read-size-guard`) sowie `piper-notify`, `check-chatbox`, `ticket-mover` | einmal in `~/.claude/hooks/` aufgesetzt, feuert überall, wird nie neu aufgesetzt |
-| `hooks/repo-local/` | `pre-commit-registry`, `pre-commit-agentdocs` | wirken nur im `ai-SKILL-set`-Repo, nie global deployt |
+| `hooks/repo-local/` | `pre-commit-registry`, `pre-commit-agentdocs`, `pre-commit-toc` | wirken nur im `ai-SKILL-set`-Repo, nie global deployt |
 
 **Wichtig:** Die Unterordner gibt es nur im **Repo**. Beim Deploy landen die Skripte
 flach in `~/.claude/hooks/` — die `settings.json`-Pfade unten zeigen deshalb auf
@@ -57,6 +57,7 @@ nur sinnvoll als **Ersatz**, falls man ihn bewusst nicht global will.
 | `gh-cli-guard.sh` | Blockt Repo-Visibility-Änderung, `repo create --public`, `pr/issue create`, `repo delete` / `api … DELETE`. | Bei riskanten `gh`-Befehlen. |
 | `pre-commit-registry.sh` | Regeneriert `registry.json`, wenn `SKILL.md`-Dateien gestaged sind; bricht den Commit ab (`exit 2`), falls die Validierung fehlschlägt. | Bei `git commit` in diesem Repo. |
 | `pre-commit-agentdocs.sh` | Regeneriert `CLAUDE.md`/`GEMINI.md` aus `AGENTS.md` (Source of Truth) und stagt sie nach, wenn eine der drei Root-Configs gestaged ist; bricht ab (`exit 2`) bei Fehler. | Bei `git commit` in diesem Repo. |
+| `pre-commit-toc.sh` | Aktualisiert das Kopf-Inhaltsverzeichnis (Funktionsname + Zeilennummer, via `scripts/update_script_toc.py`) von `scripts/setup_global_conventions.sh` und `scripts/tickets.sh` und stagt sie nach, wenn eine der beiden gestaged ist; bricht ab (`exit 2`) bei Fehler. | Bei `git commit` in diesem Repo. |
 
 ### PostToolUse — Edit / Write
 
@@ -162,7 +163,8 @@ Eigenschaften: idempotent, fragt bei Drift vor dem Überschreiben (`--force` umg
    läuft es wirkungslos durch. Als Projekt-Hook in `.claude/settings.json` des
    Repos eintragen (mit absolutem Pfad auf dein Klon-Verzeichnis). Weicht dein
    Layout ab, lässt sich das Repo per `AI_SKILL_SET_REPO` fest vorgeben.
-   Dasselbe gilt für `pre-commit-agentdocs.sh` (Marker: `scripts/sync_agent_docs.sh`).
+   Dasselbe gilt für `pre-commit-agentdocs.sh` (Marker: `scripts/sync_agent_docs.sh`) und
+   `pre-commit-toc.sh` (Marker: `scripts/update_script_toc.py`).
 
    **Wichtig — Reihenfolge:** `pre-commit-registry.sh` muss **vor** `git-commit-guard.sh`
    eingetragen werden. `ask` bricht die Hook-Chain ab (der User entscheidet, danach
