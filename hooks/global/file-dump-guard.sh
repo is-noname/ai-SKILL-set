@@ -7,16 +7,22 @@
 #
 # Laesst durch: Pipelines (| grep, | wc, | jq), Umleitungen (>, >>), Heredocs,
 # begrenzte Ausschnitte (head -30, sed -n '10,60p') und Dateien unter dem Schwellwert.
-# Schwellwert ueber FILE_DUMP_GUARD_MAX_LINES setzbar (Default 300).
+# Schwellwert ueber FILE_DUMP_GUARD_MAX_LINES setzbar (Default 120).
+#
+# Warum 120 und nicht 300: 120 Zeilen sind ein Ausschnitt zum Nachsehen, 300 sind ein
+# halbes Modul. Ein sed -n '1,300p' kippt rund 3.000 Tokens ohne Zeilennummern ins
+# Fenster, die ein Edit adressieren koennte - danach folgt oft ein zweiter, echter
+# Read derselben Datei (Doppelkosten). Fuer Dateiinhalt ist Read mit offset/limit
+# das richtige Werkzeug. Gemessen im Token-Review 12.08.2026 (IZG-T-126).
 #
 # Braucht: python3 (Kommando-Zerlegung), jq nicht noetig.
 
 INPUT=$(cat)
 
-MAX_LINES="${FILE_DUMP_GUARD_MAX_LINES:-300}" python3 - "$INPUT" <<'PY'
+MAX_LINES="${FILE_DUMP_GUARD_MAX_LINES:-120}" python3 - "$INPUT" <<'PY'
 import json, os, re, shlex, sys
 
-MAX = int(os.environ.get("MAX_LINES") or 300)
+MAX = int(os.environ.get("MAX_LINES") or 120)
 
 try:
     data = json.loads(sys.argv[1])
