@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-02",
+  "generated": "2026-08-12",
   "skills": {
     "grilling": {
       "name": "grilling",
@@ -135,6 +135,18 @@
         "izg-domain-modeling"
       ],
       "path": "skills/layer-3-domain/coding/improve-codebase-architecture",
+      "disable-model-invocation": true
+    },
+    "izg-improve-token-usage": {
+      "name": "izg-improve-token-usage",
+      "description": "Identifiziert Tokenfresser, Redundanzen und ineffiziente Ablaeufe in Skills, Workflows und Skripten, belegt sie mit Messdaten aus den Transcripts und praesentiert sie als HTML-Report.",
+      "layer": 3,
+      "dependencies": [
+        "grilling",
+        "izg-create-fixplan",
+        "html-report-template"
+      ],
+      "path": "skills/layer-3-domain/coding/izg-improve-token-usage",
       "disable-model-invocation": true
     },
     "agentmail": {
