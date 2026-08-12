@@ -230,6 +230,12 @@ bash ~/.claude/scripts/init_tickets.sh /pfad/zum/projekt
 Idempotent: erneutes Ausführen rüstet fehlenden Counter / aktuelles
 `next_ticket_id.sh` nach, ohne bestehende Tickets oder `PROTOCOL.md` zu überschreiben.
 
+**Bestandsprojekte nachziehen:** Kommen im Repo neue oder geänderte Projekt-Skripte
+dazu (etwa `tickets.sh` mit IZG-T-089), bekommen bereits gebootstrappte Projekte die
+nicht von selbst — sie behalten den Stand ihres letzten Laufs. Nach solchen Änderungen
+denselben Befehl im Bestandsprojekt erneut ausführen; er kopiert die aktuellen Skripte
+über die alten und lässt Tickets, Counter und `PROTOCOL.md` unangetastet.
+
 ---
 
 ## 7. Kopplung mit dem doc-ids-System

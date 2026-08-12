@@ -229,6 +229,12 @@ bash ~/.claude/scripts/init_tickets.sh /path/to/project
 Idempotent: re-running adds a missing counter / the current `next_ticket_id.sh`
 without overwriting existing tickets or `PROTOCOL.md`.
 
+**Catching up existing projects:** When the repo gains new or changed project scripts
+(such as `tickets.sh` in IZG-T-089), already bootstrapped projects do not pick them up
+by themselves — they keep whatever their last run installed. After such changes, run
+the same command again inside the existing project; it copies the current scripts over
+the old ones and leaves tickets, counter and `PROTOCOL.md` untouched.
+
 ---
 
 ## 7. Coupling with the doc-ids system

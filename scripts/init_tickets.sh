@@ -38,7 +38,13 @@ fi
 # (Original im ai-SKILL-set-Repo ODER eine bereits deployte Kopie). Wird hier schon
 # gebraucht, um die PROTOCOL.md-Vorlage zu finden (siehe unten) und weiter unten
 # erneut fuer deploy_script.
-REPO_SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
+#
+# $0 erst symlink-aufloesen: setup_global_conventions.sh legt in den Agent-Dirs einen
+# Symlink an (~/.claude/scripts/init_tickets.sh -> Repo). Ohne readlink zeigt
+# dirname "$0" auf das Symlink-Verzeichnis, wo die Geschwisterskripte fehlen — der
+# Aufruf ueber den Symlink brach dann ab (IZG-T-119).
+SELF="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+REPO_SCRIPTS="$(cd "$(dirname "$SELF")" && pwd)"
 
 if [ ! -f "$TARGET/tickets/PROTOCOL.md" ]; then
   TEMPLATE="$REPO_SCRIPTS/ticket_protocol_template.md"
@@ -87,10 +93,9 @@ deploy_script() {
 deploy_script tickets.sh
 deploy_script next_ticket_id.sh
 
-SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 DEST="$(cd "$TARGET/scripts" && pwd)/init_tickets.sh"
 if [ "$SELF" != "$DEST" ]; then
-  cp "$0" "$TARGET/scripts/init_tickets.sh"
+  cp "$SELF" "$TARGET/scripts/init_tickets.sh"
   chmod +x "$TARGET/scripts/init_tickets.sh"
 fi
 
