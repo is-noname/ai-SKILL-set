@@ -203,6 +203,81 @@ sync_block() {
   echo "  patched: $cfg ($block_id)"
 }
 
+# Block-Inhalte als eigene Funktionen statt inline in process_agent_dir (IZG-T-100):
+# check_global_drift.sh sourced dieses Skript und ruft dieselben Funktionen auf, um den
+# Soll-Hash zu berechnen — ein zweites Vorhalten des Blocktexts wuerde sonst lautlos
+# aus dem Tritt geraten, sobald sich einer der beiden Orte aendert ohne den anderen.
+render_claude_ticket_block() {
+  local AGENT_DIR="$1"
+  cat << BLOCK
+## Ticketsystem
+
+- Ticket anlegen: \`bash scripts/tickets.sh new --type ... --title "..." --by claude\`
+  (Standardweg, ein Kommando statt ID abfragen + Datei von Hand anlegen).
+- Status wechseln: \`bash scripts/tickets.sh move <ID> <status> "<verlaufstext>" --by claude\`
+  (Standardweg). Alternativ das \`status:\`-Feld im Frontmatter direkt ändern — nie \`mv\`
+  auf eine Ticketdatei, der \`ticket-mover\`-Hook verschiebt sie dann selbst.
+- Jeder Statuswechsel braucht einen Verlaufseintrag.
+- Tickets liegen in \`tickets/\`. Auf Ansage nachsehen — kein automatischer Scan bei Sessionstart.
+- Volle Konvention bei Bedarf lesen: \`$AGENT_DIR/tickets.md\`
+
+## Dokument-IDs
+
+Typ-Codes, ADR-Filter, Prefix-Registry bei Bedarf: \`$AGENT_DIR/doc-ids.md\`,
+\`~/ai-shared/project-identifier.md\`
+
+## Design Tokens
+
+Farb-, Typo- und Komponentenwerte für UI-Arbeit: \`$AGENT_DIR/design-tokens.md\` — bei
+Frontend-Aufgaben lesen. Nicht ungefragt anwenden: manche Projekte haben eine eigene
+Palette, die ausdrücklich Vorrang hat.
+BLOCK
+}
+
+render_ticket_lookup_block() {
+  local AGENT_DIR="$1"
+  local agent_name status_move_hint
+  agent_name="$(basename "$AGENT_DIR")"
+  if [ "$agent_name" = ".vibe" ]; then
+    status_move_hint="Status-Feld im Frontmatter ändern — Hook verschiebt die Datei automatisch."
+  else
+    status_move_hint="Status-Feld im Frontmatter ändern, danach \`bash scripts/tickets.sh sync\` aufrufen — kein Hook verfügbar, die Datei wandert sonst nicht automatisch in den passenden Ordner."
+  fi
+  cat << BLOCK
+## Ticketsystem
+
+Vollständige Konvention: \`$AGENT_DIR/tickets.md\`
+
+Lookup-Reihenfolge:
+1. \`tickets/in-progress/\` — läuft noch was?
+2. \`tickets/open/\` — nächste Arbeit
+3. \`tickets/blocked/\` — nur wenn Blocker gezielt gelöst werden soll
+
+Ticket anlegen: \`bash scripts/tickets.sh new --type ... --title "..." --by <agent>\`
+(Standardweg, ein Kommando statt ID abfragen + Datei von Hand anlegen).
+Status wechseln: \`bash scripts/tickets.sh move <ID> <status> "<verlaufstext>" --by <agent>\`
+(Standardweg). Alternativ das \`status:\`-Feld direkt ändern: $status_move_hint
+
+Neues Projekt bootstrappen (zweites Argument = Projekt-Prefix, optional — fehlt es,
+bleibt der \`{PRJ}\`-Platzhalter in \`tickets/PROTOCOL.md\`):
+\`\`\`bash
+bash $AGENT_DIR/scripts/init_tickets.sh /pfad/zum/projekt PREFIX
+\`\`\`
+BLOCK
+}
+
+render_doc_ids_design_tokens_block() {
+  local AGENT_DIR="$1"
+  cat << BLOCK
+## Konventionen (Dokument-IDs & Design Tokens)
+
+Dokument-ID-Schema und Typ-Codes: \`$AGENT_DIR/doc-ids.md\`
+Globale Design-Tokens (Farben, Typografie, Spacing) für Outputs/Reports: \`$AGENT_DIR/design-tokens.md\`
+
+Beide sind Symlinks auf die gemeinsame Quelle \`~/ai-shared/\` — bei Bedarf lesen, nie über andere Agent-Dirs (z.B. \`~/.claude/\`) referenzieren.
+BLOCK
+}
+
 # Setup/Update für genau ein Agent-Dir. Rückgabe 0 = ok, 1 = Fehler.
 process_agent_dir() {
   local AGENT_DIR="$1"
@@ -454,30 +529,7 @@ PY
     # Lookup reaktiv formuliert. Content-addressiert (IZG-T-092): sync_block ersetzt den
     # Block automatisch, sobald sich sein Inhalt hier im Script aendert.
     local claude_block
-    claude_block="$(cat << BLOCK
-## Ticketsystem
-
-- Ticket anlegen: \`bash scripts/tickets.sh new --type ... --title "..." --by claude\`
-  (Standardweg, ein Kommando statt ID abfragen + Datei von Hand anlegen).
-- Status wechseln: \`bash scripts/tickets.sh move <ID> <status> "<verlaufstext>" --by claude\`
-  (Standardweg). Alternativ das \`status:\`-Feld im Frontmatter direkt ändern — nie \`mv\`
-  auf eine Ticketdatei, der \`ticket-mover\`-Hook verschiebt sie dann selbst.
-- Jeder Statuswechsel braucht einen Verlaufseintrag.
-- Tickets liegen in \`tickets/\`. Auf Ansage nachsehen — kein automatischer Scan bei Sessionstart.
-- Volle Konvention bei Bedarf lesen: \`$AGENT_DIR/tickets.md\`
-
-## Dokument-IDs
-
-Typ-Codes, ADR-Filter, Prefix-Registry bei Bedarf: \`$AGENT_DIR/doc-ids.md\`,
-\`~/ai-shared/project-identifier.md\`
-
-## Design Tokens
-
-Farb-, Typo- und Komponentenwerte für UI-Arbeit: \`$AGENT_DIR/design-tokens.md\` — bei
-Frontend-Aufgaben lesen. Nicht ungefragt anwenden: manche Projekte haben eine eigene
-Palette, die ausdrücklich Vorrang hat.
-BLOCK
-)"
+    claude_block="$(render_claude_ticket_block "$AGENT_DIR")"
     sync_block "$cfg" "ticket-docid-design-tokens" "$claude_block" \
       "## Ticketsystem" "## Dokument-IDs" "## Design Tokens"
     if grep -qE "^@(tickets|doc-ids|design-tokens)\.md" "$cfg"; then
@@ -487,55 +539,25 @@ BLOCK
     # Vibe hat einen registrierten post_tool-Hook (ticket-mover-vibe.sh, s.o.) —
     # Codex/Gemini haben keine Hook-Mechanik und muessen tickets.sh sync selbst
     # aufrufen (IZG-T-088).
-    local status_move_hint
-    if [ "$agent_name" = ".vibe" ]; then
-      status_move_hint="Status-Feld im Frontmatter ändern — Hook verschiebt die Datei automatisch."
-    else
-      status_move_hint="Status-Feld im Frontmatter ändern, danach \`bash scripts/tickets.sh sync\` aufrufen — kein Hook verfügbar, die Datei wandert sonst nicht automatisch in den passenden Ordner."
-    fi
     local ticket_block
-    ticket_block="$(cat << BLOCK
-## Ticketsystem
-
-Vollständige Konvention: \`$AGENT_DIR/tickets.md\`
-
-Lookup-Reihenfolge:
-1. \`tickets/in-progress/\` — läuft noch was?
-2. \`tickets/open/\` — nächste Arbeit
-3. \`tickets/blocked/\` — nur wenn Blocker gezielt gelöst werden soll
-
-Ticket anlegen: \`bash scripts/tickets.sh new --type ... --title "..." --by <agent>\`
-(Standardweg, ein Kommando statt ID abfragen + Datei von Hand anlegen).
-Status wechseln: \`bash scripts/tickets.sh move <ID> <status> "<verlaufstext>" --by <agent>\`
-(Standardweg). Alternativ das \`status:\`-Feld direkt ändern: $status_move_hint
-
-Neues Projekt bootstrappen (zweites Argument = Projekt-Prefix, optional — fehlt es,
-bleibt der \`{PRJ}\`-Platzhalter in \`tickets/PROTOCOL.md\`):
-\`\`\`bash
-bash $AGENT_DIR/scripts/init_tickets.sh /pfad/zum/projekt PREFIX
-\`\`\`
-BLOCK
-)"
+    ticket_block="$(render_ticket_lookup_block "$AGENT_DIR")"
     sync_block "$cfg" "ticket-lookup" "$ticket_block" "## Ticketsystem"
 
     # doc-ids.md + design-tokens.md als Prosa-Verweis auf den LOKALEN (symgelinkten)
     # Pfad — nie über andere Agent-Dirs.
     local conventions_block
-    conventions_block="$(cat << BLOCK
-## Konventionen (Dokument-IDs & Design Tokens)
-
-Dokument-ID-Schema und Typ-Codes: \`$AGENT_DIR/doc-ids.md\`
-Globale Design-Tokens (Farben, Typografie, Spacing) für Outputs/Reports: \`$AGENT_DIR/design-tokens.md\`
-
-Beide sind Symlinks auf die gemeinsame Quelle \`~/ai-shared/\` — bei Bedarf lesen, nie über andere Agent-Dirs (z.B. \`~/.claude/\`) referenzieren.
-BLOCK
-)"
+    conventions_block="$(render_doc_ids_design_tokens_block "$AGENT_DIR")"
     sync_block "$cfg" "doc-ids-design-tokens" "$conventions_block" "## Konventionen (Dokument-IDs & Design Tokens)"
   fi
 
   echo "Done: $AGENT_DIR"
   return 0
 }
+
+# Dispatcher nur ausfuehren, wenn das Skript direkt aufgerufen wird — check_global_drift.sh
+# sourced diese Datei, um render_*_block()/CFG_MAP wiederzuverwenden, ohne dabei einen
+# echten Deploy anzustossen (IZG-T-100).
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
 
 # --- Dispatcher: Ziel-Dirs bestimmen ---
 target_dirs=()
@@ -556,3 +578,5 @@ for d in "${target_dirs[@]}"; do
   process_agent_dir "$d" || rc=1
 done
 exit "$rc"
+
+fi

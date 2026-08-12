@@ -13,7 +13,10 @@ wächst monoton. Immer über die aktiven Ordner oder `scripts/tickets.sh` gehen.
 
 ## Dateiname
 `{PRJ}-T-{NNN}_{kurz-beschreibung}.md`
-Projekt-Prefix aus der Registry `project-identifier.md` im globalen Agent-Verzeichnis.
+Der `{PRJ}`-Platzhalter oben wird von `init_tickets.sh` durch das echte Prefix ersetzt
+und dient danach `scripts/tickets.sh new` als projekt-lokale Laufzeit-Quelle (Zeile wird
+per Regex ausgelesen). Vergeben wird das Prefix zentral in der Registry
+`project-identifier.md` im globalen Agent-Verzeichnis; gelesen wird sie dafuer nicht.
 
 ## Ticket anlegen
 ```bash

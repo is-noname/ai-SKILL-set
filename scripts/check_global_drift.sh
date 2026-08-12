@@ -17,6 +17,12 @@
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# Sourced statt dupliziert, damit render_*_block()/CFG_MAP nicht zweimal gepflegt
+# werden muessen (IZG-T-100) — der Dispatcher-Teil von setup_global_conventions.sh
+# ist per BASH_SOURCE-Guard geschuetzt und laeuft beim Sourcen nicht an.
+# shellcheck source=setup_global_conventions.sh
+source "$REPO_ROOT/scripts/setup_global_conventions.sh"
+
 # project-identifier.md ist User-State → NICHT geprüft. Alles hier sind die von
 # setup_global_conventions.sh stets überschriebenen (= managed) Dateien.
 # Format: "<repo-relpath>|<agent-relpath>[|<nur-für-agent-dir>]"
@@ -94,6 +100,40 @@ else
   fi
 fi
 
+# Prueft einen izg-block (IZG-T-100): vergleicht den Hash im Marker-Kommentar gegen
+# den aus dem aktuellen Blockinhalt (render_*_block() aus setup_global_conventions.sh)
+# berechneten Soll-Hash — dasselbe Format wie sync_block() beim Schreiben verwendet.
+# Args: cfg, block_id, content, legacy_headings... (fuer die "unmarkiert"-Erkennung).
+check_izg_block() {
+  local cfg="$1" block_id="$2" content="$3"; shift 3
+  local want_hash have_hash
+  want_hash="$(printf '%s' "$content" | sha256sum | cut -d' ' -f1)"
+  have_hash="$(grep -oE "izg-block:$block_id start hash:[0-9a-f]+" "$cfg" 2>/dev/null \
+    | head -1 | sed -E 's/.*hash:([0-9a-f]+)/\1/')"
+
+  if [ -n "$have_hash" ]; then
+    if [ "$have_hash" = "$want_hash" ]; then
+      echo "  ok izg-block:$block_id ($cfg)"
+    else
+      echo "  !! izg-block:$block_id ($cfg) — DRIFT (Hash im Marker weicht vom aktuellen Skript-Blockinhalt ab)"
+      drift_found=1
+    fi
+    return
+  fi
+
+  local heading
+  for heading in "$@"; do
+    if grep -qF "$heading" "$cfg"; then
+      echo "  ~~ izg-block:$block_id ($cfg) — Sektion ohne Marker (vor IZG-T-092 angelegt oder von Hand ergaenzt, nicht automatisch pruefbar)"
+      drift_found=1
+      return
+    fi
+  done
+
+  echo "  -- izg-block:$block_id ($cfg) — fehlt (nicht gepatcht)"
+  drift_found=1
+}
+
 for adir in "${agent_dirs[@]}"; do
   echo "== $adir =="
   for entry in "${MANAGED[@]}"; do
@@ -115,6 +155,24 @@ for adir in "${agent_dirs[@]}"; do
       drift_found=1
     fi
   done
+
+  agent_name="$(basename "$adir")"
+  cfg_file="${CFG_MAP[$agent_name]}"
+  cfg="$adir/$cfg_file"
+  if [ -z "$cfg_file" ]; then
+    echo "  ?? unbekanntes Agent-Dir '$agent_name' — izg-block-Check übersprungen"
+    drift_found=1
+  elif [ ! -f "$cfg" ]; then
+    echo "  ?? $cfg fehlt — izg-block-Check übersprungen"
+    drift_found=1
+  elif [ "$cfg_file" = "CLAUDE.md" ]; then
+    check_izg_block "$cfg" "ticket-docid-design-tokens" "$(render_claude_ticket_block "$adir")" \
+      "## Ticketsystem" "## Dokument-IDs" "## Design Tokens"
+  else
+    check_izg_block "$cfg" "ticket-lookup" "$(render_ticket_lookup_block "$adir")" "## Ticketsystem"
+    check_izg_block "$cfg" "doc-ids-design-tokens" "$(render_doc_ids_design_tokens_block "$adir")" \
+      "## Konventionen (Dokument-IDs & Design Tokens)"
+  fi
 done
 
 if [ "$drift_found" -ne 0 ]; then

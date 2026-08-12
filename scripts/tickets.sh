@@ -88,21 +88,35 @@ cmd_list() {
 # Treffer sind ein echter ID-Konflikt und brechen sofort ab.
 resolve_ticket_file() {
   local id="$1"
-  local -a matches=()
   local folder file
+
+  # Ordnerebene 1: aktive Statusordner in einem grep -l statt grep pro Datei.
+  local -a active_files=()
   for folder in in-progress open blocked; do
     [ -d "$TICKETS_DIR/$folder" ] || continue
     for file in "$TICKETS_DIR/$folder"/*.md; do
-      [ -e "$file" ] || continue
-      grep -q "^id: ${id}\$" "$file" 2>/dev/null && matches+=("$file")
+      [ -e "$file" ] && active_files+=("$file")
     done
   done
 
+  local -a matches=()
+  if [ ${#active_files[@]} -gt 0 ]; then
+    while IFS= read -r file; do
+      matches+=("$file")
+    done < <(grep -l "^id: ${id}\$" "${active_files[@]}" 2>/dev/null || true)
+  fi
+
+  # Ordnerebene 2: Jahresarchiv, nur als Fallback ohne Treffer oben.
   if [ ${#matches[@]} -eq 0 ] && [ -d "$TICKETS_DIR/done" ]; then
+    local -a done_files=()
     for file in "$TICKETS_DIR/done"/*/*.md; do
-      [ -e "$file" ] || continue
-      grep -q "^id: ${id}\$" "$file" 2>/dev/null && matches+=("$file")
+      [ -e "$file" ] && done_files+=("$file")
     done
+    if [ ${#done_files[@]} -gt 0 ]; then
+      while IFS= read -r file; do
+        matches+=("$file")
+      done < <(grep -l "^id: ${id}\$" "${done_files[@]}" 2>/dev/null || true)
+    fi
   fi
 
   [ ${#matches[@]} -eq 0 ] && return 0
@@ -175,6 +189,7 @@ cmd_show() {
 # (IZG-T-088) — Claude- und Vibe-Hook-Adapter rufen ausschliesslich dies auf.
 sync_one() {
   local file_path="$1"
+  local result_var="${2:-}"
   [ -f "$file_path" ] || return 0
   [[ "$file_path" == */tickets/* ]] || return 0
   grep -qE "^id: [A-Z]+-T-[0-9]+" "$file_path" || return 0
@@ -205,9 +220,15 @@ sync_one() {
       tickets_root="$(dirname "$current_dir")"
     fi
     target_dir="$tickets_root/done/$year"
-    [ "$current_dir" = "$target_dir" ] && return 0
+    if [ "$current_dir" = "$target_dir" ]; then
+      [ -n "$result_var" ] && printf -v "$result_var" '%s' "$file_path"
+      return 0
+    fi
   else
-    [ "$current_folder" = "$status" ] && return 0
+    if [ "$current_folder" = "$status" ]; then
+      [ -n "$result_var" ] && printf -v "$result_var" '%s' "$file_path"
+      return 0
+    fi
     tickets_root="$(dirname "$current_dir")"
     target_dir="$tickets_root/$status"
   fi
@@ -220,14 +241,17 @@ sync_one() {
     if cmp -s "$file_path" "$target_dir/$filename"; then
       rm -f "$file_path"
       echo "$filename: identische Dublette in $status/ gefunden — Quelle in $current_folder/ entfernt. Datei liegt jetzt unter $target_dir/."
+      [ -n "$result_var" ] && printf -v "$result_var" '%s' "$target_dir/$filename"
       return 0
     fi
     echo "$filename: Ziel $status/ existiert bereits mit ABWEICHENDEM Inhalt — nicht verschoben (echter ID-Konflikt). Bitte manuell zusammenfuehren."
+    [ -n "$result_var" ] && printf -v "$result_var" '%s' "$file_path"
     return 0
   fi
 
   mv -n "$file_path" "$target_dir/$filename"
   echo "$filename automatisch von $current_folder/ nach $status/ verschoben. Datei liegt jetzt unter $target_dir/ — kein manueller mv noetig."
+  [ -n "$result_var" ] && printf -v "$result_var" '%s' "$target_dir/$filename"
 }
 
 cmd_sync() {
@@ -319,9 +343,10 @@ cmd_move() {
 
   sed -i "s/^status: .*/status: ${status}/" "$file"
 
-  sync_one "$file"
+  local target_path=""
+  sync_one "$file" target_path
 
-  resolve_ticket_file "$id"
+  printf '%s\n' "${target_path:-$file}"
 }
 
 cmd_next() {

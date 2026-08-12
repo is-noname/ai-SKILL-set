@@ -46,7 +46,10 @@ tickets/
 {PRJ}-T-{NNN}_{kurz-beschreibung}.md
 ```
 
-`{PRJ}` = Projekt-Prefix aus der Registry `project-identifier.md` im globalen Agent-Verzeichnis.
+`{PRJ}` = Projekt-Prefix, zur Laufzeit gelesen aus `tickets/PROTOCOL.md` des Projekts
+(dort von `init_tickets.sh` verankert — siehe `scripts/tickets.sh:cmd_new`). Vergeben wird
+das Prefix zentral in der Registry `project-identifier.md` im globalen Agent-Verzeichnis;
+gelesen wird sie fuer die ID-Vergabe nicht.
 
 **Standardweg:** `scripts/tickets.sh new` erzeugt ID, Datei und Frontmatter in einem
 Kommando — siehe [Ticket anlegen](#ticket-anlegen). Nur wenn ausschliesslich die naechste
