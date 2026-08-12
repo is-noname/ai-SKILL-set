@@ -13,6 +13,14 @@
 
 input=$(cat)
 
+# Prefilter ohne Prozessstart: file_path wird unten ohnehin auf */tickets/*
+# geprueft, ein Payload ohne "tickets/"-Substring kann also nie durchkommen —
+# vor dem jq-Fork abbrechen (IZG-T-104).
+case "$input" in
+  *tickets/*) ;;
+  *) exit 0 ;;
+esac
+
 file_path=$(echo "$input" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 [[ -n "$file_path" && -f "$file_path" && "$file_path" == */tickets/* ]] || exit 0
 

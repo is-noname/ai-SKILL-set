@@ -5,6 +5,16 @@
 
 input=$(cat)
 
+# Prefilter ohne Prozessstart: der weit ueberwiegende Teil aller Edit/Write/Bash-
+# Aufrufe betrifft keine Ticketdatei. Ein Payload ohne "tickets/"-Substring kann in
+# keinem der drei Zweige unten zu einem Treffer fuehren (Edit/Write pruefen den
+# file_path direkt auf */tickets/*, der Bash-Zweig verlangt "tickets/" bereits im
+# eigenen grep-Pattern) — also vor dem ersten jq-Fork abbrechen (IZG-T-104).
+case "$input" in
+  *tickets/*) ;;
+  *) exit 0 ;;
+esac
+
 tool_name=$(echo "$input" | jq -r '.tool_name // empty' 2>/dev/null)
 
 if [[ "$tool_name" == "Edit" || "$tool_name" == "Write" ]]; then
