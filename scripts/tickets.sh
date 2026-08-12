@@ -2,25 +2,33 @@
 # Schmales Abfrage-Interface fuer tickets/. Ersetzt Glob+Volltext-Read durch
 # Frontmatter-Zeilen (list), gezielten Volltext-Read (show) und die bisherige
 # next_ticket_id.sh-Logik (next). Siehe IZG-T-083.
-# Usage:
-#   tickets.sh list [--status open|in-progress|blocked|done] [--group SLUG] [--type TYPE]
-#   tickets.sh show <ID> [--full]
-#   tickets.sh next <PREFIX>
-#   tickets.sh new --type <T> --priority <P> --title <TITLE> --by <AGENT>
-#                   [--group SLUG] [--assigned AGENT] [--source DOC-ID] [--body TEXT|-]
-#   tickets.sh sync [FILE]
-#   tickets.sh move <ID> <status> "<verlaufstext>" [--by <agent>]
+# Verben: list, show, next, new, sync, move, help — Flags/Beispiele: tickets.sh help
+# --- Inhaltsverzeichnis (auto) ---
+# Von update_script_toc.py generiert — nicht von Hand pflegen.
+#   cmd_list             Zeile 24
+#   resolve_ticket_file  Zeile 98
+#   cmd_show             Zeile 145
+#   sync_one             Zeile 209
+#   cmd_sync             Zeile 276
+#   cmd_move             Zeile 305
+#   cmd_next             Zeile 371
+#   slugify              Zeile 407
+#   cmd_new              Zeile 422
+#   cmd_help             Zeile 535
+# --- Ende Inhaltsverzeichnis ---
+
 set -euo pipefail
 
 TICKETS_DIR="$(cd "$(dirname "$0")/.." && pwd)/tickets"
 
 cmd_list() {
-  local status_filter="" group_filter="" type_filter=""
+  local status_filter="" group_filter="" type_filter="" priority_filter=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --status) status_filter="$2"; shift 2 ;;
       --group) group_filter="$2"; shift 2 ;;
       --type) type_filter="$2"; shift 2 ;;
+      --priority) priority_filter="$2"; shift 2 ;;
       *) echo "Unbekannte Option: $1" >&2; exit 1 ;;
     esac
   done
@@ -52,7 +60,7 @@ cmd_list() {
   # Ein awk-Durchlauf ueber alle Dateien statt frontmatter_field pro Feld/Datei
   # (IZG-T-090). FNR==1 resettet den Zustand pro Datei; nextfile bricht ab,
   # sobald das Frontmatter zuende ist oder ein Filter nicht passt.
-  awk -v type_filter="$type_filter" -v group_filter="$group_filter" '
+  awk -v type_filter="$type_filter" -v group_filter="$group_filter" -v priority_filter="$priority_filter" '
     FNR == 1 { id = ""; type = ""; priority = ""; group = ""; infm = 0 }
     /^---$/ { infm++; next }
     infm == 1 {
@@ -66,6 +74,7 @@ cmd_list() {
       if (id == "") { nextfile }
       if (type_filter != "" && type != type_filter) { nextfile }
       if (group_filter != "" && group != group_filter) { nextfile }
+      if (priority_filter != "" && priority != priority_filter) { nextfile }
 
       idx = index(FILENAME, "/tickets/")
       n = split(substr(FILENAME, idx + 9), parts, "/")
@@ -134,16 +143,21 @@ resolve_ticket_file() {
 # wer nur wissen will was zu tun ist bezahlt sonst die volle Historie mit.
 # --full liefert byteidentisch das bisherige Verhalten.
 cmd_show() {
-  local id="" full=0
+  local id="" full=0 brief=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --full) full=1; shift ;;
+      --brief) brief=1; shift ;;
       -*) echo "Unbekannte Option: $1" >&2; exit 1 ;;
       *) id="$1"; shift ;;
     esac
   done
   if [ -z "$id" ]; then
-    echo "Usage: tickets.sh show <ID> [--full]" >&2
+    echo "Usage: tickets.sh show <ID> [--full|--brief]" >&2
+    exit 1
+  fi
+  if [ "$full" -eq 1 ] && [ "$brief" -eq 1 ]; then
+    echo "--full und --brief schliessen sich aus." >&2
     exit 1
   fi
   local match
@@ -151,6 +165,11 @@ cmd_show() {
   if [ -z "$match" ]; then
     echo "Ticket nicht gefunden: $id" >&2
     exit 1
+  fi
+
+  if [ "$brief" -eq 1 ]; then
+    awk '/^## Verlauf/ { exit } { print }' "$match"
+    return 0
   fi
 
   if [ "$full" -eq 1 ] || ! grep -q '^## Verlauf' "$match"; then
@@ -401,7 +420,7 @@ slugify() {
 # an cmd_next (gleicher flock-Codepfad). Enum-Validierung laeuft VOR der ID-Vergabe,
 # damit ein Abbruch keine ID verbraucht. Legt immer in open/ an.
 cmd_new() {
-  local type="" priority="" title="" group="" by="" assigned="" source="" body_arg=""
+  local type="" priority="" title="" group="" by="" assigned="" source="" body_arg="" ac_arg=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --type) type="$2"; shift 2 ;;
@@ -412,9 +431,14 @@ cmd_new() {
       --assigned) assigned="$2"; shift 2 ;;
       --source) source="$2"; shift 2 ;;
       --body) body_arg="$2"; shift 2 ;;
+      --ac) ac_arg="$2"; shift 2 ;;
       *) echo "Unbekannte Option: $1" >&2; exit 1 ;;
     esac
   done
+  if [ "$body_arg" = "-" ] && [ "$ac_arg" = "-" ]; then
+    echo "--body und --ac koennen nicht beide von stdin lesen (--ac -)." >&2
+    exit 1
+  fi
 
   case "$type" in
     bug|task|feature|question) ;;
@@ -454,6 +478,18 @@ cmd_new() {
     desc="$body_arg"
   fi
 
+  local ac_raw=""
+  if [ "$ac_arg" = "-" ]; then
+    ac_raw="$(cat)"
+  elif [ -n "$ac_arg" ]; then
+    ac_raw="$ac_arg"
+  fi
+
+  local ac_block="- [ ] "
+  if [ -n "$ac_raw" ]; then
+    ac_block="$(printf '%s\n' "$ac_raw" | awk '{ if ($0 ~ /^- \[ \] /) print; else print "- [ ] " $0 }')"
+  fi
+
   local id
   id="$(cmd_next "$prefix")"
 
@@ -483,7 +519,7 @@ cmd_new() {
     echo ""
     echo "## Akzeptanzkriterien"
     echo ""
-    echo "- [ ] "
+    echo "$ac_block"
     echo ""
     echo "## Verlauf"
     echo ""
@@ -494,6 +530,49 @@ cmd_new() {
   echo "$filepath"
 }
 
+# Einzige Quelle fuer Verben, Flags und Beispiele (IZG-T-102) — der Kopfkommentar
+# verweist nur noch hierher, keine zweite Liste pflegen.
+cmd_help() {
+  cat <<'EOF'
+tickets.sh <verb> [optionen]
+
+  list   [--status open|in-progress|blocked|done] [--group SLUG] [--type TYPE]
+         [--priority high|normal|low]
+         Tickets auflisten. Ohne --status: in-progress, open, blocked.
+         tickets.sh list --status done --priority high
+
+  show   <ID> [--full|--brief]
+         Ticketdatei anzeigen, Verlauf auf 2 Eintraege gekappt.
+         --full: komplett. --brief: Frontmatter, Beschreibung, Akzeptanzkriterien
+         ohne Verlauf. --full und --brief schliessen sich aus.
+         tickets.sh show IZG-T-001 --brief
+
+  next   <PREFIX>
+         Naechste ID vergeben, ohne Ticket anzulegen.
+         tickets.sh next IZG
+
+  new    --type bug|task|feature|question --priority high|normal|low
+         --title <TITLE> --by <AGENT>
+         [--group SLUG] [--assigned AGENT] [--source DOC-ID] [--body TEXT|-]
+         [--ac TEXT|-]
+         Ticket anlegen, landet in open/. --body -: Beschreibung von stdin.
+         --ac: Akzeptanzkriterien, mehrere Zeilen werden je ein "- [ ]"-Punkt.
+         --ac -: von stdin. --body und --ac koennen nicht beide "-" sein.
+         tickets.sh new --type task --priority high --title "Fix X" --by claude --ac "Kriterium 1
+Kriterium 2"
+
+  sync   [FILE]
+         Ordner an status:-Feld angleichen. Ohne FILE: alle aktiven Ordner.
+         tickets.sh sync tickets/open/IZG-T-001_x.md
+
+  move   <ID> <status> "<verlaufstext>" [--by <agent>]
+         Statuswechsel: Verlauf anhaengen, status setzen, Datei verschieben.
+         Erlaubt: open|in-progress|blocked|done. blocked -> in-progress verboten,
+         erst nach open.
+         tickets.sh move IZG-T-001 in-progress "Angefangen" --by claude
+EOF
+}
+
 case "${1:-}" in
   list) shift; cmd_list "$@" ;;
   show) shift; cmd_show "$@" ;;
@@ -501,8 +580,9 @@ case "${1:-}" in
   new) shift; cmd_new "$@" ;;
   sync) shift; cmd_sync "$@" ;;
   move) shift; cmd_move "$@" ;;
+  help) cmd_help ;;
   *)
-    echo "Usage: tickets.sh {list|show|next|new|sync|move} ..." >&2
+    echo "Usage: tickets.sh {list|show|next|new|sync|move|help} — Details: tickets.sh help" >&2
     exit 1
     ;;
 esac
