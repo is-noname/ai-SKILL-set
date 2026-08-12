@@ -7,6 +7,7 @@ Hooks lesen ihren Input als JSON von `stdin` und steuern Claude über JSON auf `
 Exit-Code (`exit 2` = harter Abbruch).
 
 > **Voraussetzung:** `jq` muss installiert sein (alle Guards parsen ihren JSON-Input damit).
+> `file-dump-guard.sh` nutzt stattdessen `python3` für die Kommando-Zerlegung.
 > `piper-notify.sh` braucht zusätzlich `python3`, Piper-TTS und `aplay`.
 
 ---
@@ -17,7 +18,7 @@ Die Hooks liegen im Repo in zwei Unterordnern nach **Default-Deploy-Ort**:
 
 | Ordner | Hooks | Bedeutung |
 |--------|-------|-----------|
-| `hooks/global/` | alle Guards (`protect-env`, `dir-scope-guard` +`dir-scope.conf`, `env-key-guard`, `gh-cli-guard`, `git-*-guard`, `read-size-guard`) sowie `piper-notify`, `check-chatbox`, `ticket-mover` | einmal in `~/.claude/hooks/` aufgesetzt, feuert überall, wird nie neu aufgesetzt |
+| `hooks/global/` | alle Guards (`protect-env`, `dir-scope-guard` +`dir-scope.conf`, `env-key-guard`, `file-dump-guard`, `gh-cli-guard`, `git-*-guard`, `read-size-guard`) sowie `piper-notify`, `check-chatbox`, `ticket-mover` | einmal in `~/.claude/hooks/` aufgesetzt, feuert überall, wird nie neu aufgesetzt |
 | `hooks/repo-local/` | `pre-commit-registry`, `pre-commit-agentdocs` | wirken nur im `ai-SKILL-set`-Repo, nie global deployt |
 
 **Wichtig:** Die Unterordner gibt es nur im **Repo**. Beim Deploy landen die Skripte
@@ -49,6 +50,7 @@ nur sinnvoll als **Ersatz**, falls man ihn bewusst nicht global will.
 | Hook | Was er tut | Wann er feuert |
 |------|------------|----------------|
 | `env-key-guard.sh` | Blockt `env`/`printenv` (nackt oder per `grep`-Pipe) und direkte Expansion bekannter Key-Variablen (`$ANTHROPIC*`, `$OPENAI*`, `$*TOKEN` …). | Vor Bash-Befehlen, die Keys aus dem Environment auslesen könnten. |
+| `file-dump-guard.sh` | Blockt Voll-Dumps von Dateien > 300 Zeilen (`cat`, `less`, `nl`, `head -n 2000`, `sed` ohne begrenzenden Ausdruck) und verweist auf Read mit `offset`/`limit`. Pipelines, Umleitungen, Heredocs und begrenzte Ausschnitte laufen durch. Schwellwert über `FILE_DUMP_GUARD_MAX_LINES`. | Vor Bash-Befehlen, die eine Datei vollständig ausgeben. Braucht `python3`. |
 | `git-commit-guard.sh` | Setzt `ask` — Commit nur nach expliziter User-Anfrage. | Bei `git commit`. |
 | `git-push-guard.sh` | `git push` → `ask`; `git push --force` → **deny**. | Bei jedem `git push`. |
 | `git-destructive-guard.sh` | Blockt `reset --hard`, `clean -f`, `checkout .`, `branch -D`, `rebase`. | Bei destruktiven Git-Operationen. |
@@ -128,6 +130,7 @@ Eigenschaften: idempotent, fragt bei Drift vor dem Überschreiben (`--force` umg
          ]},
          { "matcher": "Bash", "hooks": [
            { "type": "command", "command": "/home/USER/.claude/hooks/env-key-guard.sh" },
+           { "type": "command", "command": "/home/USER/.claude/hooks/file-dump-guard.sh" },
            { "type": "command", "command": "/home/USER/.claude/hooks/git-commit-guard.sh" },
            { "type": "command", "command": "/home/USER/.claude/hooks/git-push-guard.sh" },
            { "type": "command", "command": "/home/USER/.claude/hooks/git-destructive-guard.sh" },

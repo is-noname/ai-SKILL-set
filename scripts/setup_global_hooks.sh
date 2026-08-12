@@ -33,6 +33,7 @@ HOOK_SPECS=(
   "dir-scope-guard|PreToolUse|Read|Edit|Write"
   "read-size-guard|PreToolUse|Read"
   "env-key-guard|PreToolUse|Bash"
+  "file-dump-guard|PreToolUse|Bash"
   "git-commit-guard|PreToolUse|Bash"
   "git-push-guard|PreToolUse|Bash"
   "git-destructive-guard|PreToolUse|Bash"
