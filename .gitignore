@@ -26,3 +26,9 @@ __pycache__/
 
 # Decision Sheets (izg-decision-sheet Skill) - Wegwerf-Artefakte
 .decisions/
+
+# Verunglueckte Shell-Umleitungen im Repo-Root (IZG-T-112): Dateien ohne Endung,
+# benannt wie Python-Stdlib-Module, z.B. `python3 -m module > module` statt in eine Datei.
+/argparse
+/hashlib
+/json
