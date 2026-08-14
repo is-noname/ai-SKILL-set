@@ -12,9 +12,15 @@ REPO_ROOT = Path(__file__).parent.parent
 REGISTRY_PATH = REPO_ROOT / "registry.json"
 SETS_DIR = REPO_ROOT / "skills" / "sets"
 
-# Generierte/lokale Artefakte, die nie in den Inhaltsvergleich gehören.
-IGNORE_DIR_NAMES = {"__pycache__", ".git"}
+# Verzeichnisse, die im Repo leben, aber nicht zum Skill gehören: generierte
+# Artefakte und Messaufbauten (benchmark/ gehört zum Ablauf von izg-benchmark-actions,
+# nicht zum Skill, in dem es liegt). Gilt für Pull UND Inhaltsvergleich — sonst
+# gilt ein gepullter Skill dauerhaft als veraltet, weil ihm etwas fehlt, das er
+# nie bekommen sollte.
+IGNORE_DIR_NAMES = {"__pycache__", ".git", "benchmark"}
 IGNORE_SUFFIXES = {".pyc", ".pyo", ".backup", ".db"}
+
+REPO_ONLY = shutil.ignore_patterns(*IGNORE_DIR_NAMES, *(f"*{s}" for s in IGNORE_SUFFIXES))
 
 
 def dir_digest(root: Path) -> str:
@@ -97,7 +103,7 @@ def pull(
         if not dry_run:
             if dst.exists():
                 shutil.rmtree(dst)
-            shutil.copytree(src, dst)
+            shutil.copytree(src, dst, ignore=REPO_ONLY)
         installed.append(name)
 
     return installed, skipped
