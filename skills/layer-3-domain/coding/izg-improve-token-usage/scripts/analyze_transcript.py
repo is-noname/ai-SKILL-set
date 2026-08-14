@@ -25,6 +25,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 CHARS_PER_TOKEN = 4  # grobe Schaetzung fuer Tool-Result-Payloads
+CACHE_HIT_RATE_THRESHOLD = 0.85  # darunter deutet auf Cache-Bruch (IZG-T-137)
+REDUNDANZ_COUNT_THRESHOLD = 3  # ab dieser Wiederholungszahl gilt ein Aufruf als redundant
 
 
 def project_slug(path: Path) -> str:
@@ -32,8 +34,10 @@ def project_slug(path: Path) -> str:
     return re.sub(r"[^a-zA-Z0-9]", "-", str(path.resolve()))
 
 
-def find_transcripts(project: Path, limit: int | None, session: str | None = None) -> list[Path]:
-    base = Path.home() / ".claude" / "projects" / project_slug(project)
+def find_transcripts(project: Path, limit: int | None, session: str | None = None,
+                      base_dir: Path | None = None) -> list[Path]:
+    base = base_dir if base_dir is not None else \
+        Path.home() / ".claude" / "projects" / project_slug(project)
     if not base.is_dir():
         return []
     if session:
@@ -94,6 +98,36 @@ def call_label(name: str, params: dict[str, Any]) -> str:
     if name == "Skill":
         return str(params.get("skill", "?"))
     return json.dumps(params, ensure_ascii=False)[:120]
+
+
+def fmt_pct(x: float) -> str:
+    return f"{x * 100:.1f}".replace(".", ",") + " %"
+
+
+def compute_findings(cache_hit_rate: float, sessions: int, repeats: list[dict[str, Any]],
+                      totals: dict[str, int]) -> list[dict[str, Any]]:
+    """Zieht die Auswertungen, die SKILL.md bisher in Prosa verlangt hat."""
+    findings: list[dict[str, Any]] = []
+
+    fresh = totals["input"] + totals["cache_creation"]
+    if (totals["cache_read"] + fresh) > 0 and cache_hit_rate < CACHE_HIT_RATE_THRESHOLD:
+        findings.append({
+            "signal": "cache-bruch",
+            "value": cache_hit_rate,
+            "evidence": f"Cache-Trefferquote {fmt_pct(cache_hit_rate)} ueber {sessions} Sessions",
+            "confidence": "belegt",
+        })
+
+    for r in repeats:
+        if r["count"] >= REDUNDANZ_COUNT_THRESHOLD:
+            findings.append({
+                "signal": "redundanz",
+                "value": r["count"],
+                "evidence": f"{r['tool']} `{r['label']}` {r['count']}x aufgerufen ({fmt(r['tokens'])} Tokens)",
+                "confidence": "belegt",
+            })
+
+    return findings
 
 
 def analyze(files: list[Path], since: str | None = None, until: str | None = None) -> dict[str, Any]:
@@ -163,17 +197,20 @@ def analyze(files: list[Path], since: str | None = None, until: str | None = Non
 
     cached = totals["cache_read"]
     fresh = totals["input"] + totals["cache_creation"]
+    cache_hit_rate = round(cached / (cached + fresh), 3) if (cached + fresh) else 0.0
+    findings = compute_findings(cache_hit_rate, len(files), repeats, totals)
     return {
         "sessions": len(files),
         "requests": len(usage_by_request),
         "totals": totals,
-        "cache_hit_rate": round(cached / (cached + fresh), 3) if (cached + fresh) else 0.0,
+        "cache_hit_rate": cache_hit_rate,
         "calls_per_tool": dict(calls_per_tool.most_common()),
         "tokens_per_tool": dict(tokens_per_tool.most_common()),
         "top_calls": per_call[:20],
         "repeats": repeats[:20],
         "skills_used": dict(skills_used.most_common()),
         "subagent_output_tokens": sidechain_output,
+        "findings": findings,
     }
 
 
@@ -196,6 +233,19 @@ def report(data: dict[str, Any]) -> str:
         f"| Output | {fmt(t['output'])} |",
         f"| Cache-Trefferquote | {data['cache_hit_rate'] * 100:.1f} % |",
         f"| Output aus Subagents | {fmt(data['subagent_output_tokens'])} |",
+        "",
+        "## Befunde",
+        "",
+        "| Signal | Wert | Evidenz | Vertrauen |",
+        "|---|---:|---|---|",
+    ]
+    if data["findings"]:
+        for f in data["findings"]:
+            out.append(f"| {f['signal']} | {f['value']} | {f['evidence']} | {f['confidence']} |")
+    else:
+        out.append("| - | - | keine | - |")
+
+    out += [
         "",
         "## Kontextlast pro Tool (geschaetzt aus Tool-Results)",
         "",

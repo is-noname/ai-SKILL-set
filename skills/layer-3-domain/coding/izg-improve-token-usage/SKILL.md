@@ -53,10 +53,11 @@ Das Skript wertet `~/.claude/projects/<projekt-slug>/*.jsonl` aus und liefert:
 
 Findet das Skript keine Transcripts, meldet es das und beendet sich mit Exit-Code 1. Dann rein statisch weiterarbeiten und im Report deutlich kennzeichnen, dass die Kandidaten unbelegt sind.
 
-Zwei Auswertungen, die aus den Zahlen folgen und die man aktiv ziehen muss:
-
-- **Cache-Trefferquote unter ~85 %** deutet auf Cache-Bruch — etwas aendert den Kontextanfang zwischen Turns (dynamische Zeitstempel in CLAUDE.md, Hooks, die Kontext einspeisen, haeufig neu geschriebene Statusdateien).
-- **Skills, die im Verbrauch nie auftauchen, aber Kontextgewicht haben** sind Preload-Kandidaten fuer Lazy Load.
+Die Schwellwert-Ableitungen (Cache-Bruch, redundante Aufrufe) stehen nicht mehr hier in Prosa,
+sondern werden vom Skript selbst gezogen: Abschnitt "Befunde" im Report bzw. `findings` im
+`--json`-Output. Skills, die im Verbrauch nie auftauchen, aber Kontextgewicht haben, sind
+Preload-Kandidaten fuer Lazy Load — das kann das Skript mangels Skill-Verzeichnis-Kenntnis noch
+nicht pruefen, das bleibt manuell.
 
 ### 2. Lesen
 
