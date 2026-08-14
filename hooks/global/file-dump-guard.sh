@@ -89,14 +89,71 @@ def too_big(name):
     return (lines, size // 4) if lines > MAX else None
 
 
+TOOTHLESS_CMDS = {"cat", "bat", "tac", "tee", "nl"}
+
+
+def is_toothless(tokens):
+    """True, wenn dieses Pipeline-Glied nichts herausfiltert (Schein-Filter)."""
+    if not tokens:
+        return True
+    cmd = os.path.basename(tokens[0])
+    if cmd in TOOTHLESS_CMDS:
+        return True
+    if cmd == "grep":
+        args = tokens[1:]
+        flags = []
+        pattern = None
+        for a in args:
+            if a.startswith("-") and pattern is None:
+                flags.append(a)
+                continue
+            pattern = a
+            break
+        if pattern == "":
+            return True
+        if pattern == "$^" and "-v" in flags:
+            return True
+        return False
+    if cmd in ("head", "tail"):
+        limit = None
+        for i in range(1, len(tokens)):
+            limit = numeric_limit(tokens, i)
+            if limit is not None:
+                break
+        if limit is None:
+            return False  # Default-Limit (10 Zeilen) - filtert real
+        return limit > MAX
+    return False  # unbekanntes Kommando: im Zweifel echter Filter
+
+
 def offenders(segment):
-    # Pipeline oder Umleitung: die Ausgabe wird gefiltert bzw. geht in eine Datei
-    if "|" in segment or ">" in segment or "<<" in segment:
+    # Umleitung: die Ausgabe geht in eine Datei, nicht ins Kontextfenster
+    if ">" in segment or "<<" in segment:
         return []
     try:
-        tokens = shlex.split(segment)
+        all_tokens = shlex.split(segment)
     except ValueError:
         return []  # unparsebar -> fail open
+    if not all_tokens:
+        return []
+
+    stages, current = [], []
+    for t in all_tokens:
+        if t == "|":
+            stages.append(current)
+            current = []
+        else:
+            current.append(t)
+    stages.append(current)
+
+    pipeline = len(stages) > 1
+    if pipeline:
+        # Pipeline laesst nur durch, wenn ALLE nachfolgenden Glieder Schein-Filter sind.
+        # Ist mindestens ein Glied ein echter Filter, gilt die Pipeline als gefiltert.
+        if not all(is_toothless(s) for s in stages[1:]):
+            return []
+
+    tokens = stages[0]
     if not tokens:
         return []
 
@@ -135,7 +192,7 @@ def offenders(segment):
             continue
         hit = too_big(name)
         if hit:
-            found.append((name, hit[0], hit[1]))
+            found.append((name, hit[0], hit[1], pipeline))
     return found
 
 
@@ -146,7 +203,7 @@ for segment in split_commands(command):
 if not hits:
     sys.exit(0)
 
-name, lines, tokens = hits[0]
+name, lines, tokens, pipeline = hits[0]
 reason = (
     "Voll-Dump von %s (%d Zeilen) blockiert - das kippt ~%d Tokens Kontextlast ins Fenster. "
     "Nutze Read mit offset/limit auf den relevanten Abschnitt, oder Grep mit Pattern. "
@@ -154,6 +211,11 @@ reason = (
     "(| grep, | wc) oder FILE_DUMP_GUARD_MAX_LINES hochsetzen."
     % (os.path.basename(name), lines, tokens)
 )
+if pipeline:
+    reason += (
+        " Diese Pipeline filtert nicht wirklich - 'grep -n \"\"' o.ae. matcht jede "
+        "Zeile und nummeriert nur. Read mit offset/limit liefert Zeilennummern gratis mit."
+    )
 print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
