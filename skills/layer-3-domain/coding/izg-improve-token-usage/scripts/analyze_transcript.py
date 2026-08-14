@@ -9,6 +9,8 @@ Nutzung:
     python3 analyze_transcript.py                    # aktuelles Projekt, alle Sessions
     python3 analyze_transcript.py --project /pfad    # anderes Projekt
     python3 analyze_transcript.py --sessions 5       # nur die 5 juengsten Sessions
+    python3 analyze_transcript.py --session <uuid>   # nur diese eine Session
+    python3 analyze_transcript.py --since 2026-08-14 # nur Eintraege ab diesem Zeitpunkt
     python3 analyze_transcript.py --json             # Rohdaten statt Report
 """
 
@@ -30,15 +32,20 @@ def project_slug(path: Path) -> str:
     return re.sub(r"[^a-zA-Z0-9]", "-", str(path.resolve()))
 
 
-def find_transcripts(project: Path, limit: int | None) -> list[Path]:
+def find_transcripts(project: Path, limit: int | None, session: str | None = None) -> list[Path]:
     base = Path.home() / ".claude" / "projects" / project_slug(project)
     if not base.is_dir():
         return []
+    if session:
+        one = base / f"{session}.jsonl"
+        return [one] if one.is_file() else []
     files = sorted(base.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
     return files[:limit] if limit else files
 
 
-def read_entries(files: list[Path]) -> Iterator[dict[str, Any]]:
+def read_entries(files: list[Path], since: str | None = None,
+                 until: str | None = None) -> Iterator[dict[str, Any]]:
+    """Liest die Eintraege; since/until vergleichen das ISO-Feld `timestamp` als Praefix."""
     for f in files:
         with f.open(encoding="utf-8", errors="replace") as fh:
             for line in fh:
@@ -46,9 +53,14 @@ def read_entries(files: list[Path]) -> Iterator[dict[str, Any]]:
                 if not line:
                     continue
                 try:
-                    yield json.loads(line)
+                    entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                if since or until:
+                    ts = str(entry.get("timestamp") or "")
+                    if not ts or (since and ts < since) or (until and ts > until):
+                        continue
+                yield entry
 
 
 def content_len(content: Any) -> int:
@@ -84,7 +96,7 @@ def call_label(name: str, params: dict[str, Any]) -> str:
     return json.dumps(params, ensure_ascii=False)[:120]
 
 
-def analyze(files: list[Path]) -> dict[str, Any]:
+def analyze(files: list[Path], since: str | None = None, until: str | None = None) -> dict[str, Any]:
     usage_by_request: dict[str, dict[str, int]] = {}
     tool_calls: dict[str, tuple[str, str, bool]] = {}  # tool_use_id -> (tool, label, sidechain)
     result_chars: dict[str, int] = defaultdict(int)  # tool_use_id -> chars
@@ -93,7 +105,7 @@ def analyze(files: list[Path]) -> dict[str, Any]:
     skills_used: Counter[str] = Counter()
     sidechain_output = 0
 
-    for entry in read_entries(files):
+    for entry in read_entries(files, since, until):
         msg = entry.get("message")
         sidechain = bool(entry.get("isSidechain"))
 
@@ -216,11 +228,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--project", default=os.getcwd(), help="Projektpfad (Default: cwd)")
     ap.add_argument("--sessions", type=int, default=None, help="nur die N juengsten Sessions")
+    ap.add_argument("--session", default=None, help="nur diese Session-ID")
+    ap.add_argument("--since", default=None, help="nur Eintraege ab diesem ISO-Zeitpunkt")
+    ap.add_argument("--until", default=None, help="nur Eintraege bis zu diesem ISO-Zeitpunkt")
     ap.add_argument("--json", action="store_true", help="Rohdaten als JSON ausgeben")
     args = ap.parse_args()
 
     project = Path(args.project)
-    files = find_transcripts(project, args.sessions)
+    files = find_transcripts(project, args.sessions, args.session)
     if not files:
         print(
             f"Keine Transcripts fuer {project} gefunden "
@@ -229,7 +244,7 @@ def main() -> int:
         )
         return 1
 
-    data = analyze(files)
+    data = analyze(files, args.since, args.until)
     print(json.dumps(data, ensure_ascii=False, indent=2) if args.json else report(data))
     return 0
 

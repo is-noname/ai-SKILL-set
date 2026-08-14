@@ -14,6 +14,8 @@ Findet heraus, wofuer ein Projekt seine Tokens wirklich ausgibt, und schlaegt **
 
 **Abgrenzung zu `context-budget`:** Der `context-budget`-Skill (falls in der Agent-Konfiguration vorhanden) inventarisiert das **statische** Kontextgewicht — Zeilenzahlen, Frontmatter-Bloat, MCP-Tool-Schemata. Dieser Skill baut das nicht nach. Er misst, was im Betrieb passiert: wiederholte Reads, ausufernde Skript-Ausgaben, teure Subagent-Spawns, zerstoerte Caches, Anweisungen, die den Agenten zu unnoetiger Arbeit zwingen.
 
+**Abgrenzung zu `izg-benchmark-actions`:** Dieser Skill misst **retrospektiv**, was in einem Projekt ohnehin schon passiert ist, und sucht darin Tokenfresser. Er vergleicht keine Varianten. Wer wissen will, ob Fassung A eines Ablaufs billiger ist als Fassung B, braucht wiederholte, isolierte Messlaeufe auf derselben Testaufgabe — das macht `izg-benchmark-actions`. Umgekehrt ist dieser Skill das richtige Werkzeug, sobald dort eine Variante verliert und die Ursache gesucht wird.
+
 Vor dem Explore pruefen, ob `context-budget` verfuegbar ist (`~/.claude/skills/context-budget/` oder projektlokal). Wenn ja: dort das statische Inventar holen und im Report referenzieren, statt es selbst zu erheben. Wenn nein: ohne weiterlaufen und im Report vermerken, dass die statische Seite nicht abgedeckt ist.
 
 ## Vokabular
