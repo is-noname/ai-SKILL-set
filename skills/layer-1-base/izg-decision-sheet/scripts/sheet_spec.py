@@ -53,7 +53,7 @@ FIELDS: list[dict[str, Any]] = [
         "kind": "id",
         "required": True,
         "pflicht": "ja",
-        "doc": "Zahl oder kurzer String, eindeutig",
+        "doc": "Sprechender Kurzname, eindeutig — keine durchlaufende Zahl (Einschub wuerde sonst alle folgenden IDs verschieben)",
     },
     {
         "name": "q",

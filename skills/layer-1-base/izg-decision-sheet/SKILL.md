@@ -19,10 +19,25 @@ Drei bewegliche Teile:
 | Renderer `index.html` | im Skill; global gespiegelt nach `~/ai-shared/izg-decision-sheet/` | User bedient |
 | Antworten `<slug>.answers.json` | `<projekt>/.decisions/` | User exportiert |
 
+`assets/index.html` **nie direkt lesen** — reine Renderer-Vorlage fuer `render_sheet.py`,
+ohne Informationswert fuer dich. Bei Renderfehlern die Fehlermeldung von `render_sheet.py`
+lesen, nicht die HTML.
+
 Die Scripts im Skill funktionieren überall — auch auf einem System, auf dem der
 globale Setup-Schritt nie gelaufen ist. Die Hooks sind Komfort, keine Voraussetzung:
 sie sparen dir pro Sheet ein paar Tool-Calls, mehr nicht. Du musst nicht wissen, ob
 sie da sind — der Ablauf ist mit und ohne derselbe.
+
+### Scripts im Überblick
+
+| Script | Aufruf | Ausgabe |
+|--------|--------|---------|
+| `render_sheet.py` | `python3 <skill>/scripts/render_sheet.py .decisions/<slug>.jsonl` | Validiert das Sheet, meldet alle Verstöße auf einmal, baut die HTML und öffnet das Fenster |
+| `fetch_answers.py` | `python3 <skill>/scripts/fetch_answers.py [--slug <slug>]` | Holt die neueste `.answers.json` aus dem Download-Ordner nach `.decisions/`, ruft `resolve_answers.py` mit auf und gibt die aufgelöste Entscheidungstabelle aus |
+| `resolve_answers.py` | `python3 <skill>/scripts/resolve_answers.py .decisions/<slug>.jsonl .decisions/<slug>.answers.json` | Führt Sheet und Antwort-Datei zusammen, Zeile pro Frage mit Wert und Herkunft |
+
+Quelltext dieser Scripts nur bei einem echten Fehler im Script selbst lesen — für den
+normalen Ablauf genügt die Tabelle.
 
 ## Wann dieser Skill statt AskUserQuestion
 
@@ -33,16 +48,19 @@ Ab etwa vier offenen Entscheidungen, oder sobald Fragen voneinander abhängen
 
 ## Modus 1: Sheet schreiben
 
-`.decisions/<slug>.jsonl` anlegen — ein JSON-Objekt pro Zeile, erste Zeile Header:
+Vorab nichts nachsehen — kein `ls`, kein `mkdir`: `Write` legt `.decisions/` mit an,
+`<skill>` ist der Pfad aus der Zeile "Base directory for this skill" über dieser SKILL.md.
+
+`.decisions/<slug>.jsonl` per `Write` anlegen — ein JSON-Objekt pro Zeile, erste Zeile Header:
 
 ```
 {"v":1,"sheet":"ticketsystem-v2","title":"Ticketsystem v2","ctx":"docs/RFC-20260727-001.md"}
-{"id":1,"q":"IDs per Counter oder Timestamp?","t":"pick","o":["Counter","Timestamp","beides"],"d":"Counter","why":"kollisionsfrei, braucht aber Lockfile"}
-{"id":2,"q":"Prefix-Registry global lassen?","t":"yn","d":"y"}
-{"id":3,"q":"Wie soll der Archiv-Ordner heissen?","t":"text","d":"archiv"}
-{"id":4,"q":"Welche Agents dürfen Tickets schreiben?","t":"multi","o":["claude","codex","gemini","vibe"],"d":["claude","codex"]}
-{"id":5,"q":"Lock via flock oder mkdir?","t":"pick","o":["flock","mkdir"],"dep":[1,"Counter"]}
-{"id":6,"q":"Migrations-Skript synchron oder als Job?","t":"pick","o":["synchron","Job"],"ctx":"Bestand: 40k Zeilen in ticket_legacy, Migration lief 2025 zuletzt bei ticket_archive - synchron dauerte dort 6min und blockte den Import."}
+{"id":"id-vergabe","q":"IDs per Counter oder Timestamp?","t":"pick","o":["Counter","Timestamp","beides"],"d":"Counter","why":"kollisionsfrei, braucht aber Lockfile"}
+{"id":"prefix-registry","q":"Prefix-Registry global lassen?","t":"yn","d":"y"}
+{"id":"archiv-name","q":"Wie soll der Archiv-Ordner heissen?","t":"text","d":"archiv"}
+{"id":"schreibrechte","q":"Welche Agents dürfen Tickets schreiben?","t":"multi","o":["claude","codex","gemini","vibe"],"d":["claude","codex"]}
+{"id":"lock-mechanismus","q":"Lock via flock oder mkdir?","t":"pick","o":["flock","mkdir"],"dep":["id-vergabe","Counter"]}
+{"id":"migration-modus","q":"Migrations-Skript synchron oder als Job?","t":"pick","o":["synchron","Job"],"ctx":"Bestand: 40k Zeilen in ticket_legacy, Migration lief 2025 zuletzt bei ticket_archive - synchron dauerte dort 6min und blockte den Import."}
 ```
 
 Danach **immer** diesen einen Befehl — unabhängig davon, ob die Hooks eingerichtet
@@ -76,7 +94,7 @@ erneut laufen lassen, sonst arbeitet der Hook weiter mit dem alten Stand.
 
 | Feld | Pflicht | Bedeutung |
 |------|---------|-----------|
-| `id` | ja | Zahl oder kurzer String, eindeutig |
+| `id` | ja | Sprechender Kurzname, eindeutig — keine durchlaufende Zahl (Einschub wuerde sonst alle folgenden IDs verschieben) |
 | `q` | ja | Fragetext, eine Zeile |
 | `t` | nein | `pick` (default) · `multi` · `yn` · `text` |
 | `o` | bei `pick`/`multi` | Optionen. Bei `yn` implizit ja/nein |
@@ -102,7 +120,9 @@ Header: `v` (Format-Version, aktuell 1), `sheet` (Slug = Dateiname ohne Endung),
 3. **Eine Zeile pro Frage, kein Pretty-Print.** Zeilenumbrüche im JSON zerstören
    den Parser (ein Objekt = eine Zeile ist die einzige Regel des Formats).
 4. **Fragen sortieren:** grundlegende zuerst, Folgefragen per `dep` dahinter.
-   Nie eine `dep`-Frage vor der Frage, an der sie hängt.
+   Nie eine `dep`-Frage vor der Frage, an der sie hängt. IDs tragen selbst keine
+   Reihenfolge — ein nachträglicher Einschub ist ein Edit von einer Zeile, nie
+   ein Neuschreiben des ganzen Sheets.
 5. **Keine Fragen stellen, die du selbst entscheiden kannst.** Ein Sheet mit 20
    Trivialitäten ist schlimmer als drei gute Fragen in der CLI.
 6. **Bei `multi` keine „keine/reicht so"-Pseudo-Option.** Nichts ausgewählt bedeutet
