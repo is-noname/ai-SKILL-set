@@ -220,40 +220,63 @@ class Analyze(unittest.TestCase):
 
 
 class ComputeFindings(unittest.TestCase):
-    def totals(self, input_=0, cache_read=0, cache_creation=0):
-        return {"input": input_, "cache_read": cache_read, "cache_creation": cache_creation,
-                "output": 0}
+    """Regeltests ueber ein echtes Measurement aus analyze(fixture), kein Dict von Hand."""
+
+    def measurement(self, entries: list[dict]) -> at.Measurement:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sess-1.jsonl"
+            path.write_text("\n".join(json.dumps(e, ensure_ascii=False) for e in entries),
+                             encoding="utf-8")
+            data = at.analyze([path])
+        data = dict(data)
+        data["findings"] = []
+        return at.Measurement(**data)
+
+    def entry(self, req_id: str, input_=0, cache_read=0, cache_creation=0, output=0, tool_uses=()):
+        return {
+            "type": "assistant", "timestamp": "2026-08-14T10:00:00Z", "requestId": req_id,
+            "message": {
+                "usage": {"input_tokens": input_, "cache_read_input_tokens": cache_read,
+                          "cache_creation_input_tokens": cache_creation, "output_tokens": output},
+                "content": list(tool_uses),
+            },
+        }
 
     def test_cache_quote_unter_schwelle_erzeugt_ein_finding(self):
-        totals = self.totals(input_=20, cache_read=80)  # 80/100 = 0.80 < 0.85
-        findings = at.compute_findings(0.80, 4, [], totals)
-        cache_findings = [f for f in findings if f["signal"] == "cache-bruch"]
+        m = self.measurement([self.entry("r1", input_=20, cache_read=80)])  # 80/100 = 0.80 < 0.85
+        findings = at.compute_findings(m)
+        cache_findings = [f for f in findings if f.signal == "cache-bruch"]
         self.assertEqual(len(cache_findings), 1)
-        self.assertEqual(cache_findings[0]["value"], 0.80)
+        self.assertEqual(cache_findings[0].value, 0.80)
 
     def test_cache_quote_ueber_schwelle_erzeugt_kein_finding(self):
-        totals = self.totals(input_=10, cache_read=90)  # 90/100 = 0.90 >= 0.85
-        findings = at.compute_findings(0.90, 4, [], totals)
-        cache_findings = [f for f in findings if f["signal"] == "cache-bruch"]
+        m = self.measurement([self.entry("r1", input_=10, cache_read=90)])  # 90/100 = 0.90 >= 0.85
+        findings = at.compute_findings(m)
+        cache_findings = [f for f in findings if f.signal == "cache-bruch"]
         self.assertEqual(cache_findings, [])
 
     def test_ohne_usage_kein_cache_bruch_finding(self):
-        findings = at.compute_findings(0.0, 4, [], self.totals())
+        m = self.measurement([self.entry("r1")])
+        findings = at.compute_findings(m)
         self.assertEqual(findings, [])
 
     def test_redundanz_ab_schwelle_erzeugt_finding(self):
-        repeats = [{"tool": "Read", "label": "x.py", "count": at.REDUNDANZ_COUNT_THRESHOLD,
-                    "tokens": 100}]
-        findings = at.compute_findings(1.0, 4, repeats, self.totals())
-        redundanz = [f for f in findings if f["signal"] == "redundanz"]
+        tool_use = {"type": "tool_use", "id": "t1", "name": "Read", "input": {"file_path": "x.py"}}
+        entries = [self.entry(f"r{i}", tool_uses=[tool_use])
+                   for i in range(at.REDUNDANZ_COUNT_THRESHOLD)]
+        m = self.measurement(entries)
+        findings = at.compute_findings(m)
+        redundanz = [f for f in findings if f.signal == "redundanz"]
         self.assertEqual(len(redundanz), 1)
-        self.assertEqual(redundanz[0]["value"], at.REDUNDANZ_COUNT_THRESHOLD)
+        self.assertEqual(redundanz[0].value, at.REDUNDANZ_COUNT_THRESHOLD)
 
     def test_redundanz_unter_schwelle_kein_finding(self):
-        repeats = [{"tool": "Read", "label": "x.py", "count": at.REDUNDANZ_COUNT_THRESHOLD - 1,
-                    "tokens": 100}]
-        findings = at.compute_findings(1.0, 4, repeats, self.totals())
-        self.assertEqual([f for f in findings if f["signal"] == "redundanz"], [])
+        tool_use = {"type": "tool_use", "id": "t1", "name": "Read", "input": {"file_path": "x.py"}}
+        entries = [self.entry(f"r{i}", tool_uses=[tool_use])
+                   for i in range(at.REDUNDANZ_COUNT_THRESHOLD - 1)]
+        m = self.measurement(entries)
+        findings = at.compute_findings(m)
+        self.assertEqual([f for f in findings if f.signal == "redundanz"], [])
 
 
 class ContentLen(unittest.TestCase):

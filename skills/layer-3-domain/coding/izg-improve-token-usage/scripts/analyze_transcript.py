@@ -5,6 +5,11 @@ Liest die JSONL-Transcripts unter ~/.claude/projects/<projekt-slug>/ und
 liefert Kennzahlen, aus denen sich Tokenfresser belegen lassen:
 Verbrauch pro Tool, Wiederholungen, Cache-Quote, Subagent-Kosten.
 
+Das Formatwissen ueber das Transcript selbst (Slug, Parsing, Entdopplung,
+Paarung, content-Gestalten) liegt im Skill `izg-transcript-reader`
+(Dependency). Hier bleibt nur die Auswertung: Findings, Redundanzzaehlung,
+Report-Rendering.
+
 Nutzung:
     python3 analyze_transcript.py                    # aktuelles Projekt, alle Sessions
     python3 analyze_transcript.py --project /pfad    # anderes Projekt
@@ -17,178 +22,144 @@ Nutzung:
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
-import re
-from collections import Counter, defaultdict
+import sys
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
-CHARS_PER_TOKEN = 4  # grobe Schaetzung fuer Tool-Result-Payloads
+
+def _load_transcript_adapter() -> None:
+    """Loest den Skillgrenzen-uebergreifenden Import zur Laufzeit auf.
+
+    Nach `pull_skill.py` liegen Skills flach nebeneinander
+    (.claude/skills/<name>/), im Repo dagegen verschachtelt nach Layer. Ein
+    fester relativer Import haelt daher nur in einer der beiden Welten.
+    """
+    skill_root = Path(__file__).resolve().parent.parent
+    candidates = [
+        skill_root.parent / "izg-transcript-reader" / "scripts",  # Zielprojekt (flach)
+        skill_root.parent.parent.parent / "layer-1-base" / "izg-transcript-reader" / "scripts",  # Repo
+    ]
+    for c in candidates:
+        if (c / "transcript.py").is_file():
+            sys.path.insert(0, str(c))
+            return
+    raise ImportError(
+        "izg-transcript-reader nicht gefunden. Erwartet unter "
+        f"{candidates[0]} (Zielprojekt) oder {candidates[1]} (Repo). "
+        "Skill fehlt in den dependencies oder wurde nicht mitgepullt."
+    )
+
+
+_load_transcript_adapter()
+import transcript as _t  # noqa: E402
+from render import render_html  # noqa: E402
+
 CACHE_HIT_RATE_THRESHOLD = 0.85  # darunter deutet auf Cache-Bruch (IZG-T-137)
 REDUNDANZ_COUNT_THRESHOLD = 3  # ab dieser Wiederholungszahl gilt ein Aufruf als redundant
 
-
-def project_slug(path: Path) -> str:
-    """Claude Code legt Transcripts unter einem pfadbasierten Slug ab."""
-    return re.sub(r"[^a-zA-Z0-9]", "-", str(path.resolve()))
-
-
-def find_transcripts(project: Path, limit: int | None, session: str | None = None,
-                      base_dir: Path | None = None) -> list[Path]:
-    base = base_dir if base_dir is not None else \
-        Path.home() / ".claude" / "projects" / project_slug(project)
-    if not base.is_dir():
-        return []
-    if session:
-        one = base / f"{session}.jsonl"
-        return [one] if one.is_file() else []
-    files = sorted(base.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
-    return files[:limit] if limit else files
-
-
-def read_entries(files: list[Path], since: str | None = None,
-                 until: str | None = None) -> Iterator[dict[str, Any]]:
-    """Liest die Eintraege; since/until vergleichen das ISO-Feld `timestamp` als Praefix."""
-    for f in files:
-        with f.open(encoding="utf-8", errors="replace") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if since or until:
-                    ts = str(entry.get("timestamp") or "")
-                    if not ts or (since and ts < since) or (until and ts > until):
-                        continue
-                yield entry
-
-
-def content_len(content: Any) -> int:
-    """Zeichenlaenge eines Message-Content-Felds, egal ob str oder Blockliste."""
-    if isinstance(content, str):
-        return len(content)
-    if isinstance(content, list):
-        total = 0
-        for block in content:
-            if isinstance(block, str):
-                total += len(block)
-            elif isinstance(block, dict):
-                total += len(json.dumps(block.get("content", block), ensure_ascii=False))
-        return total
-    if isinstance(content, dict):
-        return len(json.dumps(content, ensure_ascii=False))
-    return 0
-
-
-def call_label(name: str, params: dict[str, Any]) -> str:
-    """Kurzer, gruppierbarer Bezeichner fuer einen Tool-Call."""
-    if name in ("Read", "Edit", "Write", "NotebookEdit"):
-        return str(params.get("file_path", "?"))
-    if name == "Bash":
-        cmd = str(params.get("command", "")).strip().replace("\n", " ")
-        return cmd[:120]
-    if name in ("Grep", "Glob"):
-        return f"{params.get('pattern', '?')} @ {params.get('path', '.')}"
-    if name == "Agent":
-        return f"{params.get('subagent_type', 'general-purpose')}: {params.get('description', '')}"
-    if name == "Skill":
-        return str(params.get("skill", "?"))
-    return json.dumps(params, ensure_ascii=False)[:120]
+# Re-Exports des Formatwissens - Tests und Aufrufer greifen ueber dieses Modul zu.
+CHARS_PER_TOKEN = _t.CHARS_PER_TOKEN
+project_slug = _t.project_slug
+find_transcripts = _t.find_transcripts
+content_len = _t.content_len
+call_label = _t.call_label
 
 
 def fmt_pct(x: float) -> str:
     return f"{x * 100:.1f}".replace(".", ",") + " %"
 
 
-def compute_findings(cache_hit_rate: float, sessions: int, repeats: list[dict[str, Any]],
-                      totals: dict[str, int]) -> list[dict[str, Any]]:
-    """Zieht die Auswertungen, die SKILL.md bisher in Prosa verlangt hat."""
-    findings: list[dict[str, Any]] = []
+@dataclass
+class Finding:
+    signal: str
+    value: float | int
+    evidence: str
+    confidence: str
 
-    fresh = totals["input"] + totals["cache_creation"]
-    if (totals["cache_read"] + fresh) > 0 and cache_hit_rate < CACHE_HIT_RATE_THRESHOLD:
-        findings.append({
-            "signal": "cache-bruch",
-            "value": cache_hit_rate,
-            "evidence": f"Cache-Trefferquote {fmt_pct(cache_hit_rate)} ueber {sessions} Sessions",
-            "confidence": "belegt",
-        })
 
-    for r in repeats:
+@dataclass
+class Measurement:
+    """Typisiertes Ergebnis von `analyze()` - kein rohes Dict.
+
+    `repeats` traegt die volle, unslicete Liste (Grundlage fuer die
+    Redundanz-Regel); die auf 20 Eintraege gekuerzte Fassung fuer den
+    JSON-/Report-Output entsteht erst beim Serialisieren in `analyze()`.
+    """
+
+    sessions: int
+    requests: int
+    totals: dict[str, int]
+    cache_hit_rate: float
+    calls_per_tool: dict[str, int]
+    tokens_per_tool: dict[str, int]
+    top_calls: list[dict[str, Any]]
+    repeats: list[dict[str, Any]]
+    skills_used: dict[str, int]
+    subagent_output_tokens: int
+    findings: list[Finding] = field(default_factory=list)
+
+
+def rule_cache_bruch(m: Measurement) -> Finding | None:
+    fresh = m.totals["input"] + m.totals["cache_creation"]
+    if (m.totals["cache_read"] + fresh) > 0 and m.cache_hit_rate < CACHE_HIT_RATE_THRESHOLD:
+        return Finding(
+            signal="cache-bruch",
+            value=m.cache_hit_rate,
+            evidence=f"Cache-Trefferquote {fmt_pct(m.cache_hit_rate)} ueber {m.sessions} Sessions",
+            confidence="belegt",
+        )
+    return None
+
+
+def rule_redundanz(m: Measurement) -> list[Finding]:
+    findings = []
+    for r in m.repeats:
         if r["count"] >= REDUNDANZ_COUNT_THRESHOLD:
-            findings.append({
-                "signal": "redundanz",
-                "value": r["count"],
-                "evidence": f"{r['tool']} `{r['label']}` {r['count']}x aufgerufen ({fmt(r['tokens'])} Tokens)",
-                "confidence": "belegt",
-            })
+            findings.append(Finding(
+                signal="redundanz",
+                value=r["count"],
+                evidence=f"{r['tool']} `{r['label']}` {r['count']}x aufgerufen ({fmt(r['tokens'])} Tokens)",
+                confidence="belegt",
+            ))
+    return findings
 
+
+RULES = [rule_cache_bruch, rule_redundanz]
+
+
+def compute_findings(measurement: Measurement) -> list[Finding]:
+    """Zieht die Auswertungen, die SKILL.md bisher in Prosa verlangt hat."""
+    findings: list[Finding] = []
+    for rule in RULES:
+        result = rule(measurement)
+        if result is None:
+            continue
+        if isinstance(result, list):
+            findings.extend(result)
+        else:
+            findings.append(result)
     return findings
 
 
 def analyze(files: list[Path], since: str | None = None, until: str | None = None) -> dict[str, Any]:
-    usage_by_request: dict[str, dict[str, int]] = {}
-    tool_calls: dict[str, tuple[str, str, bool]] = {}  # tool_use_id -> (tool, label, sidechain)
-    result_chars: dict[str, int] = defaultdict(int)  # tool_use_id -> chars
-    calls_per_tool: Counter[str] = Counter()
-    label_counts: dict[str, Counter[str]] = defaultdict(Counter)
-    skills_used: Counter[str] = Counter()
-    sidechain_output = 0
+    parsed = _t.parse_entries(_t.read_entries(files, since, until))
+    totals = _t.usage_totals(parsed.usage_by_request)
 
-    for entry in read_entries(files, since, until):
-        msg = entry.get("message")
-        sidechain = bool(entry.get("isSidechain"))
-
-        if entry.get("type") == "assistant" and isinstance(msg, dict):
-            usage = msg.get("usage") or {}
-            req = entry.get("requestId") or entry.get("uuid") or ""
-            if usage and req not in usage_by_request:
-                usage_by_request[req] = {
-                    "input": int(usage.get("input_tokens") or 0),
-                    "cache_read": int(usage.get("cache_read_input_tokens") or 0),
-                    "cache_creation": int(usage.get("cache_creation_input_tokens") or 0),
-                    "output": int(usage.get("output_tokens") or 0),
-                    "sidechain": sidechain,
-                }
-                if sidechain:
-                    sidechain_output += int(usage.get("output_tokens") or 0)
-            for block in msg.get("content") or []:
-                if isinstance(block, dict) and block.get("type") == "tool_use":
-                    name = block.get("name", "?")
-                    params = block.get("input") or {}
-                    label = call_label(name, params if isinstance(params, dict) else {})
-                    tool_calls[block.get("id", "")] = (name, label, sidechain)
-                    calls_per_tool[name] += 1
-                    label_counts[name][label] += 1
-                    if name == "Skill" and isinstance(params, dict):
-                        skills_used[str(params.get("skill", "?"))] += 1
-
-        elif entry.get("type") == "user" and isinstance(msg, dict):
-            for block in msg.get("content") or []:
-                if isinstance(block, dict) and block.get("type") == "tool_result":
-                    tid = block.get("tool_use_id", "")
-                    result_chars[tid] += content_len(block.get("content"))
-
-    # Aggregation
-    totals = {"input": 0, "cache_read": 0, "cache_creation": 0, "output": 0}
-    for u in usage_by_request.values():
-        for k in totals:
-            totals[k] += u[k]
-
-    tokens_per_tool: Counter[str] = Counter()
-    per_call: list[dict[str, Any]] = []
-    for tid, (name, label, sidechain) in tool_calls.items():
-        est = result_chars.get(tid, 0) // CHARS_PER_TOKEN
-        tokens_per_tool[name] += est
-        per_call.append({"tool": name, "label": label, "tokens": est, "sidechain": sidechain})
+    per_call = _t.estimate_tool_tokens(parsed.tool_calls, parsed.result_chars)
     per_call.sort(key=lambda c: c["tokens"], reverse=True)
 
+    tokens_per_tool: Counter[str] = Counter()
+    for c in per_call:
+        tokens_per_tool[c["tool"]] += c["tokens"]
+
     repeats = []
-    for name, labels in label_counts.items():
+    for name, labels in parsed.label_counts.items():
         for label, count in labels.items():
             if count > 1 and name in ("Read", "Bash", "Grep", "Glob"):
                 cost = sum(c["tokens"] for c in per_call if c["tool"] == name and c["label"] == label)
@@ -198,19 +169,40 @@ def analyze(files: list[Path], since: str | None = None, until: str | None = Non
     cached = totals["cache_read"]
     fresh = totals["input"] + totals["cache_creation"]
     cache_hit_rate = round(cached / (cached + fresh), 3) if (cached + fresh) else 0.0
-    findings = compute_findings(cache_hit_rate, len(files), repeats, totals)
+
+    measurement = Measurement(
+        sessions=len(files),
+        requests=len(parsed.usage_by_request),
+        totals=totals,
+        cache_hit_rate=cache_hit_rate,
+        calls_per_tool=dict(parsed.calls_per_tool.most_common()),
+        tokens_per_tool=dict(tokens_per_tool.most_common()),
+        top_calls=per_call[:20],
+        repeats=repeats,
+        skills_used=dict(parsed.skills_used.most_common()),
+        subagent_output_tokens=parsed.sidechain_output_tokens,
+    )
+    measurement.findings = compute_findings(measurement)
+
+    data = dataclasses.asdict(measurement)
+    data["repeats"] = data["repeats"][:20]
+    return data
+
+
+def empty_data() -> dict[str, Any]:
+    """analyze()-Shape fuer den Fall ohne Transcripts - traegt --html AC4."""
     return {
-        "sessions": len(files),
-        "requests": len(usage_by_request),
-        "totals": totals,
-        "cache_hit_rate": cache_hit_rate,
-        "calls_per_tool": dict(calls_per_tool.most_common()),
-        "tokens_per_tool": dict(tokens_per_tool.most_common()),
-        "top_calls": per_call[:20],
-        "repeats": repeats[:20],
-        "skills_used": dict(skills_used.most_common()),
-        "subagent_output_tokens": sidechain_output,
-        "findings": findings,
+        "sessions": 0,
+        "requests": 0,
+        "totals": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0},
+        "cache_hit_rate": 0.0,
+        "calls_per_tool": {},
+        "tokens_per_tool": {},
+        "top_calls": [],
+        "repeats": [],
+        "skills_used": {},
+        "subagent_output_tokens": 0,
+        "findings": [],
     }
 
 
@@ -274,6 +266,20 @@ def report(data: dict[str, Any]) -> str:
     return "\n".join(out)
 
 
+def _write_html(data: dict[str, Any], project: Path, html_arg: str) -> Path:
+    project_name = project.resolve().name
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    html = render_html(data, project_name, generated_at)
+    if html_arg:
+        path = Path(html_arg)
+    else:
+        tmpdir = Path(os.environ.get("TMPDIR", "/tmp"))
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        path = tmpdir / f"token-review-{ts}.html"
+    path.write_text(html, encoding="utf-8")
+    return path
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--project", default=os.getcwd(), help="Projektpfad (Default: cwd)")
@@ -282,6 +288,8 @@ def main() -> int:
     ap.add_argument("--since", default=None, help="nur Eintraege ab diesem ISO-Zeitpunkt")
     ap.add_argument("--until", default=None, help="nur Eintraege bis zu diesem ISO-Zeitpunkt")
     ap.add_argument("--json", action="store_true", help="Rohdaten als JSON ausgeben")
+    ap.add_argument("--html", nargs="?", const="", default=None, metavar="PFAD",
+                     help="HTML-Report schreiben (ohne Pfad: Temp-Verzeichnis)")
     args = ap.parse_args()
 
     project = Path(args.project)
@@ -292,10 +300,17 @@ def main() -> int:
             f"(erwartet: ~/.claude/projects/{project_slug(project)}/*.jsonl).\n"
             "Ohne Historie laeuft die Analyse rein statisch weiter."
         )
+        if args.html is not None:
+            print(_write_html(empty_data(), project, args.html))
         return 1
 
     data = analyze(files, args.since, args.until)
-    print(json.dumps(data, ensure_ascii=False, indent=2) if args.json else report(data))
+    if args.html is not None:
+        print(_write_html(data, project, args.html))
+    elif args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print(report(data))
     return 0
 
 

@@ -2,7 +2,7 @@
 name: izg-improve-token-usage
 description: Identifiziert Tokenfresser, Redundanzen und ineffiziente Ablaeufe in Skills, Workflows und Skripten, belegt sie mit Messdaten aus den Transcripts und praesentiert sie als HTML-Report.
 layer: 3
-dependencies: ["grilling", "izg-create-fixplan", "html-report-template"]
+dependencies: ["grilling", "izg-create-fixplan", "izg-transcript-reader"]
 disable-model-invocation: true
 ---
 
@@ -18,17 +18,7 @@ Findet heraus, wofuer ein Projekt seine Tokens wirklich ausgibt, und schlaegt **
 
 Vor dem Explore pruefen, ob `context-budget` verfuegbar ist (`~/.claude/skills/context-budget/` oder projektlokal). Wenn ja: dort das statische Inventar holen und im Report referenzieren, statt es selbst zu erheben. Wenn nein: ohne weiterlaufen und im Report vermerken, dass die statische Seite nicht abgedeckt ist.
 
-## Vokabular
-
-Diese Begriffe in jedem Vorschlag exakt so verwenden — nicht in "Performance", "Optimierung" oder "Effizienz" abdriften:
-
-- **Tokenfresser** — eine konkrete Stelle, die messbar Tokens verbraucht (eine Datei, ein Tool-Aufruf, ein Skript, ein Ablauf)
-- **Kontextlast** — was ein Tool-Result oder eine Datei ins Kontextfenster kippt
-- **Redundanz** — dieselbe Information mehrfach im Kontext (mehrfacher Read derselben Datei, doppelte Regeln in mehreren Configs)
-- **Cache-Bruch** — eine Aenderung am Anfang des Kontexts, die den Prefix-Cache invalidiert und alles danach neu kosten laesst
-- **Preload vs. Lazy Load** — Inhalt, der immer geladen wird, gegen Inhalt, der erst bei Bedarf gelesen wird
-- **Turn-Kosten** — was ein Arbeitsschritt insgesamt kostet, inklusive der Wiederholung des gesamten Kontexts bei jedem Turn
-- **Ertrag** — was ein teurer Ablauf inhaltlich zurueckgibt, gemessen an seinen Kosten
+Vokabular fuer Vorschlaege und Report: [HTML-REPORT.md](HTML-REPORT.md), Abschnitt "Ton".
 
 ## Process
 
@@ -76,7 +66,19 @@ Jeden Verdacht mit dem **Ertragstest** pruefen: Was gibt diese Stelle inhaltlich
 
 ### 3. Kandidaten als HTML-Report
 
-Eine eigenstaendige HTML-Datei ins Temp-Verzeichnis des Betriebssystems schreiben, damit nichts im Repo landet. Temp-Verzeichnis aus `$TMPDIR` aufloesen, Fallback `/tmp` (bzw. `%TEMP%` unter Windows), Dateiname `<tmpdir>/token-review-<timestamp>.html`, damit jeder Lauf frisch ist. Danach oeffnen (`xdg-open` unter Linux, `open` unter macOS, `start` unter Windows) und dem User den absoluten Pfad nennen.
+Scaffold, Header und Messungs-Abschnitt kommen aus dem Skript, nicht von Hand:
+
+```bash
+python3 scripts/analyze_transcript.py --project <projektpfad> --html
+```
+
+(Ohne Pfad landet die Datei als `<tmpdir>/token-review-<timestamp>.html` im
+Temp-Verzeichnis — `$TMPDIR`, Fallback `/tmp`/`%TEMP%` — und der Pfad steht auf
+stdout. Mit Pfad, z. B. `--html /pfad/report.html`, schreibt es dorthin.)
+Danach nur noch die zwei leeren Container fuellen, die die Datei bereits
+enthaelt: `#kandidaten` und `#hebel`. Anschliessend oeffnen (`xdg-open` unter
+Linux, `open` unter macOS, `start` unter Windows) und dem User den absoluten
+Pfad nennen.
 
 Jede Karte enthaelt:
 

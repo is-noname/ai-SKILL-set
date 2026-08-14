@@ -2,7 +2,7 @@
 name: izg-benchmark-actions
 description: Vergleicht die Kosten mehrerer Varianten eines Ablaufs — mit oder ohne Skill, alte gegen neue Fassung, Subagent gegen Direktarbeit — durch wiederholte, isolierte Messlaeufe auf derselben Testaufgabe und faellt ein belegtes Urteil. Haelt die Messung als Messplan fest, damit sie nach jeder Optimierungsrunde wiederholbar bleibt.
 layer: 3
-dependencies: []
+dependencies: ["izg-transcript-reader"]
 disable-model-invocation: true
 ---
 
