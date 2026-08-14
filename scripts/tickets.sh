@@ -369,7 +369,15 @@ cmd_move() {
 }
 
 cmd_next() {
-  local PREFIX="${1:-PRJ}"
+  local PREFIX="PRJ"
+  local repair=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repair) repair=1; shift ;;
+      *) PREFIX="$1"; shift ;;
+    esac
+  done
+
   local COUNTER_FILE="$TICKETS_DIR/.counter"
 
   if [ ! -d "$TICKETS_DIR" ]; then
@@ -382,19 +390,43 @@ cmd_next() {
     flock 9
   fi
 
-  local counter=0 c
+  local counter=0 c counter_valid=1
   if [ -f "$COUNTER_FILE" ]; then
     c="$(tr -dc '0-9' < "$COUNTER_FILE")"
-    [ -n "$c" ] && counter=$((10#$c))
+    if [ -n "$c" ]; then
+      counter=$((10#$c))
+    else
+      counter_valid=0
+    fi
+  else
+    counter_valid=0
   fi
 
-  local max_existing
-  max_existing="$(grep -rhoE "^id: ${PREFIX}-T-[0-9]+" "$TICKETS_DIR" 2>/dev/null \
+  # Regelbetrieb: nur aktive Ordner lesen, kein Archiv-Vollscan (IZG-T-105).
+  local active_dirs="" d
+  for d in open in-progress blocked; do
+    [ -d "$TICKETS_DIR/$d" ] && active_dirs="$active_dirs $TICKETS_DIR/$d"
+  done
+  local max_active
+  max_active="$(grep -rhoE "^id: ${PREFIX}-T-[0-9]+" $active_dirs 2>/dev/null \
     | grep -oE '[0-9]+$' | sort -n | tail -1 || true)"
-  max_existing=$((10#${max_existing:-0}))
+  max_active=$((10#${max_active:-0}))
+
+  # Vollscan (inkl. done/) nur als Selbstheilung: Counter fehlt/ungueltig, Counter
+  # liegt unter dem Maximum der aktiven Ordner, oder explizit per --repair.
+  local need_full_scan=0
+  [ "$repair" -eq 1 ] && need_full_scan=1
+  [ "$counter_valid" -eq 0 ] && need_full_scan=1
+  [ "$max_active" -gt "$counter" ] && need_full_scan=1
 
   local floor=$counter
-  [ "$max_existing" -gt "$floor" ] && floor=$max_existing
+  if [ "$need_full_scan" -eq 1 ]; then
+    local max_all
+    max_all="$(grep -rhoE "^id: ${PREFIX}-T-[0-9]+" "$TICKETS_DIR" 2>/dev/null \
+      | grep -oE '[0-9]+$' | sort -n | tail -1 || true)"
+    max_all=$((10#${max_all:-0}))
+    [ "$max_all" -gt "$floor" ] && floor=$max_all
+  fi
 
   local next=$((floor + 1))
   echo "$next" > "$COUNTER_FILE"
@@ -547,9 +579,14 @@ tickets.sh <verb> [optionen]
          ohne Verlauf. --full und --brief schliessen sich aus.
          tickets.sh show IZG-T-001 --brief
 
-  next   <PREFIX>
-         Naechste ID vergeben, ohne Ticket anzulegen.
+  next   <PREFIX> [--repair]
+         Naechste ID vergeben, ohne Ticket anzulegen. Regelbetrieb liest nur
+         .counter und die aktiven Ordner (open, in-progress, blocked); ein
+         Vollscan inkl. done/ laeuft nur zur Selbstheilung (Counter fehlt/
+         ungueltig oder unter dem Maximum der aktiven Ordner). --repair
+         erzwingt den Vollscan explizit und schreibt den Counter neu.
          tickets.sh next IZG
+         tickets.sh next IZG --repair
 
   new    --type bug|task|feature|question --priority high|normal|low
          --title <TITLE> --by <AGENT>
