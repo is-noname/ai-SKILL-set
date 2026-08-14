@@ -97,7 +97,7 @@ Plan von Hand anlegen oder ansehen: `plan save`, `plan show --task ...`, `plan l
 
 Das Skript startet `claude -p` headless mit fester Session-ID, liest danach das Transcript und verbucht pro Lauf eine JSON-Datei. Erfasst werden: exakte `usage`-Werte, `total_cost_usd` und `num_turns` aus der CLI, Cache-Quote, Tool-Aufrufe, Tool-Result-Kontextlast, Subagent-Output, Laufzeit.
 
-**Mindestens 3 Laeufe pro Variante.** Darunter verweigert `compare` das Urteil. Ein Lauf wird nicht verbucht — und darf auch nicht nachgetragen werden — bei:
+**3 Laeufe pro Variante, wo es auf die Zahl ankommt.** Darunter urteilt `compare` trotzdem, kennzeichnet das Urteil aber als *ungesichert*: bei einem Lauf ist die Spanne ein Punkt, Spannen koennen dann nicht ueberlappen — das Ueberlappungskriterium greift ins Leere und jeder Streuungsunterschied wird zum Urteil. Fuer die schnelle Frage "ueberhaupt in die richtige Richtung?" reicht `--repeat 1`; fuer eine Zahl, die jemanden ueberzeugen soll, nicht. Ein Lauf wird nicht verbucht — und darf auch nicht nachgetragen werden — bei:
 
 - Timeout (`--timeout`, Default 900 s)
 - fehlendem Transcript (Session-Datei nicht gefunden)
@@ -133,7 +133,7 @@ python3 scripts/bench.py --out /tmp/izg-bench compare --baseline ohne-skill
 Das Urteil ist bewusst zurueckhaltend:
 
 - **Spannen ueberlappen** → "kein belastbarer Unterschied". Nicht wegdiskutieren, nicht auf Mediane ausweichen. Wer trotzdem ein Urteil will, misst mehr Laeufe.
-- **n < 3** → kein Urteil.
+- **n < 3** → Urteil mit dem Zusatz „ungesichert". Als Richtungsanzeige brauchbar, als Beleg nicht.
 - **Ertrag offen oder `fail` dabei** → kein Urteil.
 - **Testaufgabe, Modell oder Messrunde weichen ab** → kein Urteil, sondern die Aufforderung, neu zu messen. Diese drei verschieben die Kosten, ohne dass die Variante sich geaendert hat.
 
@@ -194,7 +194,7 @@ Eine Testaufgabe pro Skill, als Task-Kennung der Skillname. Der Messplan haelt j
 
 ## Grenzen
 
-- **Streuung ist gross.** Modellantworten schwanken zwischen identischen Laeufen erheblich. Deshalb Median und Spanne statt Mittelwert, deshalb n >= 3, deshalb das Ueberlappungskriterium.
+- **Streuung ist gross.** Modellantworten schwanken zwischen identischen Laeufen erheblich. Deshalb Median und Spanne statt Mittelwert, deshalb das Ueberlappungskriterium — und deshalb traegt ein Urteil aus weniger als 3 Laeufen den Zusatz „ungesichert": es kann die Streuung nicht von der Wirkung trennen.
 - **`--setup` wird nicht geprueft.** Laeuft das Kommando ins Leere, misst man klaglos die falsche Variante. Nach dem ersten Lauf einer Variante stichprobenartig nachsehen, ob der Zustand stimmt.
 - **Tool-Result-Tokens sind geschaetzt** (~4 Zeichen pro Token). Die `usage`-Werte und `total_cost_usd` sind exakt — Urteile nur auf diesen faellen.
 - **Nur Claude Code.** Vibe, Codex und Gemini schreiben kein kompatibles Transcript. Deren Varianten lassen sich hier nicht gegeneinander stellen.

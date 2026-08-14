@@ -3,9 +3,9 @@
 
 Kein Dateisystem, kein HOME-Zugriff, kein claude-Aufruf: die Summary-Zeilen werden
 von Hand gebaut statt ueber load_records()/measure_session() erzeugt. Getestet wird
-die Regel selbst - n >= 3, kein Urteil bei offenem Ertrag, kein Ausweichen auf
-Mediane bei ueberlappenden Spannen - und dass sie in Markdown wie in JSON exakt
-dieselbe Entscheidung traegt.
+die Regel selbst - kein Urteil bei offenem Ertrag, kein Ausweichen auf Mediane bei
+ueberlappenden Spannen, Vorbehalt statt Sperre bei n < 3 - und dass sie in Markdown
+wie in JSON exakt dieselbe Entscheidung traegt.
 
     python3 -m unittest discover skills/layer-3-domain/coding/izg-benchmark-actions/tests
     python3 skills/layer-3-domain/coding/izg-benchmark-actions/tests/test_verdict.py
@@ -51,12 +51,29 @@ class Verdict(unittest.TestCase):
         self.assertIsNone(v["delta"])
         self.assertEqual(bench.render_verdict(v), "teurer (Basis-Median 0)")
 
-    def test_n_gleich_zwei_gegen_drei(self):
+    def test_n_gleich_zwei_gegen_drei_urteilt_mit_vorbehalt(self):
         base = mk("basis", 3, 150, 100, 200)
         other = mk("neu", 2, 400, 380, 420)
         v = bench.verdict(base, other)
-        self.assertEqual(v["art"], "zu-wenige-laeufe")
+        self.assertEqual(v["art"], "teurer")
+        self.assertTrue(v["duenn"])
         self.assertEqual((v["n_basis"], v["n_variante"]), (3, 2))
+        self.assertIn("ungesichert", bench.render_verdict(v))
+
+    def test_einzellauf_urteilt_und_kennzeichnet(self):
+        base = mk("basis", 1, 1000, 1000, 1000)
+        other = mk("neu", 1, 500, 500, 500)
+        v = bench.verdict(base, other)
+        self.assertEqual(v["art"], "guenstiger")
+        self.assertEqual(v["delta"], -0.5)
+        self.assertEqual(bench.render_verdict(v), "guenstiger um 50 % (n=1 - ungesichert)")
+
+    def test_drei_laeufe_bleiben_ohne_vorbehalt(self):
+        base = mk("basis", 3, 1000, 900, 1100)
+        other = mk("neu", 3, 500, 400, 600)
+        v = bench.verdict(base, other)
+        self.assertFalse(v["duenn"])
+        self.assertEqual(bench.render_verdict(v), "guenstiger um 50 %")
 
     def test_einzelner_unset_lauf_macht_ertrag_offen(self):
         base = mk("basis", 3, 150, 100, 200)

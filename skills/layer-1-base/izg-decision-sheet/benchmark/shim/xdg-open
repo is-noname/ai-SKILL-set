@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# No-op statt xdg-open: waehrend der Messung soll kein Browserfenster aufgehen.
+# Beide Varianten laufen mit demselben PATH, die Messung bleibt fair.
+exit 0

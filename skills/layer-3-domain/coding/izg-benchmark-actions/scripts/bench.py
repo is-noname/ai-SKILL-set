@@ -233,22 +233,25 @@ def verdict(base: dict[str, Any], other: dict[str, Any],
         return {"art": "keine-daten"}
     if blocker := comparability(base, other, strict_round):
         return blocker
-    if base["n"] < 3 or other["n"] < 3:
-        return {"art": "zu-wenige-laeufe", "n_basis": base["n"], "n_variante": other["n"]}
     if other["outcomes"].get("fail") or other["outcomes"].get("unset"):
         return {"art": "ertrag-offen", "outcomes": dict(other["outcomes"])}
+    # n < 3 sperrt das Urteil nicht mehr, es kennzeichnet es. Bei einem Lauf ist die
+    # Spanne ein Punkt - Spannen koennen dann nicht ueberlappen, also faellt das Urteil
+    # immer, auch wenn der Unterschied reine Streuung ist. Deshalb "duenn".
+    duenn = base["n"] < 3 or other["n"] < 3
+    beleg = {"duenn": duenn, "n_basis": base["n"], "n_variante": other["n"]}
     overlap = not (other["weighted_max"] < base["weighted_min"]
                    or other["weighted_min"] > base["weighted_max"])
     if overlap:
-        return {"art": "kein-unterschied",
+        return {"art": "kein-unterschied", **beleg,
                 "basis_spanne": [base["weighted_min"], base["weighted_max"]],
                 "variante_spanne": [other["weighted_min"], other["weighted_max"]]}
     if base["weighted_median"] == 0:
         # Basis-Median 0: eine Prozentangabe waere eine Division durch 0.
-        return {"art": "teurer", "delta": None,
+        return {"art": "teurer", "delta": None, **beleg,
                 "basis_median": 0, "variante_median": other["weighted_median"]}
     delta = (other["weighted_median"] - base["weighted_median"]) / base["weighted_median"]
-    return {"art": "guenstiger" if delta < 0 else "teurer", "delta": round(delta, 4),
+    return {"art": "guenstiger" if delta < 0 else "teurer", "delta": round(delta, 4), **beleg,
             "basis_median": base["weighted_median"], "variante_median": other["weighted_median"]}
 
 
@@ -265,15 +268,14 @@ def render_verdict(v: dict[str, Any]) -> str:
         return "verschiedene Modelle (" + ", ".join(v["modelle"]) + ") - nicht vergleichbar"
     if art == "runden-gemischt":
         return "verschiedene Messrunden - Basis neu messen"
-    if art == "zu-wenige-laeufe":
-        return "zu wenige Laeufe (n < 3)"
     if art == "ertrag-offen":
         return "Ertrag offen"
+    zusatz = f", n={v['n_variante']} - ungesichert" if v.get("duenn") else ""
     if art == "kein-unterschied":
-        return "kein belastbarer Unterschied (Spannen ueberlappen)"
+        return f"kein belastbarer Unterschied (Spannen ueberlappen{zusatz})"
     if v["delta"] is None:
-        return f"{art} (Basis-Median 0)"
-    return f"{art} um {abs(v['delta']) * 100:.0f} %"
+        return f"{art} (Basis-Median 0{zusatz})"
+    return f"{art} um {abs(v['delta']) * 100:.0f} %" + (f" ({zusatz.lstrip(', ')})" if zusatz else "")
 
 
 def base_for(task: str, baseline: "str | Mapping[str, str | None] | None") -> str | None:

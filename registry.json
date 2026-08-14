@@ -139,7 +139,7 @@
     },
     "izg-benchmark-actions": {
       "name": "izg-benchmark-actions",
-      "description": "Vergleicht die Kosten mehrerer Varianten eines Ablaufs — mit oder ohne Skill, alte gegen neue Fassung, Subagent gegen Direktarbeit — durch wiederholte, isolierte Messlaeufe auf derselben Testaufgabe und faellt ein belegtes Urteil.",
+      "description": "Vergleicht die Kosten mehrerer Varianten eines Ablaufs — mit oder ohne Skill, alte gegen neue Fassung, Subagent gegen Direktarbeit — durch wiederholte, isolierte Messlaeufe auf derselben Testaufgabe und faellt ein belegtes Urteil. Haelt die Messung als Messplan fest, damit sie nach jeder Optimierungsrunde wiederholbar bleibt.",
       "layer": 3,
       "dependencies": [],
       "path": "skills/layer-3-domain/coding/izg-benchmark-actions",
