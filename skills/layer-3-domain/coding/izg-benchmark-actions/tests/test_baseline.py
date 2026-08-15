@@ -19,13 +19,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-import bench  # noqa: E402
 import plans  # noqa: E402
 import urteil  # noqa: E402
-
-
-def summary(*variants: str, task: str = "t1") -> dict[str, dict]:
-    return {f"{task}::{v}": {"task": task, "variant": v} for v in variants}
 
 
 class RecordBaseline(unittest.TestCase):
@@ -61,9 +56,12 @@ class ResolveBaselines(unittest.TestCase):
             plan = plans.new_plan("t1")
             plans.record_baseline(plan, "aus-plan")
             plans.save_plan(out, plan)
-            resolved, notes = bench.resolve_baselines(out, summary("a", "b"), "vom-aufruf")
+            resolved, notes = plans.resolve_baselines(out, ["t1"], "vom-aufruf")
             self.assertEqual(resolved["t1"], "vom-aufruf")
-            self.assertEqual(notes, [])
+            self.assertEqual(len(notes), 1)
+            self.assertIn("aus-plan", notes[0])
+            self.assertIn("vom-aufruf", notes[0])
+            self.assertEqual(plans.load_plan(out, "t1")["baseline"], "vom-aufruf")
 
     def test_messplan_wenn_aufruf_schweigt(self):
         with tempfile.TemporaryDirectory() as d:
@@ -71,13 +69,13 @@ class ResolveBaselines(unittest.TestCase):
             plan = plans.new_plan("t1")
             plans.record_baseline(plan, "aus-plan")
             plans.save_plan(out, plan)
-            resolved, notes = bench.resolve_baselines(out, summary("a", "b"), None)
+            resolved, notes = plans.resolve_baselines(out, ["t1"], None)
             self.assertEqual(resolved["t1"], "aus-plan")
             self.assertEqual(notes, [])
 
     def test_ohne_basis_wird_gemeldet(self):
         with tempfile.TemporaryDirectory() as d:
-            resolved, notes = bench.resolve_baselines(Path(d), summary("a", "b"), None)
+            resolved, notes = plans.resolve_baselines(Path(d), ["t1"], None)
             self.assertIsNone(resolved["t1"])
             self.assertEqual(len(notes), 1)
             self.assertIn("--baseline", notes[0])
@@ -89,8 +87,7 @@ class ResolveBaselines(unittest.TestCase):
                 plan = plans.new_plan(task)
                 plans.record_baseline(plan, base)
                 plans.save_plan(out, plan)
-            summ = {**summary("a", "b1", task="t1"), **summary("a", "b2", task="t2")}
-            resolved, _ = bench.resolve_baselines(out, summ, None)
+            resolved, _ = plans.resolve_baselines(out, ["t1", "t2"], None)
             self.assertEqual(resolved, {"t1": "b1", "t2": "b2"})
 
 
@@ -101,7 +98,7 @@ class SelectBase(unittest.TestCase):
 
     def test_einzelwert_gilt_fuer_alle(self):
         variants = [{"task": "t1", "variant": v} for v in ("a", "basis")]
-        self.assertEqual(urteil.select_base(variants, "basis"), "basis")
+        self.assertEqual(urteil.select_base(variants, {"t1": "basis"}), "basis")
 
     def test_alphabet_wenn_basis_fehlt(self):
         variants = [{"task": "t1", "variant": v} for v in ("b", "a")]

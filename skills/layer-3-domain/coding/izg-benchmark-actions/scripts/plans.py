@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -122,6 +123,36 @@ def record_baseline(plan: dict[str, Any], baseline: str | None) -> str | None:
     if known != baseline:
         return f"Messplan aktualisiert: Basis '{known}' -> '{baseline}'"
     return None
+
+
+def resolve_baselines(out: Path, tasks: Iterable[str],
+                      cli_baseline: str | None) -> tuple[dict[str, str | None], list[str]]:
+    """Basis je Testaufgabe: Kommandozeile schlaegt Messplan, Messplan schlaegt Alphabet.
+
+    Ohne diesen Griff in den Plan haengt der Bezugspunkt eines Urteils daran, ob jemand
+    beim Aufruf `--baseline` getippt hat - und die Fehlmessung faellt niemandem auf, weil
+    die Tabelle mit einer anderen Basis genauso plausibel aussieht. Eine auf der
+    Kommandozeile genannte Basis wandert dabei gleich in den bestehenden Messplan -
+    einmal genannt, danach nicht mehr noetig. Plaene, die es noch nicht gibt, werden
+    dafuer nicht angelegt: der Plan entsteht beim Messen, nicht beim Auswerten.
+    """
+    resolved: dict[str, str | None] = {}
+    notes: list[str] = []
+    for task in sorted(set(tasks)):
+        plan = load_plan(out, task)
+        if cli_baseline:
+            resolved[task] = cli_baseline
+            if plan is not None and (note := record_baseline(plan, cli_baseline)):
+                save_plan(out, plan)
+                notes.append(f"  {note}")
+            continue
+        planned = (plan or {}).get("baseline")
+        resolved[task] = planned
+        if not planned:
+            notes.append(f"! {task}: keine Basis angegeben und keine im Messplan - es wird "
+                         f"die alphabetisch erste Variante verglichen. Mit --baseline "
+                         f"festlegen, dann steht sie im Plan.")
+    return resolved, notes
 
 
 def record_variant(plan: dict[str, Any], variant: str, setup: str | None) -> str | None:

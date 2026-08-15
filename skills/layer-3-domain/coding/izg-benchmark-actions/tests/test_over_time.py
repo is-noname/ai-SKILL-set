@@ -27,6 +27,7 @@ import bericht  # noqa: E402
 import plans  # noqa: E402
 import runs  # noqa: E402
 import urteil  # noqa: E402
+from urteil import Kennung  # noqa: E402
 
 
 def measured(w: int) -> dict:
@@ -55,14 +56,14 @@ def laeufe(variant: str, *gewichte: int, task: str = "t1", rnd: str | None = "20
 
 
 def beurteile(*gruppen: list[dict], baseline: str = "v1", **kw) -> urteil.Beurteilung:
-    return urteil.beurteile([r for g in gruppen for r in g], baseline, **kw)
+    return urteil.beurteile([r for g in gruppen for r in g], {"t1": baseline}, **kw)
 
 
 class Vergleichbarkeit(unittest.TestCase):
     def test_zwei_messrunden_ergeben_kein_urteil(self):
         t = beurteile(laeufe("v1", 480, 500, 520, rnd="2026-05-02"),
                       laeufe("v2", 90, 100, 110, rnd="2026-08-14")).tabelle
-        v = t["t1::v2"]["urteil"]
+        v = t[Kennung("t1", "v2")]["urteil"]
         self.assertEqual(v["art"], "runden-gemischt")
         self.assertEqual(v["runden"], ["2026-05-02", "2026-08-14"])
         self.assertIn("neu messen", bericht.render_verdict(v))
@@ -71,38 +72,38 @@ class Vergleichbarkeit(unittest.TestCase):
         t = beurteile(laeufe("v1", 480, 500, 520, rnd="2026-05-02"),
                       laeufe("v2", 90, 100, 110, rnd="2026-08-14"),
                       strict_round=False).tabelle
-        self.assertEqual(t["t1::v2"]["urteil"]["art"], "guenstiger")
+        self.assertEqual(t[Kennung("t1", "v2")]["urteil"]["art"], "guenstiger")
 
     def test_verschiedene_modelle_ergeben_kein_urteil(self):
         # Auch ohne Rundensperre bleibt das Modell ein Ausschlussgrund.
         t = beurteile(laeufe("v1", 480, 500, 520, models=["claude-opus-4-5"]),
                       laeufe("v2", 90, 100, 110, models=["claude-opus-5"]),
                       strict_round=False).tabelle
-        v = t["t1::v2"]["urteil"]
+        v = t[Kennung("t1", "v2")]["urteil"]
         self.assertEqual(v["art"], "modell-gemischt")
         self.assertIn("nicht vergleichbar", bericht.render_verdict(v))
 
     def test_geaenderte_testaufgabe_schlaegt_alles_andere(self):
         t = beurteile(laeufe("v1", 480, 500, 520, sha="aaa"),
                       laeufe("v2", 90, 100, 110, sha="bbb", models=["anderes"])).tabelle
-        self.assertEqual(t["t1::v2"]["urteil"]["art"], "aufgabe-geaendert")
+        self.assertEqual(t[Kennung("t1", "v2")]["urteil"]["art"], "aufgabe-geaendert")
 
     def test_eine_variante_aus_zwei_modellen_ist_selbst_schon_unvergleichbar(self):
         t = beurteile(laeufe("v1", 480, 500, 520),
                       laeufe("v2", 90, 100, 110,
                              models=["claude-opus-4-5", "claude-opus-5"])).tabelle
-        self.assertEqual(t["t1::v2"]["urteil"]["art"], "modell-gemischt")
+        self.assertEqual(t[Kennung("t1", "v2")]["urteil"]["art"], "modell-gemischt")
 
     def test_unbekannte_umgebung_blockiert_nicht(self):
         # Altdaten ohne Umgebungsfelder: None ist "unbekannt", nicht "abweichend".
         leer = {"rnd": None, "models": [None], "sha": None, "cli": None}
         t = beurteile(laeufe("v1", 480, 500, 520, **leer),
                       laeufe("v2", 90, 100, 110, **leer)).tabelle
-        self.assertEqual(t["t1::v2"]["urteil"]["art"], "guenstiger")
+        self.assertEqual(t[Kennung("t1", "v2")]["urteil"]["art"], "guenstiger")
 
     def test_gleiche_runde_und_modell_urteilt_normal(self):
         t = beurteile(laeufe("v1", 480, 500, 520), laeufe("v2", 90, 100, 110)).tabelle
-        self.assertEqual(t["t1::v2"]["urteil"]["art"], "guenstiger")
+        self.assertEqual(t[Kennung("t1", "v2")]["urteil"]["art"], "guenstiger")
 
 
 class RundenGruppierung(unittest.TestCase):
@@ -113,26 +114,26 @@ class RundenGruppierung(unittest.TestCase):
                       laeufe("v3", 50, 60, 70, rnd="r2"),
                       baseline="v2", je_runde=True).tabelle
         # v2 ist in beiden Runden Basis, v1 und v3 werden je gegen ihre eigene Runde geurteilt.
-        self.assertEqual(t["t1::r1::v2"]["urteil"]["art"], "basis")
-        self.assertEqual(t["t1::r2::v2"]["urteil"]["art"], "basis")
-        self.assertEqual(t["t1::r1::v1"]["urteil"]["art"], "teurer")
-        self.assertEqual(t["t1::r2::v3"]["urteil"]["art"], "guenstiger")
+        self.assertEqual(t[Kennung("t1", "v2", "r1")]["urteil"]["art"], "basis")
+        self.assertEqual(t[Kennung("t1", "v2", "r2")]["urteil"]["art"], "basis")
+        self.assertEqual(t[Kennung("t1", "v1", "r1")]["urteil"]["art"], "teurer")
+        self.assertEqual(t[Kennung("t1", "v3", "r2")]["urteil"]["art"], "guenstiger")
 
     def test_runden_werden_nur_auf_verlangen_getrennt(self):
         recs = laeufe("v1", 100, 110, rnd="r1") + laeufe("v1", 200, 210, rnd="r2")
-        flach = urteil.beurteile(recs, "v1").tabelle
-        self.assertEqual(flach["t1::v1"]["n"], 4)
-        self.assertEqual(flach["t1::v1"]["rounds"], ["r1", "r2"])
+        flach = urteil.beurteile(recs, {"t1": "v1"}).tabelle
+        self.assertEqual(flach[Kennung("t1", "v1")]["n"], 4)
+        self.assertEqual(flach[Kennung("t1", "v1")]["rounds"], ["r1", "r2"])
 
-        proRunde = urteil.beurteile(recs, "v1", je_runde=True).tabelle
-        self.assertEqual(set(proRunde), {"t1::r1::v1", "t1::r2::v1"})
-        self.assertEqual(proRunde["t1::r1::v1"]["weighted_median"], 105)
-        self.assertEqual(proRunde["t1::r2::v1"]["weighted_median"], 205)
+        proRunde = urteil.beurteile(recs, {"t1": "v1"}, je_runde=True).tabelle
+        self.assertEqual(set(proRunde), {Kennung("t1", "v1", "r1"), Kennung("t1", "v1", "r2")})
+        self.assertEqual(proRunde[Kennung("t1", "v1", "r1")]["weighted_median"], 105)
+        self.assertEqual(proRunde[Kennung("t1", "v1", "r2")]["weighted_median"], 205)
 
     def test_laeufe_ohne_runde_landen_in_einem_eigenen_topf(self):
-        t = urteil.beurteile(laeufe("v1", 100, rnd=None), "v1", je_runde=True).tabelle
-        self.assertEqual(list(t), ["t1::ohne-runde::v1"])
-        self.assertEqual(t["t1::ohne-runde::v1"]["rounds"], [])
+        t = urteil.beurteile(laeufe("v1", 100, rnd=None), {"t1": "v1"}, je_runde=True).tabelle
+        self.assertEqual(list(t), [Kennung("t1", "v1", "ohne-runde")])
+        self.assertEqual(t[Kennung("t1", "v1", "ohne-runde")]["rounds"], [])
 
 
 class Verlauf(unittest.TestCase):
@@ -140,7 +141,7 @@ class Verlauf(unittest.TestCase):
         b = beurteile(laeufe("v2", 40000, rnd="2026-05-02", models=["opus-4-5"]),
                       laeufe("v2", 44000, rnd="2026-08-14", models=["opus-5"]),
                       baseline="v2", je_runde=True)
-        reihe = b.verlauf["t1::v2"]
+        reihe = b.verlauf[Kennung("t1", "v2")]
         self.assertEqual([p["round"] for p in reihe], ["2026-05-02", "2026-08-14"])
         self.assertIsNone(reihe[0]["delta_zur_vorrunde"])
         self.assertAlmostEqual(reihe[1]["delta_zur_vorrunde"], 0.1, places=4)
@@ -213,7 +214,8 @@ class Altdaten(unittest.TestCase):
             self.assertEqual(len(geladen), 1)
             self.assertIsNone(geladen[0]["round"])
             # und sie fallen durch die Auswertung, ohne dass ein Feld fehlt
-            self.assertEqual(urteil.beurteile(geladen, "v1").tabelle["t1::v1"]["models"], [])
+            self.assertEqual(
+                urteil.beurteile(geladen, {"t1": "v1"}).tabelle[Kennung("t1", "v1")]["models"], [])
 
 
 if __name__ == "__main__":

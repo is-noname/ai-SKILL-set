@@ -38,7 +38,7 @@ def render_verdict(v: dict[str, Any]) -> str:
     return f"{art} um {abs(v['delta']) * 100:.0f} %" + (f" ({zusatz.lstrip(', ')})" if zusatz else "")
 
 
-def report(summary: dict[str, dict[str, Any]], baseline: "urteil.Basis" = None,
+def report(summary: dict["urteil.Kennung", dict[str, Any]], baseline: "urteil.Basis" = None,
            show_round: bool = False) -> str:
     """Die Vergleichstabelle je Testaufgabe. `summary` ist eine beurteilte Tabelle."""
     by_task: dict[str, list[dict[str, Any]]] = {}
@@ -74,7 +74,7 @@ def report(summary: dict[str, dict[str, Any]], baseline: "urteil.Basis" = None,
     return "\n".join(out)
 
 
-def render_trend(trends: dict[str, list[dict[str, Any]]]) -> str:
+def render_trend(trends: dict["urteil.Kennung", list[dict[str, Any]]]) -> str:
     if not trends:
         return ("\n## Verlauf\n\nNur eine Messrunde vorhanden - kein Verlauf. "
                 "Fuer den Vergleich ueber die Zeit dieselbe Variante in einer zweiten "
@@ -83,8 +83,7 @@ def render_trend(trends: dict[str, list[dict[str, Any]]]) -> str:
            "Beobachtung mit Datum, kein Beleg: zwischen den Runden liegt mehr als die "
            "Optimierung. Belastbar ist nur ein Urteil innerhalb einer Runde."]
     for key, reihe in sorted(trends.items()):
-        task, variant = key.split("::", 1)
-        out += ["", f"**{task} / {variant}**", ""]
+        out += ["", f"**{key.task} / {key.variante}**", ""]
         for p in reihe:
             med = f"{p['weighted_median']:,}".replace(",", ".")
             d = (f" ({p['delta_zur_vorrunde'] * 100:+.0f} %)"

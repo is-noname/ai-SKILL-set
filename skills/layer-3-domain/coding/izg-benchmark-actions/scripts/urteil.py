@@ -16,12 +16,36 @@ from __future__ import annotations
 
 import statistics
 from collections import Counter
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-# Die Basis einer Testaufgabe: entweder eine Variante fuer alle Tasks oder eine je Task.
-Basis = "str | Mapping[str, str | None] | None"
+# Die Basis: je Testaufgabe eine Variante, oder keine. Kommt immer aus
+# plans.resolve_baselines() - Kommandozeile schlaegt Messplan schlaegt Alphabet.
+Basis = "Mapping[str, str | None] | None"
+
+
+@dataclass(frozen=True, order=True)
+class Kennung:
+    """Der Gruppenschluessel von Tabelle und Verlauf: Testaufgabe, Variante, Messrunde.
+
+    Ein Wert statt eines zusammengesetzten Strings - `task::runde::variante` liesse sich
+    nicht mehr eindeutig zerlegen, sobald ein Variantenname selbst '::' enthaelt. Der
+    String entsteht erst dort, wo JSON ihn verlangt (`als_string()`), nicht hier.
+    """
+
+    task: str
+    variante: str
+    runde: str | None = None
+
+    def als_string(self) -> str:
+        if self.runde is None:
+            return f"{self.task}::{self.variante}"
+        return f"{self.task}::{self.runde}::{self.variante}"
+
+
+def zu_json(gruppiert: dict["Kennung", Any]) -> dict[str, Any]:
+    """Wandelt einen Kennung-gruppierten Wert an den Rand: JSON verlangt String-Schluessel."""
+    return {k.als_string(): v for k, v in gruppiert.items()}
 
 
 def _distinct(group: list[dict[str, Any]], field_name: str) -> list[str]:
@@ -30,7 +54,7 @@ def _distinct(group: list[dict[str, Any]], field_name: str) -> list[str]:
 
 
 def summarize(recs: list[dict[str, Any]],
-              group_round: bool = False) -> dict[str, dict[str, Any]]:
+              group_round: bool = False) -> dict[Kennung, dict[str, Any]]:
     """Fasst die Laeufe je (Task, Variante) zusammen - bei group_round zusaetzlich je Messrunde.
 
     task/variant sind laut Schema (runs.build_record) in jedem Datensatz gesetzt - hier direkt
@@ -46,13 +70,13 @@ def summarize(recs: list[dict[str, Any]],
         rnd = (r.get("round") or "ohne-runde") if group_round else ""
         groups.setdefault((r["task"], rnd, r["variant"]), []).append(r)
 
-    summary: dict[str, dict[str, Any]] = {}
+    summary: dict[Kennung, dict[str, Any]] = {}
     for (task, rnd, variant), group in groups.items():
         weighted = [r["weighted_tokens"] for r in group if r.get("weighted_tokens") is not None]
         costs = [r["cost_usd"] for r in group if r.get("cost_usd") is not None]
         turns = [r["num_turns"] for r in group if r.get("num_turns") is not None]
         outcomes = Counter(r.get("outcome", "unset") for r in group)
-        key = f"{task}::{rnd}::{variant}" if group_round else f"{task}::{variant}"
+        key = Kennung(task, variant, rnd if group_round else None)
         summary[key] = {
             "task": task,
             "variant": variant,
@@ -136,22 +160,15 @@ def verdict(base: dict[str, Any], other: dict[str, Any],
             "basis_median": base["weighted_median"], "variante_median": other["weighted_median"]}
 
 
-def base_for(task: str, baseline: Basis) -> str | None:
-    """Die Basis fuer eine Testaufgabe - entweder eine fuer alle oder eine je Task."""
-    if isinstance(baseline, Mapping):
-        return baseline.get(task)
-    return baseline
-
-
 def select_base(variants: list[dict[str, Any]], baseline: Basis) -> str:
     variants = sorted(variants, key=lambda v: v["variant"])
-    wanted = base_for(variants[0]["task"], baseline)
+    wanted = (baseline or {}).get(variants[0]["task"])
     if wanted and any(v["variant"] == wanted for v in variants):
         return wanted
     return variants[0]["variant"]
 
 
-def attach_verdicts(summary: dict[str, dict[str, Any]], baseline: Basis,
+def attach_verdicts(summary: dict[Kennung, dict[str, Any]], baseline: Basis,
                     strict_round: bool = True) -> None:
     """Haengt an jede Variante ihr Urteil gegen die Basis derselben Testaufgabe und Messrunde an.
 
@@ -169,7 +186,7 @@ def attach_verdicts(summary: dict[str, dict[str, Any]], baseline: Basis,
             v["urteil"] = verdict(base, v, strict_round)
 
 
-def trend(summary: dict[str, dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+def trend(summary: dict[Kennung, dict[str, Any]]) -> dict[Kennung, list[dict[str, Any]]]:
     """Wie sich eine Variante ueber die Messrunden bewegt hat - je Task und Variante.
 
     Bewusst getrennt vom Urteil: die Runden liegen Wochen auseinander, dazwischen liegen
@@ -182,7 +199,7 @@ def trend(summary: dict[str, dict[str, Any]]) -> dict[str, list[dict[str, Any]]]
         if s.get("round") and s.get("weighted_median") is not None:
             by_variant.setdefault((s["task"], s["variant"]), []).append(s)
 
-    result: dict[str, list[dict[str, Any]]] = {}
+    result: dict[Kennung, list[dict[str, Any]]] = {}
     for (task, variant), punkte in by_variant.items():
         if len(punkte) < 2:
             continue
@@ -202,7 +219,7 @@ def trend(summary: dict[str, dict[str, Any]]) -> dict[str, list[dict[str, Any]]]
                     vor and (set(p["models"]) != set(vor["models"])
                              or set(p["cli_versions"]) != set(vor["cli_versions"]))),
             })
-        result[f"{task}::{variant}"] = reihe
+        result[Kennung(task, variant)] = reihe
     return result
 
 
@@ -215,8 +232,8 @@ class Beurteilung:
     keinen Zeitpunkt, ueber den etwas verlaufen koennte.
     """
 
-    tabelle: dict[str, dict[str, Any]]
-    verlauf: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    tabelle: dict[Kennung, dict[str, Any]]
+    verlauf: dict[Kennung, list[dict[str, Any]]] = field(default_factory=dict)
 
 
 def beurteile(recs: list[dict[str, Any]], baseline: Basis = None, *,

@@ -68,48 +68,6 @@ def resolve_plan(args: argparse.Namespace, out: Path) -> tuple[dict[str, Any], d
     return plan, values
 
 
-def resolve_baselines(out: Path, summary: dict[str, dict[str, Any]],
-                      cli_baseline: str | None) -> tuple[dict[str, str | None], list[str]]:
-    """Basis je Testaufgabe: Kommandozeile schlaegt Messplan, Messplan schlaegt Alphabet.
-
-    Ohne diesen Griff in den Plan haengt der Bezugspunkt eines Urteils daran, ob jemand
-    beim Aufruf `--baseline` getippt hat - und die Fehlmessung faellt niemandem auf, weil
-    die Tabelle mit einer anderen Basis genauso plausibel aussieht.
-    """
-    resolved: dict[str, str | None] = {}
-    notes: list[str] = []
-    for task in sorted({s["task"] for s in summary.values()}):
-        if cli_baseline:
-            resolved[task] = cli_baseline
-            continue
-        planned = (plans.load_plan(out, task) or {}).get("baseline")
-        resolved[task] = planned
-        if not planned:
-            notes.append(f"! {task}: keine Basis angegeben und keine im Messplan - es wird "
-                         f"die alphabetisch erste Variante verglichen. Mit --baseline "
-                         f"festlegen, dann steht sie im Plan.")
-    return resolved, notes
-
-
-def persist_baseline(out: Path, baselines: dict[str, str | None],
-                     cli_baseline: str | None) -> None:
-    """Eine auf der Kommandozeile genannte Basis wandert in den Messplan.
-
-    Analog zur Umschaltung einer Variante: einmal genannt, danach nicht mehr noetig.
-    Plaene, die es noch nicht gibt, werden dafuer nicht angelegt - der Plan entsteht
-    beim Messen, nicht beim Auswerten.
-    """
-    if not cli_baseline:
-        return
-    for task in baselines:
-        plan = plans.load_plan(out, task)
-        if plan is None:
-            continue
-        if note := plans.record_baseline(plan, cli_baseline):
-            plans.save_plan(out, plan)
-            print(f"  {note}")
-
-
 # ----------------------------------------------------------------------------- CLI
 
 
@@ -214,11 +172,10 @@ def cmd_compare(args: argparse.Namespace) -> int:
     if not recs:
         print(f"Keine Laufdaten unter {args.out}.")
         return 1
-    baselines, notes = resolve_baselines(out, urteil.summarize(recs), args.baseline)
-    persist_baseline(out, baselines, args.baseline)
+    baselines, notes = plans.resolve_baselines(out, (r["task"] for r in recs), args.baseline)
     beurteilt = urteil.beurteile(recs, baselines, strict_round=not args.across_rounds)
-    print(json.dumps(beurteilt.tabelle, ensure_ascii=False, indent=2) if args.json
-          else bericht.report(beurteilt.tabelle, baselines))
+    print(json.dumps(urteil.zu_json(beurteilt.tabelle), ensure_ascii=False, indent=2)
+          if args.json else bericht.report(beurteilt.tabelle, baselines))
     for n in notes:
         print(n)
     if args.across_rounds:
@@ -233,11 +190,11 @@ def cmd_history(args: argparse.Namespace) -> int:
     if not recs:
         print(f"Keine Laufdaten unter {args.out}.")
         return 1
-    baselines, notes = resolve_baselines(out, urteil.summarize(recs), args.baseline)
-    persist_baseline(out, baselines, args.baseline)
+    baselines, notes = plans.resolve_baselines(out, (r["task"] for r in recs), args.baseline)
     beurteilt = urteil.beurteile(recs, baselines, je_runde=True)
     if args.json:
-        print(json.dumps({"runden": beurteilt.tabelle, "verlauf": beurteilt.verlauf},
+        print(json.dumps({"runden": urteil.zu_json(beurteilt.tabelle),
+                          "verlauf": urteil.zu_json(beurteilt.verlauf)},
                          ensure_ascii=False, indent=2))
     else:
         print(bericht.report(beurteilt.tabelle, baselines, show_round=True))
