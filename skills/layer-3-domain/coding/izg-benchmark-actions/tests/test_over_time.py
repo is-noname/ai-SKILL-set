@@ -6,7 +6,9 @@ Zahlen aus zwei Messrunden, von zwei Modellen oder zu zwei Fassungen der Testauf
 *kein* Urteil ergeben, sondern eine Aufforderung, neu zu messen. Dazu der Messplan, der
 eine Messung Monate spaeter wiederholbar haelt, und der Verlauf ueber die Runden.
 
-Kein Dateisystem ausser tmp_path, kein claude-Aufruf.
+Alles ueber `urteil.beurteile()`: Laufdaten und Basis herein, beurteilte Tabelle heraus -
+derselbe Weg, den `bench.py compare` und `bench.py history` gehen. Kein Dateisystem ausser
+tmp_path, kein claude-Aufruf.
 
     python3 -m unittest discover skills/layer-3-domain/coding/izg-benchmark-actions/tests
     python3 skills/layer-3-domain/coding/izg-benchmark-actions/tests/test_over_time.py
@@ -21,25 +23,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-import bench  # noqa: E402
+import bericht  # noqa: E402
 import plans  # noqa: E402
 import runs  # noqa: E402
-
-
-def mk(variant: str, n: int = 3, median: int = 100, wmin: int = 90, wmax: int = 110,
-       *, task: str = "t1", rounds: list[str] | None = None, models: list[str] | None = None,
-       shas: list[str] | None = None, rnd: str | None = None) -> dict:
-    return {
-        "task": task, "variant": variant, "round": rnd, "n": n,
-        "weighted_median": median, "weighted_min": wmin, "weighted_max": wmax,
-        "cost_median": None, "turns_median": None, "cache_hit_median": 0.0,
-        "outcomes": {"ok": n},
-        "rounds": rounds if rounds is not None else ["2026-05-02"],
-        "models": models if models is not None else ["claude-opus-5"],
-        "cli_versions": ["2.0.0"],
-        "prompt_shas": shas if shas is not None else ["aaa"],
-        "last_recorded": "2026-05-02T10:00:00+00:00",
-    }
+import urteil  # noqa: E402
 
 
 def measured(w: int) -> dict:
@@ -49,108 +36,126 @@ def measured(w: int) -> dict:
             "first_timestamp": "t0", "last_timestamp": "t1"}
 
 
+def laeufe(variant: str, *gewichte: int, task: str = "t1", rnd: str | None = "2026-05-02",
+           models: list[str] | None = None, sha: str | None = "aaa",
+           cli: str | None = "2.0.0") -> list[dict]:
+    """Laufdatensaetze einer Variante - ein Datensatz je gewichtetem Wert.
+
+    `models` darf mehrere Modelle tragen: eine Variante, die aus zwei Modellen
+    zusammengesetzt ist, muss selbst schon unvergleichbar sein.
+    """
+    mods = models if models is not None else ["claude-opus-5"]
+    return [
+        runs.build_record(task=task, variant=variant, run=i, project=Path("/p"),
+                          outcome="ok", note="", measured=measured(w),
+                          env={"round": rnd, "model": mods[(i - 1) % len(mods)],
+                               "cli_version": cli, "prompt_sha": sha})
+        for i, w in enumerate(gewichte, 1)
+    ]
+
+
+def beurteile(*gruppen: list[dict], baseline: str = "v1", **kw) -> urteil.Beurteilung:
+    return urteil.beurteile([r for g in gruppen for r in g], baseline, **kw)
+
+
 class Vergleichbarkeit(unittest.TestCase):
     def test_zwei_messrunden_ergeben_kein_urteil(self):
-        base = mk("v1", median=500, wmin=480, wmax=520, rounds=["2026-05-02"])
-        neu = mk("v2", median=100, wmin=90, wmax=110, rounds=["2026-08-14"])
-        v = bench.verdict(base, neu)
+        t = beurteile(laeufe("v1", 480, 500, 520, rnd="2026-05-02"),
+                      laeufe("v2", 90, 100, 110, rnd="2026-08-14")).tabelle
+        v = t["t1::v2"]["urteil"]
         self.assertEqual(v["art"], "runden-gemischt")
         self.assertEqual(v["runden"], ["2026-05-02", "2026-08-14"])
-        self.assertIn("neu messen", bench.render_verdict(v))
+        self.assertIn("neu messen", bericht.render_verdict(v))
 
     def test_across_rounds_hebt_die_rundensperre_auf(self):
-        base = mk("v1", median=500, wmin=480, wmax=520, rounds=["2026-05-02"])
-        neu = mk("v2", median=100, wmin=90, wmax=110, rounds=["2026-08-14"])
-        v = bench.verdict(base, neu, strict_round=False)
-        self.assertEqual(v["art"], "guenstiger")
+        t = beurteile(laeufe("v1", 480, 500, 520, rnd="2026-05-02"),
+                      laeufe("v2", 90, 100, 110, rnd="2026-08-14"),
+                      strict_round=False).tabelle
+        self.assertEqual(t["t1::v2"]["urteil"]["art"], "guenstiger")
 
     def test_verschiedene_modelle_ergeben_kein_urteil(self):
-        base = mk("v1", median=500, wmin=480, wmax=520, models=["claude-opus-4-5"])
-        neu = mk("v2", median=100, wmin=90, wmax=110, models=["claude-opus-5"])
         # Auch ohne Rundensperre bleibt das Modell ein Ausschlussgrund.
-        v = bench.verdict(base, neu, strict_round=False)
+        t = beurteile(laeufe("v1", 480, 500, 520, models=["claude-opus-4-5"]),
+                      laeufe("v2", 90, 100, 110, models=["claude-opus-5"]),
+                      strict_round=False).tabelle
+        v = t["t1::v2"]["urteil"]
         self.assertEqual(v["art"], "modell-gemischt")
-        self.assertIn("nicht vergleichbar", bench.render_verdict(v))
+        self.assertIn("nicht vergleichbar", bericht.render_verdict(v))
 
     def test_geaenderte_testaufgabe_schlaegt_alles_andere(self):
-        base = mk("v1", median=500, wmin=480, wmax=520, shas=["aaa"])
-        neu = mk("v2", median=100, wmin=90, wmax=110, shas=["bbb"], models=["anderes"])
-        self.assertEqual(bench.verdict(base, neu)["art"], "aufgabe-geaendert")
+        t = beurteile(laeufe("v1", 480, 500, 520, sha="aaa"),
+                      laeufe("v2", 90, 100, 110, sha="bbb", models=["anderes"])).tabelle
+        self.assertEqual(t["t1::v2"]["urteil"]["art"], "aufgabe-geaendert")
 
     def test_eine_variante_aus_zwei_modellen_ist_selbst_schon_unvergleichbar(self):
-        base = mk("v1", median=500, wmin=480, wmax=520)
-        neu = mk("v2", median=100, wmin=90, wmax=110,
-                 models=["claude-opus-4-5", "claude-opus-5"])
-        self.assertEqual(bench.verdict(base, neu)["art"], "modell-gemischt")
+        t = beurteile(laeufe("v1", 480, 500, 520),
+                      laeufe("v2", 90, 100, 110,
+                             models=["claude-opus-4-5", "claude-opus-5"])).tabelle
+        self.assertEqual(t["t1::v2"]["urteil"]["art"], "modell-gemischt")
 
     def test_unbekannte_umgebung_blockiert_nicht(self):
         # Altdaten ohne Umgebungsfelder: None ist "unbekannt", nicht "abweichend".
-        base = mk("v1", median=500, wmin=480, wmax=520, rounds=[], models=[], shas=[])
-        neu = mk("v2", median=100, wmin=90, wmax=110, rounds=[], models=[], shas=[])
-        self.assertEqual(bench.verdict(base, neu)["art"], "guenstiger")
+        leer = {"rnd": None, "models": [None], "sha": None, "cli": None}
+        t = beurteile(laeufe("v1", 480, 500, 520, **leer),
+                      laeufe("v2", 90, 100, 110, **leer)).tabelle
+        self.assertEqual(t["t1::v2"]["urteil"]["art"], "guenstiger")
 
     def test_gleiche_runde_und_modell_urteilt_normal(self):
-        base = mk("v1", median=500, wmin=480, wmax=520)
-        neu = mk("v2", median=100, wmin=90, wmax=110)
-        self.assertEqual(bench.verdict(base, neu)["art"], "guenstiger")
+        t = beurteile(laeufe("v1", 480, 500, 520), laeufe("v2", 90, 100, 110)).tabelle
+        self.assertEqual(t["t1::v2"]["urteil"]["art"], "guenstiger")
 
 
 class RundenGruppierung(unittest.TestCase):
-    def test_attach_verdicts_vergleicht_nur_innerhalb_einer_runde(self):
-        summary = {
-            "t1::r1::v1": mk("v1", median=500, wmin=480, wmax=520, rnd="r1", rounds=["r1"]),
-            "t1::r1::v2": mk("v2", median=100, wmin=90, wmax=110, rnd="r1", rounds=["r1"]),
-            "t1::r2::v2": mk("v2", median=120, wmin=110, wmax=130, rnd="r2", rounds=["r2"]),
-            "t1::r2::v3": mk("v3", median=60, wmin=50, wmax=70, rnd="r2", rounds=["r2"]),
-        }
-        bench.attach_verdicts(summary, baseline="v2")
+    def test_urteil_faellt_nur_innerhalb_einer_runde(self):
+        t = beurteile(laeufe("v1", 480, 500, 520, rnd="r1"),
+                      laeufe("v2", 90, 100, 110, rnd="r1"),
+                      laeufe("v2", 110, 120, 130, rnd="r2"),
+                      laeufe("v3", 50, 60, 70, rnd="r2"),
+                      baseline="v2", je_runde=True).tabelle
         # v2 ist in beiden Runden Basis, v1 und v3 werden je gegen ihre eigene Runde geurteilt.
-        self.assertEqual(summary["t1::r1::v2"]["urteil"]["art"], "basis")
-        self.assertEqual(summary["t1::r2::v2"]["urteil"]["art"], "basis")
-        self.assertEqual(summary["t1::r1::v1"]["urteil"]["art"], "teurer")
-        self.assertEqual(summary["t1::r2::v3"]["urteil"]["art"], "guenstiger")
+        self.assertEqual(t["t1::r1::v2"]["urteil"]["art"], "basis")
+        self.assertEqual(t["t1::r2::v2"]["urteil"]["art"], "basis")
+        self.assertEqual(t["t1::r1::v1"]["urteil"]["art"], "teurer")
+        self.assertEqual(t["t1::r2::v3"]["urteil"]["art"], "guenstiger")
 
-    def test_summarize_trennt_runden_nur_auf_verlangen(self):
-        recs = []
-        for i, (w, rnd) in enumerate([(100, "r1"), (110, "r1"), (200, "r2"), (210, "r2")], 1):
-            recs.append(runs.build_record(
-                task="t1", variant="v1", run=i, project=Path("/p"), outcome="ok", note="",
-                measured=measured(w), env={"round": rnd, "model": "m", "cli_version": "c",
-                                           "prompt_sha": "aaa"}))
-        flach = bench.summarize(recs)
+    def test_runden_werden_nur_auf_verlangen_getrennt(self):
+        recs = laeufe("v1", 100, 110, rnd="r1") + laeufe("v1", 200, 210, rnd="r2")
+        flach = urteil.beurteile(recs, "v1").tabelle
         self.assertEqual(flach["t1::v1"]["n"], 4)
         self.assertEqual(flach["t1::v1"]["rounds"], ["r1", "r2"])
 
-        proRunde = bench.summarize(recs, group_round=True)
+        proRunde = urteil.beurteile(recs, "v1", je_runde=True).tabelle
         self.assertEqual(set(proRunde), {"t1::r1::v1", "t1::r2::v1"})
         self.assertEqual(proRunde["t1::r1::v1"]["weighted_median"], 105)
         self.assertEqual(proRunde["t1::r2::v1"]["weighted_median"], 205)
 
     def test_laeufe_ohne_runde_landen_in_einem_eigenen_topf(self):
-        rec = runs.build_record(task="t1", variant="v1", run=1, project=Path("/p"),
-                                 outcome="ok", note="", measured=measured(100))
-        s = bench.summarize([rec], group_round=True)
-        self.assertEqual(list(s), ["t1::ohne-runde::v1"])
-        self.assertEqual(s["t1::ohne-runde::v1"]["rounds"], [])
+        t = urteil.beurteile(laeufe("v1", 100, rnd=None), "v1", je_runde=True).tabelle
+        self.assertEqual(list(t), ["t1::ohne-runde::v1"])
+        self.assertEqual(t["t1::ohne-runde::v1"]["rounds"], [])
 
 
 class Verlauf(unittest.TestCase):
-    def test_trend_zeigt_delta_und_umgebungswechsel(self):
-        summary = {
-            "t1::r1::v2": mk("v2", rnd="2026-05-02", median=40000, models=["opus-4-5"]),
-            "t1::r2::v2": mk("v2", rnd="2026-08-14", median=44000, models=["opus-5"]),
-        }
-        t = bench.trend(summary)["t1::v2"]
-        self.assertEqual([p["round"] for p in t], ["2026-05-02", "2026-08-14"])
-        self.assertIsNone(t[0]["delta_zur_vorrunde"])
-        self.assertAlmostEqual(t[1]["delta_zur_vorrunde"], 0.1, places=4)
-        self.assertTrue(t[1]["umgebung_gewechselt"])
-        self.assertIn("Modell/CLI gewechselt", bench.render_trend({"t1::v2": t}))
+    def test_verlauf_zeigt_delta_und_umgebungswechsel(self):
+        b = beurteile(laeufe("v2", 40000, rnd="2026-05-02", models=["opus-4-5"]),
+                      laeufe("v2", 44000, rnd="2026-08-14", models=["opus-5"]),
+                      baseline="v2", je_runde=True)
+        reihe = b.verlauf["t1::v2"]
+        self.assertEqual([p["round"] for p in reihe], ["2026-05-02", "2026-08-14"])
+        self.assertIsNone(reihe[0]["delta_zur_vorrunde"])
+        self.assertAlmostEqual(reihe[1]["delta_zur_vorrunde"], 0.1, places=4)
+        self.assertTrue(reihe[1]["umgebung_gewechselt"])
+        self.assertIn("Modell/CLI gewechselt", bericht.render_trend(b.verlauf))
 
     def test_eine_einzelne_runde_ergibt_keinen_verlauf(self):
-        summary = {"t1::r1::v2": mk("v2", rnd="2026-05-02")}
-        self.assertEqual(bench.trend(summary), {})
-        self.assertIn("Nur eine Messrunde", bench.render_trend({}))
+        b = beurteile(laeufe("v2", 40000, rnd="2026-05-02"), baseline="v2", je_runde=True)
+        self.assertEqual(b.verlauf, {})
+        self.assertIn("Nur eine Messrunde", bericht.render_trend(b.verlauf))
+
+    def test_ohne_rundentrennung_gibt_es_keinen_verlauf(self):
+        b = beurteile(laeufe("v2", 40000, rnd="2026-05-02"),
+                      laeufe("v2", 44000, rnd="2026-08-14"), baseline="v2")
+        self.assertEqual(b.verlauf, {})
 
 
 class Messplan(unittest.TestCase):
@@ -190,9 +195,7 @@ class Messplan(unittest.TestCase):
         # load_records() darf den Plan nicht als Lauf einlesen.
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
-            runs.write_record(out, runs.build_record(
-                task="t1", variant="v1", run=1, project=Path("/p"), outcome="ok",
-                note="", measured=measured(100)))
+            runs.write_record(out, laeufe("v1", 100)[0])
             plans.save_plan(out, plans.new_plan("t1"))
             self.assertEqual(len(runs.load_records(out, "t1")), 1)
 
@@ -201,18 +204,16 @@ class Altdaten(unittest.TestCase):
     def test_laufdaten_ohne_umgebungsfelder_bleiben_lesbar(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
-            rec = runs.build_record(task="t1", variant="v1", run=1, project=Path("/p"),
-                                     outcome="ok", note="", measured=measured(100))
+            rec = laeufe("v1", 100)[0]
             for f in ("round", "model", "cli_version", "prompt_sha"):
                 del rec[f]
-            (out / "t1__v1__01.json").parent.mkdir(parents=True, exist_ok=True)
             import json
             (out / "t1__v1__01.json").write_text(json.dumps(rec), encoding="utf-8")
             geladen = runs.load_records(out, "t1")
             self.assertEqual(len(geladen), 1)
             self.assertIsNone(geladen[0]["round"])
-            # und sie fallen durch summarize, ohne dass ein Feld fehlt
-            self.assertEqual(bench.summarize(geladen)["t1::v1"]["models"], [])
+            # und sie fallen durch die Auswertung, ohne dass ein Feld fehlt
+            self.assertEqual(urteil.beurteile(geladen, "v1").tabelle["t1::v1"]["models"], [])
 
 
 if __name__ == "__main__":

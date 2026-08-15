@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import bench  # noqa: E402
 import plans  # noqa: E402
+import urteil  # noqa: E402
 
 
 def summary(*variants: str, task: str = "t1") -> dict[str, dict]:
@@ -96,20 +97,20 @@ class ResolveBaselines(unittest.TestCase):
 class SelectBase(unittest.TestCase):
     def test_mapping_je_task(self):
         variants = [{"task": "t2", "variant": v} for v in ("a", "b2")]
-        self.assertEqual(bench.select_base(variants, {"t1": "b1", "t2": "b2"}), "b2")
+        self.assertEqual(urteil.select_base(variants, {"t1": "b1", "t2": "b2"}), "b2")
 
     def test_einzelwert_gilt_fuer_alle(self):
         variants = [{"task": "t1", "variant": v} for v in ("a", "basis")]
-        self.assertEqual(bench.select_base(variants, "basis"), "basis")
+        self.assertEqual(urteil.select_base(variants, "basis"), "basis")
 
     def test_alphabet_wenn_basis_fehlt(self):
         variants = [{"task": "t1", "variant": v} for v in ("b", "a")]
-        self.assertEqual(bench.select_base(variants, None), "a")
+        self.assertEqual(urteil.select_base(variants, None), "a")
 
     def test_alphabet_wenn_basis_nicht_gemessen(self):
         """Eine Basis, zu der keine Laeufe vorliegen, darf nicht stillschweigend gelten."""
         variants = [{"task": "t1", "variant": v} for v in ("b", "a")]
-        self.assertEqual(bench.select_base(variants, {"t1": "nie-gemessen"}), "a")
+        self.assertEqual(urteil.select_base(variants, {"t1": "nie-gemessen"}), "a")
 
 
 if __name__ == "__main__":

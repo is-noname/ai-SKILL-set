@@ -16,6 +16,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# Gewichte in Input-Token-Aequivalenten, angelehnt an die Anthropic-Preisstruktur.
+# Ein Lauf, der den Cache schont, sieht in rohen Summen sonst schlechter aus als er ist.
+# Sie stehen hier, weil `weighted_tokens` ein Feld des Laufdatensatzes ist: wer die Gewichte
+# aendert, aendert die Bedeutung aller frueher geschriebenen Datensaetze - dann neu messen.
+WEIGHTS = {"input": 1.0, "cache_creation": 1.25, "cache_read": 0.1, "output": 5.0}
+
 # Felder, die build_record() garantiert belegt - Basis fuer summarize()'s Zugriff ohne .get().
 RECORD_FIELDS = (
     "task", "variant", "run", "project", "recorded_at", "outcome", "note",

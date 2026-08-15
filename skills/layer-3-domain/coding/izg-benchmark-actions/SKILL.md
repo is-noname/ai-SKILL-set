@@ -35,7 +35,7 @@ Rohe Tokensummen bestrafen Varianten, die den Cache gut nutzen. Verglichen wird 
 
 `input x1 + cache_creation x1,25 + cache_read x0,1 + output x5`
 
-Die Gewichte stehen in `scripts/bench.py` (`WEIGHTS`) und werden im Report mit ausgewiesen. Wer sie aendert, macht alte Laufdaten unvergleichbar — dann neu messen.
+Die Gewichte stehen in `scripts/runs.py` (`WEIGHTS`) und werden im Report mit ausgewiesen. Wer sie aendert, macht alte Laufdaten unvergleichbar — dann neu messen.
 
 ## Process
 
