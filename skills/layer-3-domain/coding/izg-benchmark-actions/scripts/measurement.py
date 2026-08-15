@@ -7,8 +7,8 @@ jedes spaetere Urteil. Sie lagen bisher in der Schleife von `cmd_run` und waren 
 nur mit einem echten `claude`-Aufruf erreichbar; testbar war allein `discard_reason()`,
 also die eine Zeile, die nie bricht.
 
-Die Ausfuehrung selbst steht deshalb hinter einem seam: `fahre()` bekommt sie als
-Aufrufparameter (Protokoll `Ausfuehrung`). Im Betrieb reicht `bench.py` den Adapter auf
+Die Ausfuehrung selbst steht deshalb hinter einem seam: `drive()` bekommt sie als
+Aufrufparameter (Protokoll `Executor`). Im Betrieb reicht `bench.py` den Adapter auf
 die echte CLI herein, im Test einen Fake, der Timeout, Fehler-Exitcode und fehlendes
 Transcript auf Kommando liefert. Zwei Adapter, also ein echter seam - keine Vorratshaltung.
 
@@ -34,7 +34,7 @@ import runs
 
 
 @dataclass(frozen=True)
-class Laufauftrag:
+class RunSpec:
     """Alles, was fuer die Laeufe *einer* Variante feststeht - die Konstante der Schleife.
 
     `env` traegt Messrunde, Modell, CLI-Version und Aufgaben-Pruefsumme; es wird
@@ -55,41 +55,41 @@ class Laufauftrag:
 
 
 @dataclass(frozen=True)
-class Laufergebnis:
+class RunResult:
     """Das Ergebnis eines einzelnen Laufs - verbucht oder verworfen, nie beides.
 
-    `verworfen` traegt den Grund im Klartext; ist es gesetzt, sind `record` und `pfad`
+    `discarded` traegt den Grund im Klartext; ist es gesetzt, sind `record` und `path`
     None und die Laufnummer bleibt fuer den naechsten Versuch frei.
     """
 
-    nummer: int
+    index: int
     run: int
     session_id: str
-    verworfen: str | None = None
+    discarded: str | None = None
     record: dict[str, Any] | None = None
-    pfad: Path | None = None
+    path: Path | None = None
 
 
-class Ausfuehrung(Protocol):
+class Executor(Protocol):
     """Der seam zur Aussenwelt: Shell, `claude -p` und das Transcript auf der Platte.
 
     Alles, was Geld kostet oder Dateien anfasst, liegt hinter diesen drei Methoden.
     """
 
-    def schalte_um(self, setup: str, project: Path) -> None:
+    def switch(self, setup: str, project: Path) -> None:
         """Stellt den Zustand der Variante her. Fehler bleiben ungeprueft - siehe SKILL.md."""
 
-    def starte(self, auftrag: Laufauftrag, session_id: str) -> dict[str, Any]:
+    def start(self, spec: RunSpec, session_id: str) -> dict[str, Any]:
         """Fuehrt einen Lauf aus. Wirft `subprocess.TimeoutExpired` bei Zeitueberschreitung."""
 
-    def miss(self, project: Path, session_id: str) -> dict[str, Any]:
+    def measure(self, project: Path, session_id: str) -> dict[str, Any]:
         """Liest das Transcript. Wirft `FileNotFoundError`, wenn es keines gibt."""
 
 
 def discard_reason(meta: dict[str, Any]) -> str | None:
     """Prueft Exitcode und CLI-Subtype eines Laufs auf Abbruch - ohne subprocess, ohne I/O.
 
-    `meta` ist die Rueckgabe von `Ausfuehrung.starte()`.
+    `meta` ist die Rueckgabe von `Executor.start()`.
     """
     if meta["exit_code"] != 0:
         return f"Exitcode {meta['exit_code']}"
@@ -99,48 +99,48 @@ def discard_reason(meta: dict[str, Any]) -> str | None:
     return None
 
 
-def _neue_session() -> str:
+def _new_session() -> str:
     return str(uuid.uuid4())
 
 
-def fahre(out: Path, auftrag: Laufauftrag, wiederholungen: int, ausfuehrung: Ausfuehrung,
+def drive(out: Path, spec: RunSpec, repeats: int, executor: Executor,
           *,
-          neue_session: Callable[[], str] = _neue_session,
-          melde: Callable[[int, int, int, str], None] | None = None,
-          ) -> Iterator[Laufergebnis]:
-    """Faehrt `wiederholungen` Laeufe einer Variante und verbucht, was zaehlt.
+          new_session: Callable[[], str] = _new_session,
+          notify: Callable[[int, int, int, str], None] | None = None,
+          ) -> Iterator[RunResult]:
+    """Faehrt `repeats` Laeufe einer Variante und verbucht, was zaehlt.
 
     Generator statt Liste: ein Lauf dauert Minuten, der Aufrufer soll nach jedem einzelnen
-    ausgeben koennen statt am Ende alles auf einmal. `melde` wird *vor* dem Start gerufen
+    ausgeben koennen statt am Ende alles auf einmal. `notify` wird *vor* dem Start gerufen
     (Nummer, Gesamtzahl, Laufnummer, Session-ID), damit waehrend eines langen Laufs
     ueberhaupt etwas auf dem Schirm steht.
     """
-    for i in range(1, wiederholungen + 1):
-        run = runs.next_run_index(out, auftrag.task, auftrag.variant)
-        if auftrag.setup:
-            ausfuehrung.schalte_um(auftrag.setup, auftrag.project)
-        sid = neue_session()
-        if melde:
-            melde(i, wiederholungen, run, sid)
+    for i in range(1, repeats + 1):
+        run = runs.next_run_index(out, spec.task, spec.variant)
+        if spec.setup:
+            executor.switch(spec.setup, spec.project)
+        sid = new_session()
+        if notify:
+            notify(i, repeats, run, sid)
 
         try:
-            meta = ausfuehrung.starte(auftrag, sid)
+            meta = executor.start(spec, sid)
         except subprocess.TimeoutExpired:
-            yield Laufergebnis(i, run, sid, verworfen=f"Timeout nach {auftrag.timeout} s")
+            yield RunResult(i, run, sid, discarded=f"Timeout nach {spec.timeout} s")
             continue
 
-        if grund := discard_reason(meta):
-            yield Laufergebnis(i, run, sid, verworfen=grund)
+        if reason := discard_reason(meta):
+            yield RunResult(i, run, sid, discarded=reason)
             continue
 
         try:
-            measured = ausfuehrung.miss(auftrag.project, sid)
+            measured = executor.measure(spec.project, sid)
         except FileNotFoundError as exc:
-            yield Laufergebnis(i, run, sid, verworfen=str(exc))
+            yield RunResult(i, run, sid, discarded=str(exc))
             continue
 
-        rec = runs.build_record(task=auftrag.task, variant=auftrag.variant, run=run,
-                                project=auftrag.project, outcome=auftrag.outcome,
-                                note=auftrag.note, measured=measured, meta=meta,
-                                prompt_chars=len(auftrag.prompt), env=auftrag.env)
-        yield Laufergebnis(i, run, sid, record=rec, pfad=runs.write_record(out, rec))
+        rec = runs.build_record(task=spec.task, variant=spec.variant, run=run,
+                                project=spec.project, outcome=spec.outcome,
+                                note=spec.note, measured=measured, meta=meta,
+                                prompt_chars=len(spec.prompt), env=spec.env)
+        yield RunResult(i, run, sid, record=rec, path=runs.write_record(out, rec))

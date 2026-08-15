@@ -15,9 +15,9 @@ Nutzung:
     bench.py plan show --task t1      # gespeicherte Messdefinition
 
 Diese Datei ist die Kommandozeile und sonst nichts. Was sie zusammenschaltet:
-`ausfuehrung.py` (CLI-Aufruf und Messung), `messlauf.py` (Schleife und Verwerfung),
-`runs.py` (Laufdatensatz), `plans.py` (Messplan), `urteil.py` (das Urteil),
-`bericht.py` (die Darstellung).
+`execution.py` (CLI-Aufruf und Messung), `measurement.py` (Schleife und Verwerfung),
+`runs.py` (Laufdatensatz), `plans.py` (Messplan), `verdict.py` (das Urteil),
+`report.py` (die Darstellung).
 
 Alle Laufdaten liegen als JSON unter --out (Default: ~/.local/share/izg-bench).
 """
@@ -31,12 +31,12 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-import ausfuehrung
-import bericht
-import messlauf
+import execution
+import measurement
 import plans
+import report
 import runs
-import urteil
+import verdict
 
 OUTCOMES = ("ok", "partial", "fail", "unset")
 
@@ -109,27 +109,27 @@ def cmd_run(args: argparse.Namespace) -> int:
     plan["prompt_sha"] = sha
     plans.save_plan(out, plan)
 
-    messrunde = args.round or date.today().isoformat()
-    env = {"round": messrunde, "model": values["model"],
-           "cli_version": ausfuehrung.cli_version(), "prompt_sha": sha}
-    print(f"Messrunde {messrunde}, Modell {values['model'] or '(CLI-Default)'}, "
+    round_id = args.round or date.today().isoformat()
+    env = {"round": round_id, "model": values["model"],
+           "cli_version": execution.cli_version(), "prompt_sha": sha}
+    print(f"Messrunde {round_id}, Modell {values['model'] or '(CLI-Default)'}, "
           f"CLI {env['cli_version'] or '?'}")
 
-    auftrag = messlauf.Laufauftrag(
+    spec = measurement.RunSpec(
         task=args.task, variant=args.variant, project=project, prompt=prompt,
         outcome=args.outcome, note=args.note, setup=setup, model=values["model"],
         permission_mode=permission_mode, timeout=timeout, env=env)
 
-    def melde(i: int, gesamt: int, run: int, sid: str) -> None:
-        print(f"[{i}/{gesamt}] {args.task}/{args.variant} run {run} session {sid}")
+    def notify(i: int, total: int, run: int, sid: str) -> None:
+        print(f"[{i}/{total}] {args.task}/{args.variant} run {run} session {sid}")
 
-    for erg in messlauf.fahre(out, auftrag, args.repeat,
-                              ausfuehrung.ClaudeAusfuehrung(), melde=melde):
-        if erg.verworfen:
-            print(f"  {erg.verworfen} - Lauf wird nicht verbucht.")
+    for res in measurement.drive(out, spec, args.repeat,
+                                 execution.ClaudeExecutor(), notify=notify):
+        if res.discarded:
+            print(f"  {res.discarded} - Lauf wird nicht verbucht.")
             continue
-        print(f"  gewichtet {erg.record['weighted_tokens']:,}".replace(",", ".")
-              + f" Tokens, {erg.record['duration_s']} s -> {erg.pfad}")
+        print(f"  gewichtet {res.record['weighted_tokens']:,}".replace(",", ".")
+              + f" Tokens, {res.record['duration_s']} s -> {res.path}")
     return 0
 
 
@@ -137,13 +137,13 @@ def cmd_measure(args: argparse.Namespace) -> int:
     project = Path(args.project or os.getcwd()).resolve()
     out = Path(args.out)
     try:
-        measured = ausfuehrung.measure_session(project, args.session_id)
+        measured = execution.measure_session(project, args.session_id)
     except FileNotFoundError as exc:
         print(exc)
         return 1
     run = args.run or runs.next_run_index(out, args.task, args.variant)
     env = {"round": args.round or date.today().isoformat(), "model": args.model,
-           "cli_version": ausfuehrung.cli_version(), "prompt_sha": None}
+           "cli_version": execution.cli_version(), "prompt_sha": None}
     rec = runs.build_record(task=args.task, variant=args.variant, run=run, project=project,
                              outcome=args.outcome, note=args.note, measured=measured, env=env)
     print(f"verbucht: {runs.write_record(out, rec)}")
@@ -173,9 +173,9 @@ def cmd_compare(args: argparse.Namespace) -> int:
         print(f"Keine Laufdaten unter {args.out}.")
         return 1
     baselines, notes = plans.resolve_baselines(out, (r["task"] for r in recs), args.baseline)
-    beurteilt = urteil.beurteile(recs, baselines, strict_round=not args.across_rounds)
-    print(json.dumps(urteil.zu_json(beurteilt.tabelle), ensure_ascii=False, indent=2)
-          if args.json else bericht.report(beurteilt.tabelle, baselines))
+    judged = verdict.judge(recs, baselines, strict_round=not args.across_rounds)
+    print(json.dumps(verdict.to_json(judged.table), ensure_ascii=False, indent=2)
+          if args.json else report.render_table(judged.table, baselines))
     for n in notes:
         print(n)
     if args.across_rounds:
@@ -191,14 +191,14 @@ def cmd_history(args: argparse.Namespace) -> int:
         print(f"Keine Laufdaten unter {args.out}.")
         return 1
     baselines, notes = plans.resolve_baselines(out, (r["task"] for r in recs), args.baseline)
-    beurteilt = urteil.beurteile(recs, baselines, je_runde=True)
+    judged = verdict.judge(recs, baselines, per_round=True)
     if args.json:
-        print(json.dumps({"runden": urteil.zu_json(beurteilt.tabelle),
-                          "verlauf": urteil.zu_json(beurteilt.verlauf)},
+        print(json.dumps({"rounds": verdict.to_json(judged.table),
+                          "history": verdict.to_json(judged.history)},
                          ensure_ascii=False, indent=2))
     else:
-        print(bericht.report(beurteilt.tabelle, baselines, show_round=True))
-        print(bericht.render_trend(beurteilt.verlauf))
+        print(report.render_table(judged.table, baselines, show_round=True))
+        print(report.render_trend(judged.history))
     for n in notes:
         print(n)
     return 0
@@ -212,8 +212,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
             print(f"Keine Messplaene unter {plans.plans_dir(out)}.")
             return 1
         for p in found:
-            varianten = ", ".join(sorted(p.get("variants") or {})) or "-"
-            print(f"{p['task']}: Varianten [{varianten}], Basis {p.get('baseline') or '-'}, "
+            variants = ", ".join(sorted(p.get("variants") or {})) or "-"
+            print(f"{p['task']}: Varianten [{variants}], Basis {p.get('baseline') or '-'}, "
                   f"Modell {p.get('model') or '-'}, "
                   f"zuletzt {p.get('updated_at') or p.get('created_at')}")
         return 0

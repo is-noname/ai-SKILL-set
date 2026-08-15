@@ -3,8 +3,11 @@
 
 Die Trennung Wert/Darstellung ist der Grund, warum `--json` und die Markdown-Tabelle
 dieselbe Entscheidung tragen: hier wird kein Urteil gefaellt, hier wird eines gelesen.
-Jede Zeile bekommt ihr Urteil bereits fertig aus `urteil.py` und wird nur noch in einen
+Jede Zeile bekommt ihr Urteil bereits fertig aus `verdict.py` und wird nur noch in einen
 deutschen Satz gesetzt. Wer hier eine Regel einbaut, hat zwei Wahrheiten im Skill.
+
+Dies ist auch die einzige Stelle, an der aus englischen Codenamen deutsche Woerter
+werden - `KIND_TEXT` uebersetzt die Urteilsart, sonst nichts.
 """
 
 from __future__ import annotations
@@ -12,34 +15,38 @@ from __future__ import annotations
 from typing import Any
 
 import runs
-import urteil
+import verdict
+
+# Urteilsart -> das Wort, das im Report steht. Die einzige Sprachgrenze des Skills.
+KIND_TEXT = {"cheaper": "guenstiger", "costlier": "teurer"}
 
 
 def render_verdict(v: dict[str, Any]) -> str:
     """Rendert einen Urteilswert als deutschen Satz - Wortlaut zeichengleich zur Vorversion."""
-    art = v["art"]
-    if art == "basis":
+    kind = v["kind"]
+    if kind == "baseline":
         return "Basis"
-    if art == "keine-daten":
+    if kind == "no-data":
         return "keine Daten"
-    if art == "aufgabe-geaendert":
+    if kind == "task-changed":
         return "Testaufgabe geaendert - nicht vergleichbar"
-    if art == "modell-gemischt":
-        return "verschiedene Modelle (" + ", ".join(v["modelle"]) + ") - nicht vergleichbar"
-    if art == "runden-gemischt":
+    if kind == "model-mixed":
+        return "verschiedene Modelle (" + ", ".join(v["models"]) + ") - nicht vergleichbar"
+    if kind == "rounds-mixed":
         return "verschiedene Messrunden - Basis neu messen"
-    if art == "ertrag-offen":
+    if kind == "outcome-open":
         return "Ertrag offen"
-    zusatz = f", n={v['n_variante']} - ungesichert" if v.get("duenn") else ""
-    if art == "kein-unterschied":
-        return f"kein belastbarer Unterschied (Spannen ueberlappen{zusatz})"
+    extra = f", n={v['n_variant']} - ungesichert" if v.get("thin") else ""
+    if kind == "no-difference":
+        return f"kein belastbarer Unterschied (Spannen ueberlappen{extra})"
+    wort = KIND_TEXT[kind]
     if v["delta"] is None:
-        return f"{art} (Basis-Median 0{zusatz})"
-    return f"{art} um {abs(v['delta']) * 100:.0f} %" + (f" ({zusatz.lstrip(', ')})" if zusatz else "")
+        return f"{wort} (Basis-Median 0{extra})"
+    return f"{wort} um {abs(v['delta']) * 100:.0f} %" + (f" ({extra.lstrip(', ')})" if extra else "")
 
 
-def report(summary: dict["urteil.Kennung", dict[str, Any]], baseline: "urteil.Basis" = None,
-           show_round: bool = False) -> str:
+def render_table(summary: dict["verdict.Key", dict[str, Any]],
+                 baseline: "verdict.Baseline" = None, show_round: bool = False) -> str:
     """Die Vergleichstabelle je Testaufgabe. `summary` ist eine beurteilte Tabelle."""
     by_task: dict[str, list[dict[str, Any]]] = {}
     for s in summary.values():
@@ -48,7 +55,7 @@ def report(summary: dict["urteil.Kennung", dict[str, Any]], baseline: "urteil.Ba
     out: list[str] = ["# Benchmark"]
     for task, variants in sorted(by_task.items()):
         variants.sort(key=lambda v: ((v.get("round") or ""), v["variant"]))
-        base_name = urteil.select_base(variants, baseline)
+        base_name = verdict.select_base(variants, baseline)
 
         head = "| Runde " if show_round else ""
         sep = "|---" if show_round else ""
@@ -60,21 +67,21 @@ def report(summary: dict["urteil.Kennung", dict[str, Any]], baseline: "urteil.Ba
                     if v["weighted_min"] is not None else "-")
             med = (f"{v['weighted_median']:,}".replace(",", ".")
                    if v["weighted_median"] is not None else "-")
-            ertrag = ", ".join(f"{k}:{n}" for k, n in sorted(v["outcomes"].items()))
-            urteilstext = render_verdict(v["urteil"])
+            outcome = ", ".join(f"{k}:{n}" for k, n in sorted(v["outcomes"].items()))
+            verdict_text = render_verdict(v["verdict"])
             prefix = f"| {v.get('round') or '-'} " if show_round else ""
             out.append(
                 prefix + f"| {v['variant']} | {v['n']} | {med} | {span} | "
                 f"{v['cost_median'] if v['cost_median'] is not None else '-'} | "
                 f"{v['turns_median'] if v['turns_median'] is not None else '-'} | "
-                f"{v['cache_hit_median'] * 100:.0f} % | {ertrag} | {urteilstext} |")
+                f"{v['cache_hit_median'] * 100:.0f} % | {outcome} | {verdict_text} |")
 
     out += ["", f"Gewichtung: " + ", ".join(f"{k} x{w}" for k, w in runs.WEIGHTS.items()) + ".",
             "Tool-Result-Tokens sind aus der Zeichenlaenge geschaetzt, die usage-Werte sind exakt."]
     return "\n".join(out)
 
 
-def render_trend(trends: dict["urteil.Kennung", list[dict[str, Any]]]) -> str:
+def render_trend(trends: dict["verdict.Key", list[dict[str, Any]]]) -> str:
     if not trends:
         return ("\n## Verlauf\n\nNur eine Messrunde vorhanden - kein Verlauf. "
                 "Fuer den Vergleich ueber die Zeit dieselbe Variante in einer zweiten "
@@ -82,12 +89,12 @@ def render_trend(trends: dict["urteil.Kennung", list[dict[str, Any]]]) -> str:
     out = ["", "## Verlauf ueber die Messrunden", "",
            "Beobachtung mit Datum, kein Beleg: zwischen den Runden liegt mehr als die "
            "Optimierung. Belastbar ist nur ein Urteil innerhalb einer Runde."]
-    for key, reihe in sorted(trends.items()):
-        out += ["", f"**{key.task} / {key.variante}**", ""]
-        for p in reihe:
+    for key, series in sorted(trends.items()):
+        out += ["", f"**{key.task} / {key.variant}**", ""]
+        for p in series:
             med = f"{p['weighted_median']:,}".replace(",", ".")
-            d = (f" ({p['delta_zur_vorrunde'] * 100:+.0f} %)"
-                 if p["delta_zur_vorrunde"] is not None else "")
-            warn = "  <- Modell/CLI gewechselt" if p["umgebung_gewechselt"] else ""
+            d = (f" ({p['delta_to_prev_round'] * 100:+.0f} %)"
+                 if p["delta_to_prev_round"] is not None else "")
+            warn = "  <- Modell/CLI gewechselt" if p["env_changed"] else ""
             out.append(f"- {p['round']}: {med} gew. Tokens (n={p['n']}){d}{warn}")
     return "\n".join(out)

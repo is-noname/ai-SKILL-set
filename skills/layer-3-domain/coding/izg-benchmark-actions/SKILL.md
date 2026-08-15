@@ -16,18 +16,22 @@ Ein Ablauf ist alles, was sich als Prompt ausloesen laesst: ein Skill, ein Slash
 
 ## Vokabular
 
-- **Testaufgabe** — der identische Prompt, den alle Varianten bearbeiten. Die Konstante des Versuchs
-- **Variante** — eine der verglichenen Fassungen (`ohne-skill`, `mit-skill`, `v2`)
-- **Lauf** — eine einzelne Ausfuehrung einer Variante, mit eigener Session-ID
-- **Gewichtete Tokens** — Verbrauch in Input-Token-Aequivalenten (siehe unten). Die Vergleichsgroesse
-- **Spanne** — Minimum bis Maximum ueber die Laeufe einer Variante. Ohne Spanne kein Urteil
-- **Ertrag** — hat der Lauf die Testaufgabe geloest: `ok`, `partial`, `fail`
-- **Basis** — die Variante, gegen die verglichen wird
-- **Urteil** — guenstiger/teurer um X %, oder "kein belastbarer Unterschied"
-- **Messrunde** — alle Laeufe, die zu einem Zeitpunkt unter derselben Umgebung entstanden sind. Nur innerhalb einer Runde wird geurteilt
-- **Messplan** — die festgehaltene Definition einer Messung (Testaufgabe, Projekt, Modell, Umschaltkommandos). Macht sie Monate spaeter wiederholbar
+Deutsch fuer alles, was jemand liest — Codename in Klammern. Der Code kennt nur den Codenamen, uebersetzt wird ausschliesslich in `scripts/report.py`.
+
+- **Testaufgabe** (`task`) — der identische Prompt, den alle Varianten bearbeiten. Die Konstante des Versuchs
+- **Variante** (`variant`) — eine der verglichenen Fassungen (`ohne-skill`, `mit-skill`, `v2`)
+- **Lauf** (`run`) — eine einzelne Ausfuehrung einer Variante, mit eigener Session-ID
+- **Gewichtete Tokens** (`weighted_tokens`) — Verbrauch in Input-Token-Aequivalenten (siehe unten). Die Vergleichsgroesse
+- **Spanne** (`weighted_min`/`weighted_max`, im Urteil `baseline_range`/`variant_range`) — Minimum bis Maximum ueber die Laeufe einer Variante. Ohne Spanne kein Urteil
+- **Ertrag** (`outcome`) — hat der Lauf die Testaufgabe geloest: `ok`, `partial`, `fail`
+- **Basis** (`baseline`) — die Variante, gegen die verglichen wird
+- **Urteil** (`verdict`, Art als `kind`: `cheaper`, `costlier`, `no-difference`, …) — guenstiger/teurer um X %, oder "kein belastbarer Unterschied"
+- **Messrunde** (`round`) — alle Laeufe, die zu einem Zeitpunkt unter derselben Umgebung entstanden sind. Nur innerhalb einer Runde wird geurteilt
+- **Messplan** (`plan`) — die festgehaltene Definition einer Messung (Testaufgabe, Projekt, Modell, Umschaltkommandos). Macht sie Monate spaeter wiederholbar
 
 Nicht in "Performance", "Benchmark-Score" oder "Effizienz" abdriften. Es gibt keine Punktzahl, nur Kosten und Ertrag.
+
+Die Module tragen dieselben Begriffe: `verdict.py` (das Urteil), `report.py` (die Darstellung), `measurement.py` (der Messlauf), `execution.py` (der Adapter auf CLI und Transcript), `runs.py` (Laufdatensatz), `plans.py` (Messplan), `bench.py` (Kommandozeile).
 
 ## Warum gewichtet
 

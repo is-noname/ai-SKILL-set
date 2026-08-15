@@ -2,9 +2,9 @@
 """Der Adapter auf die echte Welt - Shell, `claude -p` und das Transcript auf der Platte.
 
 Alles, was Geld kostet oder Dateien anfasst, liegt hier: der Aufruf der CLI, das Lesen
-des Transcripts und die Verbuchung seines Verbrauchs ueber die Gewichte. `messlauf.fahre()`
-kennt davon nichts - es bekommt eine `Ausfuehrung` hereingereicht und ruft drei Methoden.
-Im Betrieb ist das `ClaudeAusfuehrung`, im Test ein Fake.
+des Transcripts und die Verbuchung seines Verbrauchs ueber die Gewichte. `measurement.drive()`
+kennt davon nichts - es bekommt einen `Executor` hereingereicht und ruft drei Methoden.
+Im Betrieb ist das `ClaudeExecutor`, im Test ein Fake.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-import messlauf
+import measurement
 import runs
 import transcript
 
@@ -80,15 +80,15 @@ def execute_run(prompt: str, project: Path, session_id: str, model: str | None,
     }
 
 
-class ClaudeAusfuehrung:
+class ClaudeExecutor:
     """Der einzige Teil des Messlaufs, der Geld kostet - und der einzige, den der Test ersetzt."""
 
-    def schalte_um(self, setup: str, project: Path) -> None:
+    def switch(self, setup: str, project: Path) -> None:
         subprocess.run(setup, shell=True, cwd=str(project), check=False)
 
-    def starte(self, auftrag: messlauf.Laufauftrag, session_id: str) -> dict[str, Any]:
-        return execute_run(auftrag.prompt, auftrag.project, session_id, auftrag.model,
-                           auftrag.permission_mode, auftrag.timeout)
+    def start(self, spec: measurement.RunSpec, session_id: str) -> dict[str, Any]:
+        return execute_run(spec.prompt, spec.project, session_id, spec.model,
+                           spec.permission_mode, spec.timeout)
 
-    def miss(self, project: Path, session_id: str) -> dict[str, Any]:
+    def measure(self, project: Path, session_id: str) -> dict[str, Any]:
         return measure_session(project, session_id)

@@ -44,9 +44,9 @@ Task-Kennung, Datum, Modell, Anzahl Laeufe je Variante. Eine Zeile Datenbasis: *
 
 ## Urteil — steht oben
 
-Quelle ist das `urteil`-Feld, das `compare --json` je Variante mitliefert (Art plus
-Belegzahlen wie Delta, Spannen oder Ertragsstand). Die Karte uebersetzt die Art in
-den passenden Satz — sie erfindet keine eigene Formulierung dazu.
+Quelle ist das `verdict`-Feld, das `compare --json` je Variante mitliefert (Art `kind`
+plus Belegzahlen wie `delta`, `baseline_range`/`variant_range` oder `outcomes`). Die
+Karte uebersetzt die Art in den passenden Satz — sie erfindet keine eigene Formulierung dazu.
 
 Anders als beim Token-Review kommt das Ergebnis **zuerst**, nicht zum Schluss. Eine grosse Karte:
 
@@ -55,9 +55,9 @@ Anders als beim Token-Review kommt das Ergebnis **zuerst**, nicht zum Schluss. E
 
 Bei ueberlappenden Spannen wird der Satz genauso gross gesetzt: *"Kein belastbarer Unterschied."* Kein kleingedrucktes Ausweichen auf Mediane, keine amber getoente Hoffnung. Ein Nullergebnis ist ein Ergebnis.
 
-Ebenso gross gesetzt werden die Unvergleichbarkeits-Arten (`aufgabe-geaendert`, `modell-gemischt`, `runden-gemischt`): *"Nicht vergleichbar — die Basis stammt aus einer anderen Messrunde."* Darunter, was fehlt, um doch ein Urteil zu bekommen. Ein Report, der diesen Zustand als vorsichtige Prozentzahl tarnt, ist schlimmer als keiner.
+Ebenso gross gesetzt werden die Unvergleichbarkeits-Arten (`task-changed`, `model-mixed`, `rounds-mixed`): *"Nicht vergleichbar — die Basis stammt aus einer anderen Messrunde."* Darunter, was fehlt, um doch ein Urteil zu bekommen. Ein Report, der diesen Zustand als vorsichtige Prozentzahl tarnt, ist schlimmer als keiner.
 
-Bei einem Report ueber mehrere Messrunden (`history --json`) steht der Verlauf **unter** dem Urteilsteil und in schwaecherer Betonung — er ist Beobachtung mit Datum, kein Beleg. Runden, in denen Modell oder CLI-Version gewechselt haben (`umgebung_gewechselt`), werden an der Stelle markiert, nicht in einer Fussnote.
+Bei einem Report ueber mehrere Messrunden (`history --json`) steht der Verlauf **unter** dem Urteilsteil und in schwaecherer Betonung — er ist Beobachtung mit Datum, kein Beleg. Runden, in denen Modell oder CLI-Version gewechselt haben (`env_changed`), werden an der Stelle markiert, nicht in einer Fussnote.
 
 ## Vergleichs-Abschnitt
 
