@@ -6,11 +6,8 @@ content-Gestalten) ist dorthin ausgelagert (IZG-T-139) - hier bleibt nur die
 Weiterreichung, damit `import transcript` in diesem Skillordner unveraendert
 funktioniert (bench.py, tests/test_transcript.py).
 
-Ueber `importlib` statt `import transcript`: diese Datei heisst selbst
-`transcript.py`, ein normaler `import transcript` innerhalb dieser Datei
-wuerde in sys.modules auf sich selbst zurueckverweisen (noch unfertig
-initialisiert) statt das gleichnamige Modul aus izg-transcript-reader zu
-laden.
+Lade-Mechanik und Re-Export liegen in `locate.py` des Readers (IZG-T-146);
+hier steht nur noch der Bootstrap, der ihn ueberhaupt erst auffindbar macht.
 
 Interface: unveraendert - transcript_path() zum Auffinden, read_session()
 zum Einlesen.
@@ -18,45 +15,41 @@ zum Einlesen.
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 from pathlib import Path
 
-
-def _load_shared_transcript():
-    """Loest den Skillgrenzen-uebergreifenden Import zur Laufzeit auf.
-
-    Nach `pull_skill.py` liegen Skills flach nebeneinander
-    (.claude/skills/<name>/), im Repo dagegen verschachtelt nach Layer. Ein
-    fester relativer Import haelt daher nur in einer der beiden Welten.
-    """
-    skill_root = Path(__file__).resolve().parent.parent
-    candidates = [
-        skill_root.parent / "izg-transcript-reader" / "scripts" / "transcript.py",  # Zielprojekt (flach)
-        skill_root.parent.parent.parent / "layer-1-base" / "izg-transcript-reader"
-        / "scripts" / "transcript.py",  # Repo
-    ]
-    for path in candidates:
-        if path.is_file():
-            spec = importlib.util.spec_from_file_location("_izg_transcript_reader", path)
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[spec.name] = module
-            spec.loader.exec_module(module)
-            return module
+# --- Bootstrap izg-transcript-reader (bewusst identisch in jedem konsumierenden
+# Skill): muss vor jedem Import aus dem Reader laufen und kann daher nicht
+# selbst dorthin wandern. Nach dem Pull liegen Skills flach nebeneinander
+# (.claude/skills/<name>/), im Repo verschachtelt nach Layer - ein fester
+# relativer Import haelt nur in einer der beiden Welten.
+_READER = "izg-transcript-reader"
+_skill_root = Path(__file__).resolve().parent.parent
+_candidates = [
+    _skill_root.parent / _READER / "scripts",  # Zielprojekt (flach)
+    _skill_root.parent.parent.parent / "layer-1-base" / _READER / "scripts",  # Repo
+]
+for _c in _candidates:
+    if (_c / "locate.py").is_file():
+        sys.path.insert(0, str(_c))
+        break
+else:
     raise ImportError(
-        "izg-transcript-reader nicht gefunden. Erwartet unter "
-        f"{candidates[0]} (Zielprojekt) oder {candidates[1]} (Repo). "
-        "Skill fehlt in den dependencies oder wurde nicht mitgepullt."
+        f"{_READER} nicht gefunden. Erwartet unter {_candidates[0]} (Zielprojekt) "
+        f"oder {_candidates[1]} (Repo). Skill fehlt in den dependencies oder "
+        "wurde nicht mitgepullt."
     )
 
+import locate as _locate  # noqa: E402
+# --- Ende Bootstrap
 
-_shared = _load_shared_transcript()
-
-# Re-Export des kompletten oeffentlichen Interfaces - Aufrufer und Tests
-# greifen weiterhin ueber dieses Modul zu.
-SessionUsage = _shared.SessionUsage
-CHARS_PER_TOKEN = _shared.CHARS_PER_TOKEN
-project_slug = _shared.project_slug
-transcript_path = _shared.transcript_path
-find_transcripts = _shared.find_transcripts
-read_session = _shared.read_session
+# Re-Export des genutzten Interfaces - Aufrufer und Tests greifen weiterhin
+# ueber dieses Modul zu.
+_shared = _locate.re_export(globals(), [
+    "SessionUsage",
+    "CHARS_PER_TOKEN",
+    "project_slug",
+    "transcript_path",
+    "find_transcripts",
+    "read_session",
+])

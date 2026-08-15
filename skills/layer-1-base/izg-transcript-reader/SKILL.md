@@ -53,6 +53,26 @@ Nach dem Pull liegen Skills flach nebeneinander (`.claude/skills/<name>/`),
 im Repo dagegen verschachtelt nach Layer. Ein fester relativer Import haelt
 nur in einer der beiden Welten - konsumierende Skills loesen den Pfad daher
 zur Laufzeit auf (erst Zielprojekt-Layout, dann Repo-Layout, sonst klare
-Fehlermeldung). Siehe `scripts/analyze_transcript.py` bzw.
-`scripts/transcript.py` in `izg-improve-token-usage` / `izg-benchmark-actions`
-fuer das Muster.
+Fehlermeldung).
+
+Der Bootstrap dafuer ist in jedem konsumierenden Skill wortgleich und muss es
+bleiben: er laeuft zwangslaeufig *vor* jedem Import aus diesem Skill und kann
+daher nicht hierher wandern (IZG-T-146). Alles danach steht in `scripts/locate.py`:
+
+```python
+# ... Bootstrap: Kandidatenpfade pruefen, sys.path setzen ...
+import locate as _locate
+
+_t = _locate.re_export(globals(), ["CHARS_PER_TOKEN", "find_transcripts"])
+```
+
+- `load(name="transcript") -> module` - laedt ein Modul dieses Skills unter
+  eindeutigem sys.modules-Namen. Noetig, weil ein konsumierender Shim selbst
+  `transcript.py` heissen darf, ohne sich beim Import selbst zu treffen.
+- `re_export(namespace, names, module=None) -> module` - uebernimmt die
+  genannten Namen ins Aufrufer-Namespace und meldet Interface-Drift als
+  ImportError statt als spaeteres AttributeError.
+
+Vorlage zum Kopieren: der Bootstrap-Block in `scripts/transcript.py`
+(`izg-benchmark-actions`) bzw. `scripts/analyze_transcript.py`
+(`izg-improve-token-usage`).

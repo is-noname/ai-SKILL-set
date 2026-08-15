@@ -31,42 +31,44 @@ from pathlib import Path
 from typing import Any
 
 
-def _load_transcript_adapter() -> None:
-    """Loest den Skillgrenzen-uebergreifenden Import zur Laufzeit auf.
-
-    Nach `pull_skill.py` liegen Skills flach nebeneinander
-    (.claude/skills/<name>/), im Repo dagegen verschachtelt nach Layer. Ein
-    fester relativer Import haelt daher nur in einer der beiden Welten.
-    """
-    skill_root = Path(__file__).resolve().parent.parent
-    candidates = [
-        skill_root.parent / "izg-transcript-reader" / "scripts",  # Zielprojekt (flach)
-        skill_root.parent.parent.parent / "layer-1-base" / "izg-transcript-reader" / "scripts",  # Repo
-    ]
-    for c in candidates:
-        if (c / "transcript.py").is_file():
-            sys.path.insert(0, str(c))
-            return
+# --- Bootstrap izg-transcript-reader (bewusst identisch in jedem konsumierenden
+# Skill): muss vor jedem Import aus dem Reader laufen und kann daher nicht
+# selbst dorthin wandern. Nach dem Pull liegen Skills flach nebeneinander
+# (.claude/skills/<name>/), im Repo verschachtelt nach Layer - ein fester
+# relativer Import haelt nur in einer der beiden Welten.
+_READER = "izg-transcript-reader"
+_skill_root = Path(__file__).resolve().parent.parent
+_candidates = [
+    _skill_root.parent / _READER / "scripts",  # Zielprojekt (flach)
+    _skill_root.parent.parent.parent / "layer-1-base" / _READER / "scripts",  # Repo
+]
+for _c in _candidates:
+    if (_c / "locate.py").is_file():
+        sys.path.insert(0, str(_c))
+        break
+else:
     raise ImportError(
-        "izg-transcript-reader nicht gefunden. Erwartet unter "
-        f"{candidates[0]} (Zielprojekt) oder {candidates[1]} (Repo). "
-        "Skill fehlt in den dependencies oder wurde nicht mitgepullt."
+        f"{_READER} nicht gefunden. Erwartet unter {_candidates[0]} (Zielprojekt) "
+        f"oder {_candidates[1]} (Repo). Skill fehlt in den dependencies oder "
+        "wurde nicht mitgepullt."
     )
 
+import locate as _locate  # noqa: E402
+# --- Ende Bootstrap
 
-_load_transcript_adapter()
-import transcript as _t  # noqa: E402
 from render import render_html  # noqa: E402
 
 CACHE_HIT_RATE_THRESHOLD = 0.85  # darunter deutet auf Cache-Bruch (IZG-T-137)
 REDUNDANZ_COUNT_THRESHOLD = 3  # ab dieser Wiederholungszahl gilt ein Aufruf als redundant
 
 # Re-Exports des Formatwissens - Tests und Aufrufer greifen ueber dieses Modul zu.
-CHARS_PER_TOKEN = _t.CHARS_PER_TOKEN
-project_slug = _t.project_slug
-find_transcripts = _t.find_transcripts
-content_len = _t.content_len
-call_label = _t.call_label
+_t = _locate.re_export(globals(), [
+    "CHARS_PER_TOKEN",
+    "project_slug",
+    "find_transcripts",
+    "content_len",
+    "call_label",
+])
 
 
 def fmt_pct(x: float) -> str:
