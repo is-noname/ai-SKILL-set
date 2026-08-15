@@ -25,13 +25,13 @@ import os
 import statistics
 import subprocess
 import time
-import uuid
 from collections import Counter
 from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 from typing import Any
 
+import messlauf
 import plans
 import runs
 import transcript
@@ -125,19 +125,22 @@ def execute_run(prompt: str, project: Path, session_id: str, model: str | None,
     }
 
 
-def discard_reason(meta: dict[str, Any]) -> str | None:
-    """Prueft Exitcode und CLI-Subtype eines Laufs auf Abbruch - ohne subprocess, ohne I/O.
+class ClaudeAusfuehrung:
+    """Der Adapter auf die echte Welt - der einzige Teil des Messlaufs, der Geld kostet.
 
-    `meta` ist die Rueckgabe von execute_run() (oder ein Fake mit denselben Schluesseln).
-    Getrennt von cmd_run, damit die Verwerfungsregel per echtem dict testbar ist statt
-    ueber einen teuren claude-Aufruf.
+    Haelt zusammen, was `messlauf.fahre()` bewusst nicht kennt: Shell, `claude -p` und
+    das Transcript auf der Platte. Der Test setzt an derselben Stelle einen Fake ein.
     """
-    if meta["exit_code"] != 0:
-        return f"Exitcode {meta['exit_code']}"
-    subtype = meta.get("cli_subtype")
-    if subtype and subtype != "success":
-        return f"Abbruch ({subtype})"
-    return None
+
+    def schalte_um(self, setup: str, project: Path) -> None:
+        subprocess.run(setup, shell=True, cwd=str(project), check=False)
+
+    def starte(self, auftrag: messlauf.Laufauftrag, session_id: str) -> dict[str, Any]:
+        return execute_run(auftrag.prompt, auftrag.project, session_id, auftrag.model,
+                           auftrag.permission_mode, auftrag.timeout)
+
+    def miss(self, project: Path, session_id: str) -> dict[str, Any]:
+        return measure_session(project, session_id)
 
 
 # ------------------------------------------------------------------------ Vergleich
@@ -512,33 +515,20 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(f"Messrunde {messrunde}, Modell {values['model'] or '(CLI-Default)'}, "
           f"CLI {env['cli_version'] or '?'}")
 
-    for i in range(args.repeat):
-        run = runs.next_run_index(out, args.task, args.variant)
-        if setup:
-            subprocess.run(setup, shell=True, cwd=str(project), check=False)
-        sid = str(uuid.uuid4())
-        print(f"[{i + 1}/{args.repeat}] {args.task}/{args.variant} run {run} session {sid}")
-        try:
-            meta = execute_run(prompt, project, sid, values["model"], permission_mode, timeout)
-        except subprocess.TimeoutExpired:
-            print("  Timeout - Lauf wird nicht verbucht.")
-            continue
-        reason = discard_reason(meta)
-        if reason:
-            print(f"  {reason} - Lauf wird nicht verbucht.")
-            continue
-        try:
-            measured = measure_session(project, sid)
-        except FileNotFoundError as exc:
-            print(f"  {exc} - Lauf wird nicht verbucht.")
-            continue
+    auftrag = messlauf.Laufauftrag(
+        task=args.task, variant=args.variant, project=project, prompt=prompt,
+        outcome=args.outcome, note=args.note, setup=setup, model=values["model"],
+        permission_mode=permission_mode, timeout=timeout, env=env)
 
-        rec = runs.build_record(task=args.task, variant=args.variant, run=run, project=project,
-                                 outcome=args.outcome, note=args.note, measured=measured,
-                                 meta=meta, prompt_chars=len(prompt), env=env)
-        p = runs.write_record(out, rec)
-        print(f"  gewichtet {rec['weighted_tokens']:,}".replace(",", ".")
-              + f" Tokens, {meta['duration_s']} s -> {p}")
+    def melde(i: int, gesamt: int, run: int, sid: str) -> None:
+        print(f"[{i}/{gesamt}] {args.task}/{args.variant} run {run} session {sid}")
+
+    for erg in messlauf.fahre(out, auftrag, args.repeat, ClaudeAusfuehrung(), melde=melde):
+        if erg.verworfen:
+            print(f"  {erg.verworfen} - Lauf wird nicht verbucht.")
+            continue
+        print(f"  gewichtet {erg.record['weighted_tokens']:,}".replace(",", ".")
+              + f" Tokens, {erg.record['duration_s']} s -> {erg.pfad}")
     return 0
 
 
