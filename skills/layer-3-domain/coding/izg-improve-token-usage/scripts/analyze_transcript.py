@@ -14,8 +14,6 @@ Nutzung:
     python3 analyze_transcript.py                    # aktuelles Projekt, alle Sessions
     python3 analyze_transcript.py --project /pfad    # anderes Projekt
     python3 analyze_transcript.py --sessions 5       # nur die 5 juengsten Sessions
-    python3 analyze_transcript.py --session <uuid>   # nur diese eine Session
-    python3 analyze_transcript.py --since 2026-08-14 # nur Eintraege ab diesem Zeitpunkt
     python3 analyze_transcript.py --json             # Rohdaten statt Report
 """
 
@@ -147,8 +145,8 @@ def compute_findings(measurement: Measurement) -> list[Finding]:
     return findings
 
 
-def analyze(files: list[Path], since: str | None = None, until: str | None = None) -> dict[str, Any]:
-    parsed = _t.parse_entries(_t.read_entries(files, since, until))
+def analyze(files: list[Path]) -> dict[str, Any]:
+    parsed = _t.parse_entries(_t.read_entries(files))
     totals = _t.usage_totals(parsed.usage_by_request)
 
     per_call = _t.estimate_tool_tokens(parsed.tool_calls, parsed.result_chars)
@@ -280,20 +278,19 @@ def _write_html(data: dict[str, Any], project: Path, html_arg: str) -> Path:
     return path
 
 
-def main() -> int:
+def main(base_dir: Path | None = None) -> int:
+    """`base_dir` ersetzt in Tests ~/.claude/projects/<slug>/ - kein CLI-Flag,
+    reiner Test-Seam (siehe find_transcripts)."""
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--project", default=os.getcwd(), help="Projektpfad (Default: cwd)")
     ap.add_argument("--sessions", type=int, default=None, help="nur die N juengsten Sessions")
-    ap.add_argument("--session", default=None, help="nur diese Session-ID")
-    ap.add_argument("--since", default=None, help="nur Eintraege ab diesem ISO-Zeitpunkt")
-    ap.add_argument("--until", default=None, help="nur Eintraege bis zu diesem ISO-Zeitpunkt")
     ap.add_argument("--json", action="store_true", help="Rohdaten als JSON ausgeben")
     ap.add_argument("--html", nargs="?", const="", default=None, metavar="PFAD",
                      help="HTML-Report schreiben (ohne Pfad: Temp-Verzeichnis)")
     args = ap.parse_args()
 
     project = Path(args.project)
-    files = find_transcripts(project, args.sessions, args.session)
+    files = find_transcripts(project, args.sessions, base_dir=base_dir)
     if not files:
         print(
             f"Keine Transcripts fuer {project} gefunden "
@@ -304,7 +301,7 @@ def main() -> int:
             print(_write_html(empty_data(), project, args.html))
         return 1
 
-    data = analyze(files, args.since, args.until)
+    data = analyze(files)
     if args.html is not None:
         print(_write_html(data, project, args.html))
     elif args.json:

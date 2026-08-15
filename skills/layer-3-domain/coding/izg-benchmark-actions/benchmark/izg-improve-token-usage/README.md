@@ -41,14 +41,14 @@ Immer **beide** Varianten der Runde frisch messen. Alte Zahlen sind kein Verglei
 zwischen zwei Runden liegen Modellwechsel, neue Systemprompts und CLI-Versionen.
 
 ```bash
-cd ../../izg-benchmark-actions   # Skript liegt dort
+cd ../..   # izg-benchmark-actions, dort liegt das Skript
 
 # 1. produktive Fassung erneut messen - die Basis dieser Runde
 python3 scripts/bench.py run --task izg-improve-token-usage --variant mit-skill --repeat 3
 
 # 2. ueberarbeitete Fassung
 python3 scripts/bench.py run --task izg-improve-token-usage --variant v3 --repeat 3 \
-  --setup "bash <pfad>/benchmark/setup-v3.sh"
+  --setup "bash benchmark/izg-improve-token-usage/setup-v3.sh"
 
 # 3. jeden Lauf bewerten (Kriterien oben)
 python3 scripts/bench.py judge --task izg-improve-token-usage --variant v3 --run 1 --outcome ok

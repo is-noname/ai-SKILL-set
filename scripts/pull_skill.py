@@ -13,8 +13,9 @@ REGISTRY_PATH = REPO_ROOT / "registry.json"
 SETS_DIR = REPO_ROOT / "skills" / "sets"
 
 # Verzeichnisse, die im Repo leben, aber nicht zum Skill gehören: generierte
-# Artefakte und Messaufbauten (benchmark/ gehört zum Ablauf von izg-benchmark-actions,
-# nicht zum Skill, in dem es liegt). Gilt für Pull UND Inhaltsvergleich — sonst
+# Artefakte und Messaufbauten (izg-benchmark-actions/benchmark/<task>/ hält die
+# Messaufbauten für die gemessenen Skills — Repo-intern, nichts für ein Zielprojekt).
+# Gilt für Pull UND Inhaltsvergleich — sonst
 # gilt ein gepullter Skill dauerhaft als veraltet, weil ihm etwas fehlt, das er
 # nie bekommen sollte.
 IGNORE_DIR_NAMES = {"__pycache__", ".git", "benchmark"}

@@ -12,11 +12,14 @@ izg-benchmark-actions/tests/test_transcript.py.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
@@ -280,18 +283,8 @@ class ComputeFindings(unittest.TestCase):
 
 
 class ContentLen(unittest.TestCase):
-    def test_str(self):
-        self.assertEqual(at.content_len("abcd"), 4)
-
-    def test_list_von_blocktexten(self):
-        self.assertEqual(at.content_len(["ab", "cd"]), 4)
-
-    def test_list_von_dict_bloecken(self):
-        blocks = [{"content": "xy"}]
-        self.assertEqual(at.content_len(blocks), len(json.dumps("xy", ensure_ascii=False)))
-
-    def test_dict(self):
-        self.assertEqual(at.content_len({"a": 1}), len(json.dumps({"a": 1}, ensure_ascii=False)))
+    """Nur Faelle, die analyze(fixture) nicht durchschlaegt (str/list/dict laufen ueber
+    Analyze.test_content_als_*_wird_gezaehlt)."""
 
     def test_sonstiges_liefert_null(self):
         self.assertEqual(at.content_len(None), 0)
@@ -299,31 +292,87 @@ class ContentLen(unittest.TestCase):
 
 
 class CallLabel(unittest.TestCase):
-    def test_read_edit_write_nutzen_file_path(self):
-        self.assertEqual(at.call_label("Read", {"file_path": "/a/b.py"}), "/a/b.py")
-        self.assertEqual(at.call_label("Write", {"file_path": "/a/c.py"}), "/a/c.py")
-
-    def test_bash_kuerzt_und_ersetzt_newlines(self):
-        label = at.call_label("Bash", {"command": "echo a\necho b"})
-        self.assertEqual(label, "echo a echo b")
+    """Nur Faelle, die analyze(fixture) nicht durchschlaegt (Read/Bash-Basisfall laeuft
+    ueber Analyze.test_wiederholte_aufrufe_werden_ueber_call_label_gruppiert)."""
 
     def test_bash_kappt_bei_120_zeichen(self):
         label = at.call_label("Bash", {"command": "x" * 200})
         self.assertEqual(len(label), 120)
 
-    def test_grep_glob_kombiniert_pattern_und_pfad(self):
-        self.assertEqual(at.call_label("Grep", {"pattern": "foo", "path": "src"}), "foo @ src")
-
-    def test_agent_kombiniert_typ_und_beschreibung(self):
-        label = at.call_label("Agent", {"subagent_type": "general-purpose", "description": "such was"})
-        self.assertEqual(label, "general-purpose: such was")
-
-    def test_skill_nutzt_skillnamen(self):
-        self.assertEqual(at.call_label("Skill", {"skill": "izg-domain-modeling"}), "izg-domain-modeling")
-
     def test_unbekanntes_tool_faellt_auf_json_zurueck(self):
         label = at.call_label("Sonstiges", {"x": 1})
         self.assertEqual(label, json.dumps({"x": 1}, ensure_ascii=False))
+
+
+class Report(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "sess-1.jsonl"
+        write_fixture(self.path)
+        self.data = at.analyze([self.path])
+        self.text = at.report(self.data)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_alle_abschnittsueberschriften_vorhanden(self):
+        for h in ("## Gesamtverbrauch", "## Befunde",
+                  "## Kontextlast pro Tool (geschaetzt aus Tool-Results)",
+                  "## Teuerste Einzelaufrufe", "## Wiederholte Aufrufe (Kandidaten fuer Redundanz)",
+                  "## Genutzte Skills"):
+            self.assertIn(h, self.text)
+
+    def test_befunde_platzhalterzeile_bei_leeren_findings(self):
+        data = dict(self.data)
+        data["findings"] = []
+        text = at.report(data)
+        self.assertIn("| - | - | keine | - |", text)
+
+    def test_wiederholte_aufrufe_listet_doppelten_bash_aufruf(self):
+        self.assertIn("2x", self.text)
+        self.assertIn("Bash", self.text)
+        self.assertIn("`ls`", self.text)
+
+    def test_tausendertrennung_greift(self):
+        data = dict(self.data)
+        data["totals"] = dict(data["totals"])
+        data["totals"]["input"] = 1234567
+        text = at.report(data)
+        self.assertIn("1.234.567", text)
+
+
+class Main(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_main(self, argv: list[str]) -> tuple[int, str]:
+        out = io.StringIO()
+        with patch.object(sys, "argv", ["analyze_transcript.py"] + argv), \
+                contextlib.redirect_stdout(out):
+            code = at.main(base_dir=self.base)
+        return code, out.getvalue()
+
+    def test_ohne_transcripts_gibt_eins_zurueck_und_nennt_slug_pfad(self):
+        code, out = self.run_main(["--project", str(self.base)])
+        self.assertEqual(code, 1)
+        self.assertIn(at.project_slug(self.base), out)
+
+    def test_mit_fixture_gibt_null_zurueck(self):
+        write_fixture(self.base / "sess-1.jsonl")
+        code, out = self.run_main(["--project", str(self.base)])
+        self.assertEqual(code, 0)
+        self.assertIn("Token-Messung", out)
+
+    def test_json_ist_parsebar_und_enthaelt_findings(self):
+        write_fixture(self.base / "sess-1.jsonl")
+        code, out = self.run_main(["--project", str(self.base), "--json"])
+        self.assertEqual(code, 0)
+        parsed = json.loads(out)
+        self.assertIn("findings", parsed)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,9 @@
 # nennt keinen Skill, also muss das Modell ihn selbst ziehen duerfen.
 set -euo pipefail
 
-src="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.."
+here="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+skills="$(cd "$here/../../../../.." && pwd)"  # benchmark/<task>/ -> izg-benchmark-actions -> coding -> layer-3-domain -> skills/
+src="$skills/layer-3-domain/coding/izg-improve-token-usage"
 dst=".claude/skills/izg-improve-token-usage"
 
 rm -rf "$dst"

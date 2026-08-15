@@ -7,7 +7,8 @@
 set -euo pipefail
 
 here="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
-src="$here/.."
+skills="$(cd "$here/../../../../.." && pwd)"  # benchmark/<task>/ -> izg-benchmark-actions -> coding -> layer-3-domain -> skills/
+src="$skills/layer-1-base/izg-decision-sheet"
 dst=".claude/skills/izg-decision-sheet"
 
 rm -rf .decisions

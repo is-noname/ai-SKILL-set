@@ -30,7 +30,7 @@ ein Browserfenster aufgeht. Beide Varianten laufen damit, die Messung bleibt fai
 
 ```bash
 BENCH=~/Dokumente/AI/ai-SKILL-set/skills/layer-3-domain/coding/izg-benchmark-actions
-HIER=~/Dokumente/AI/ai-SKILL-set/skills/layer-1-base/izg-decision-sheet/benchmark
+HIER=$BENCH/benchmark/izg-decision-sheet
 
 PATH="$HIER/shim:$PATH" python3 $BENCH/scripts/bench.py run \
   --task izg-decision-sheet --variant ohne-skill --repeat 3 \

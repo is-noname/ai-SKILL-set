@@ -49,7 +49,9 @@ Eine Aufgabe, alle Varianten. Sie muss:
 
 Als Datei ablegen und mit `--prompt-file` verwenden. Nie pro Variante umformulieren; eine geaenderte Testaufgabe macht den Vergleich wertlos. Das Skript merkt sich ihre Pruefsumme und verweigert das Urteil, wenn zwei Fassungen im Spiel sind — auch Monate spaeter.
 
-Die Datei gehoert **neben den Skill, den sie misst**, nicht ins temporaere Verzeichnis. Sie ist der teuerste Teil der Messung: ohne sie faengt jede spaetere Runde bei null an.
+Die Datei gehoert in den Messaufbau, nicht ins temporaere Verzeichnis. Sie ist der teuerste Teil der Messung: ohne sie faengt jede spaetere Runde bei null an.
+
+**Wo Messaufbauten liegen:** `benchmark/<task>/` in *diesem* Skill — je Task ein Ordner mit `aufgabe.md`, den Setup-Skripten und einer README samt Bewertungskriterien und Ergebnisprotokoll. Nicht neben dem gemessenen Skill: ein Messaufbau ist Repo-Werkzeug und hat in einem Zielprojekt nichts verloren (`pull_skill.py` schliesst `benchmark/` deshalb vom Pull aus). Setup-Skripte greifen ueber den Repo-Pfad auf den gemessenen Skill zu, nicht ueber `..`.
 
 ### 2. Varianten und Umschaltung festlegen
 
