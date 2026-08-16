@@ -34,6 +34,12 @@ if echo "$FILE" | grep -qE '\.(jsonl|log)$'; then
   exit 0
 fi
 
+# Bilder/PDF/Binaerformate durchlassen: Read rendert sie als Bild bzw. ueber pages,
+# `wc -l` zaehlt dort nur Zeilenumbrueche im Binaerstrom - offset/limit hilft nicht.
+if echo "$FILE" | grep -qiE '\.(png|jpe?g|webp|gif|bmp|ico|pdf|ipynb)$'; then
+  exit 0
+fi
+
 # Ausweg-Ventil: ganze Datei wird wirklich gebraucht (z.B. Refactoring ueber ein Modul)
 if [ "$READ_SIZE_GUARD_OFF" = "1" ]; then
   exit 0
