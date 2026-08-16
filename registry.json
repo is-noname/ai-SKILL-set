@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-15",
+  "generated": "2026-08-16",
   "skills": {
     "grilling": {
       "name": "grilling",
@@ -80,7 +80,15 @@
       "layer": 1,
       "dependencies": [],
       "path": "skills/layer-1-base/izg-decision-sheet",
-      "disable-model-invocation": true
+      "disable-model-invocation": true,
+      "requires": [
+        {
+          "type": "cmd",
+          "value": "xdg-open",
+          "optional": true,
+          "hint": "Ohne xdg-open wird das Sheet trotzdem gerendert — der Pfad steht dann in der Meldung und muss manuell geoeffnet werden (Paket 'xdg-utils')"
+        }
+      ]
     },
     "izg-domain-modeling": {
       "name": "izg-domain-modeling",
@@ -96,7 +104,32 @@
       "layer": 1,
       "dependencies": [],
       "path": "skills/layer-1-base/izg-starter-icon-mkr",
-      "disable-model-invocation": true
+      "disable-model-invocation": true,
+      "requires": [
+        {
+          "type": "cmd",
+          "value": "xdg-open",
+          "hint": "Desktop-Umgebung noetig — Paket 'xdg-utils' installieren (Debian/Ubuntu: sudo apt install xdg-utils)"
+        },
+        {
+          "type": "cmd",
+          "value": "notify-send",
+          "optional": true,
+          "hint": "Ohne libnotify-bin laeuft der Starter, meldet Fehler aber nur im Log statt als Desktop-Benachrichtigung"
+        },
+        {
+          "type": "cmd",
+          "value": "xdotool",
+          "optional": true,
+          "hint": "Ohne xdotool wird ein bereits offenes App-Fenster beim Neustart nicht geschlossen"
+        },
+        {
+          "type": "cmd",
+          "value": "gio",
+          "optional": true,
+          "hint": "Ohne gio muss das Desktop-Icon in Cinnamon/GNOME einmal manuell als vertrauenswuerdig markiert werden"
+        }
+      ]
     },
     "izg-transcript-reader": {
       "name": "izg-transcript-reader",
@@ -172,7 +205,31 @@
       "description": "REST-Client für die AgentMail-API (agentmail.to) — Postfach, Nachrichten und Drafts per Python ansprechen, inkl. Webhook-Empfang und CLI-Review-Flow für Drafts. Nutzen wenn ein Agent E-Mails über AgentMail lesen, ein Draft anlegen, Labels auf Nachrichten setzen oder eingehende Mails per Webhook verarbeiten soll. Kein autonomes Senden — Drafts durchlaufen `draft_review.py` als Human-in-the-loop-Review.",
       "layer": 3,
       "dependencies": [],
-      "path": "skills/layer-3-domain/communication/agentmail"
+      "path": "skills/layer-3-domain/communication/agentmail",
+      "requires": [
+        {
+          "type": "py",
+          "value": "requests",
+          "hint": "pip install requests"
+        },
+        {
+          "type": "env",
+          "value": "AGENTMAIL_API_KEY",
+          "hint": "API-Key von agentmail.to in die Skill-eigene .env eintragen (Vorlage: env.example.txt, oder setup.sh ausfuehren)"
+        },
+        {
+          "type": "env",
+          "value": "AGENTMAIL_INBOX",
+          "hint": "Inbox-Adresse in die Skill-eigene .env eintragen (Vorlage: env.example.txt)"
+        },
+        {
+          "type": "env",
+          "value": "AGENTMAIL_WEBHOOK_SECRET",
+          "optional": true,
+          "hint": "Nur fuer webhook_receiver.py noetig — Signing-Secret aus dem agentmail-Dashboard"
+        }
+      ],
+      "setup": true
     }
   }
 }

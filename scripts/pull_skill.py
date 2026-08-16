@@ -3,14 +3,21 @@
 
 import argparse
 import hashlib
+import importlib.util
 import json
+import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
 REGISTRY_PATH = REPO_ROOT / "registry.json"
 SETS_DIR = REPO_ROOT / "skills" / "sets"
+
+REQUIRES_FILENAME = "requires.json"
+SETUP_FILENAME = "setup.sh"
+REQUIRE_TYPES = ("cmd", "env", "py", "file")
 
 # Verzeichnisse, die im Repo leben, aber nicht zum Skill gehören: generierte
 # Artefakte und Messaufbauten (izg-benchmark-actions/benchmark/<task>/ hält die
@@ -21,7 +28,15 @@ SETS_DIR = REPO_ROOT / "skills" / "sets"
 IGNORE_DIR_NAMES = {"__pycache__", ".git", "benchmark"}
 IGNORE_SUFFIXES = {".pyc", ".pyo", ".backup", ".db"}
 
-REPO_ONLY = shutil.ignore_patterns(*IGNORE_DIR_NAMES, *(f"*{s}" for s in IGNORE_SUFFIXES))
+# Lokale Secrets bleiben lokal: eine .env im Skill-Verzeichnis gehoert zur
+# Maschine, nicht zum Skill. Sonst wandert z.B. der agentmail-API-Key in jedes
+# Zielprojekt. Das Zielprojekt bekommt seine .env ueber setup.sh (requires.json).
+# Gilt auch fuer den Digest — sonst gilt jede Installation als veraltet.
+IGNORE_FILE_NAMES = {".env"}
+
+REPO_ONLY = shutil.ignore_patterns(
+    *IGNORE_DIR_NAMES, *IGNORE_FILE_NAMES, *(f"*{s}" for s in IGNORE_SUFFIXES)
+)
 
 
 def dir_digest(root: Path) -> str:
@@ -36,7 +51,7 @@ def dir_digest(root: Path) -> str:
             continue
         if not path.is_file():
             continue
-        if path.suffix in IGNORE_SUFFIXES:
+        if path.suffix in IGNORE_SUFFIXES or path.name in IGNORE_FILE_NAMES:
             continue
         h.update(str(path.relative_to(root)).encode("utf-8"))
         h.update(b"\0")
@@ -59,6 +74,149 @@ def load_set(set_name: str) -> list[str]:
         sys.exit(1)
     data = json.loads(path.read_text(encoding="utf-8"))
     return data["skills"]
+
+
+def load_requires(skill_dir: Path) -> tuple[list[dict], list[str]]:
+    """Liest requires.json eines Skills. Gibt (Anforderungen, Formatfehler) zurück.
+
+    Fehlt die Datei, hat der Skill keine externen Voraussetzungen — das ist der
+    Normalfall und kein Fehler.
+    """
+    path = skill_dir / REQUIRES_FILENAME
+    if not path.exists():
+        return [], []
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [], [f"{path}: kein gültiges JSON ({exc})"]
+
+    entries = data.get("requires", []) if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        return [], [f"{path}: erwartet {{\"requires\": [...]}}"]
+
+    valid: list[dict] = []
+    errors: list[str] = []
+    for i, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            errors.append(f"{path}: Eintrag {i} ist kein Objekt")
+            continue
+        rtype = entry.get("type")
+        value = entry.get("value")
+        if rtype not in REQUIRE_TYPES:
+            errors.append(f"{path}: Eintrag {i} hat unbekannten type '{rtype}' (erlaubt: {', '.join(REQUIRE_TYPES)})")
+            continue
+        if not isinstance(value, str) or not value:
+            errors.append(f"{path}: Eintrag {i} ({rtype}) hat kein 'value'")
+            continue
+        valid.append(entry)
+    return valid, errors
+
+
+def _env_from_skill_dotenv(skill_dir: Path, var: str) -> bool:
+    """Prüft, ob `var` in einer skill-eigenen .env mit nicht-leerem Wert steht.
+
+    Skills wie agentmail lesen ihren Key aus `<skill>/.env` statt aus der Shell —
+    ohne diesen Blick würde die Prüfung eine korrekt eingerichtete Installation
+    als kaputt melden.
+    """
+    dotenv = skill_dir / ".env"
+    if not dotenv.exists():
+        return False
+    for line in dotenv.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        if key.strip() == var:
+            return bool(value.strip().strip('"').strip("'"))
+    return False
+
+
+def check_requirement(req: dict, skill_dir: Path) -> bool:
+    rtype = req["type"]
+    value = req["value"]
+
+    if rtype == "cmd":
+        return shutil.which(value) is not None
+    if rtype == "env":
+        return bool(os.environ.get(value)) or _env_from_skill_dotenv(skill_dir, value)
+    if rtype == "py":
+        try:
+            return importlib.util.find_spec(value) is not None
+        except (ImportError, ValueError):
+            return False
+    if rtype == "file":
+        return Path(os.path.expandvars(value)).expanduser().exists()
+    return False
+
+
+def check_skill(skill_dir: Path) -> tuple[list[dict], list[dict], list[str]]:
+    """Gibt (fehlende Pflicht-, fehlende optionale Anforderungen, Formatfehler) zurück."""
+    requires, errors = load_requires(skill_dir)
+    missing: list[dict] = []
+    missing_optional: list[dict] = []
+    for req in requires:
+        if check_requirement(req, skill_dir):
+            continue
+        (missing_optional if req.get("optional") else missing).append(req)
+    return missing, missing_optional, errors
+
+
+def _format_req(req: dict) -> str:
+    label = {
+        "cmd": "Kommando",
+        "env": "Umgebungsvariable",
+        "py": "Python-Paket",
+        "file": "Datei/Pfad",
+    }[req["type"]]
+    line = f"{label} '{req['value']}'"
+    hint = req.get("hint")
+    return f"{line} — {hint}" if hint else line
+
+
+def report_requirements(names: list[str], skill_dir_for: dict, run_setup: bool = False) -> bool:
+    """Prüft die Skills und gibt einen Bericht aus. True, wenn alles erfüllt ist."""
+    all_ok = True
+
+    for name in names:
+        skill_dir = skill_dir_for[name]
+        missing, missing_optional, errors = check_skill(skill_dir)
+        setup = skill_dir / SETUP_FILENAME
+
+        for err in errors:
+            print(f"  ! {err}", file=sys.stderr)
+            all_ok = False
+
+        # Erst reparieren, dann urteilen — sonst gilt ein durch setup.sh
+        # repariertes Skill weiterhin als unbrauchbar.
+        if missing and run_setup and setup.exists():
+            # flush: sonst landet die Ausgabe des Subprozesses vor dieser Zeile
+            print(f"\n{name}: führe {SETUP_FILENAME} aus", flush=True)
+            result = subprocess.run(["bash", str(setup)], cwd=str(skill_dir))
+            if result.returncode != 0:
+                print(f"  ! {SETUP_FILENAME} endete mit Code {result.returncode}", file=sys.stderr)
+            missing, missing_optional, _ = check_skill(skill_dir)
+            if not missing:
+                print(f"  ✓ {name}: Voraussetzungen erfüllt")
+
+        if not missing and not missing_optional:
+            continue
+
+        print(f"\n{name}: externe Voraussetzungen nicht erfüllt")
+        for req in missing:
+            print(f"  ✗ {_format_req(req)}")
+        for req in missing_optional:
+            print(f"  ~ {_format_req(req)} (optional)")
+
+        if missing:
+            all_ok = False
+            if setup.exists():
+                print(f"  → Setup vorhanden: bash {setup}")
+                if not run_setup:
+                    print("    (oder Pull/doctor mit --setup wiederholen)")
+
+    return all_ok
 
 
 def resolve(names: list[str], registry: dict) -> list[str]:
@@ -127,13 +285,19 @@ def cmd_pull(args: argparse.Namespace, registry: dict) -> int:
     if args.dry_run:
         print("[dry-run] would install:", ", ".join(installed) or "(none)")
         print("[dry-run] would skip (already present):", ", ".join(skipped) or "(none)")
-    else:
-        if installed:
-            print("Installed:", ", ".join(installed))
-        if skipped:
-            print("Skipped (already present, use --force to overwrite):", ", ".join(skipped))
-        if not installed and not skipped:
-            print("Nothing to do.")
+        return 0
+
+    if installed:
+        print("Installed:", ", ".join(installed))
+    if skipped:
+        print("Skipped (already present, use --force to overwrite):", ", ".join(skipped))
+    if not installed and not skipped:
+        print("Nothing to do.")
+        return 0
+
+    # Auch die übersprungenen prüfen: "schon da" heißt nicht "einsatzbereit".
+    touched = installed + skipped
+    report_requirements(touched, {n: target / n for n in touched}, run_setup=args.setup)
 
     return 0
 
@@ -177,7 +341,35 @@ def cmd_update(args: argparse.Namespace, registry: dict) -> int:
 
     installed_names, _ = pull(outdated, target, registry, force=True)
     print("Updated:", ", ".join(installed_names))
+
+    # Ein Update kann neue Voraussetzungen mitbringen — direkt melden statt zur Laufzeit.
+    report_requirements(installed_names, {n: target / n for n in installed_names})
     return 0
+
+
+def cmd_doctor(args: argparse.Namespace, registry: dict) -> int:
+    target = Path(args.target)
+    if not target.exists():
+        print(f"Target '{target}' does not exist — nothing installed.", file=sys.stderr)
+        return 1
+
+    installed = sorted(d.name for d in target.iterdir() if d.is_dir())
+    if not installed:
+        print("No skills installed.")
+        return 0
+
+    with_requires = [n for n in installed if (target / n / REQUIRES_FILENAME).exists()]
+    if not with_requires:
+        print(f"{len(installed)} Skills installiert, keiner deklariert externe Voraussetzungen.")
+        return 0
+
+    print(f"Prüfe {len(with_requires)} von {len(installed)} Skills mit externen Voraussetzungen...")
+    ok = report_requirements(with_requires, {n: target / n for n in with_requires}, run_setup=args.setup)
+
+    if ok:
+        print("\nAlle externen Voraussetzungen erfüllt.")
+        return 0
+    return 1
 
 
 def cmd_list(registry: dict) -> int:
@@ -211,8 +403,26 @@ def main() -> int:
     )
     p_pull.add_argument("--force", action="store_true", help="Overwrite already-installed skills")
     p_pull.add_argument("--dry-run", action="store_true", help="Show what would be installed")
+    p_pull.add_argument(
+        "--setup",
+        action="store_true",
+        help="Run a skill's setup.sh when its external requirements are unmet",
+    )
 
     p_list = sub.add_parser("list", help="List available skills")
+
+    p_doctor = sub.add_parser("doctor", help="Check external requirements of installed skills")
+    p_doctor.add_argument(
+        "--target",
+        default=".claude/skills",
+        metavar="DIR",
+        help="Target directory (default: .claude/skills)",
+    )
+    p_doctor.add_argument(
+        "--setup",
+        action="store_true",
+        help="Run a skill's setup.sh when its external requirements are unmet",
+    )
 
     p_update = sub.add_parser("update", help="Update outdated installed skills")
     p_update.add_argument(
@@ -236,6 +446,8 @@ def main() -> int:
         return cmd_list(registry)
     if args.cmd == "update":
         return cmd_update(args, registry)
+    if args.cmd == "doctor":
+        return cmd_doctor(args, registry)
     return 1
 
 

@@ -7,6 +7,9 @@ import sys
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from pull_skill import load_requires  # noqa: E402  (gemeinsame Definition, kein Drift)
+
 REPO_ROOT = Path(__file__).parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
 REGISTRY_OUT = REPO_ROOT / "registry.json"
@@ -182,6 +185,15 @@ def main() -> int:
         }
         if fm.get("disable-model-invocation"):
             skills[name]["disable-model-invocation"] = True
+
+        # Externe Voraussetzungen liegen in requires.json neben SKILL.md und werden
+        # in die Registry inlined, damit sie schon vor dem Pull sichtbar sind.
+        requires, requires_errors = load_requires(skill_file.parent)
+        parse_errors.extend(requires_errors)
+        if requires:
+            skills[name]["requires"] = requires
+        if (skill_file.parent / "setup.sh").exists():
+            skills[name]["setup"] = True
 
     validation_errors = validate(skills)
     all_errors = parse_errors + validation_errors

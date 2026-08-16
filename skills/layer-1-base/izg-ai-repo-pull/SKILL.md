@@ -43,6 +43,12 @@ python3 $REPO/scripts/pull_skill.py pull grill-me --dry-run
 
 # Überschreiben (nach Update)
 python3 $REPO/scripts/pull_skill.py pull grill-me --force
+
+# Fehlende externe Voraussetzungen automatisch einrichten (führt setup.sh aus)
+python3 $REPO/scripts/pull_skill.py pull agentmail --target .claude/skills --setup
+
+# Installierte Skills nachträglich auf externe Voraussetzungen prüfen
+python3 $REPO/scripts/pull_skill.py doctor --target .claude/skills
 ```
 
 ## Ohne Argumente
@@ -59,3 +65,8 @@ Kurz melden:
 - Übersprungen (bereits vorhanden)
 
 Nicht weiter erklären — der Nutzer kennt das System.
+
+**Ausnahme:** Meldet der Pull fehlende externe Voraussetzungen (`✗`-Zeilen), diese
+wörtlich weitergeben — der Skill ist sonst unbrauchbar. Gibt es dazu ein `setup.sh`,
+anbieten, den Pull mit `--setup` zu wiederholen. `~`-Zeilen sind optional und nur
+erwähnenswert, wenn sie den geplanten Einsatz betreffen.

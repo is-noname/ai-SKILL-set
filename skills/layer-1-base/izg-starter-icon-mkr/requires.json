@@ -1,0 +1,27 @@
+{
+  "requires": [
+    {
+      "type": "cmd",
+      "value": "xdg-open",
+      "hint": "Desktop-Umgebung noetig — Paket 'xdg-utils' installieren (Debian/Ubuntu: sudo apt install xdg-utils)"
+    },
+    {
+      "type": "cmd",
+      "value": "notify-send",
+      "optional": true,
+      "hint": "Ohne libnotify-bin laeuft der Starter, meldet Fehler aber nur im Log statt als Desktop-Benachrichtigung"
+    },
+    {
+      "type": "cmd",
+      "value": "xdotool",
+      "optional": true,
+      "hint": "Ohne xdotool wird ein bereits offenes App-Fenster beim Neustart nicht geschlossen"
+    },
+    {
+      "type": "cmd",
+      "value": "gio",
+      "optional": true,
+      "hint": "Ohne gio muss das Desktop-Icon in Cinnamon/GNOME einmal manuell als vertrauenswuerdig markiert werden"
+    }
+  ]
+}

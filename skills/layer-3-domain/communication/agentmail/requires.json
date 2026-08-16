@@ -1,0 +1,25 @@
+{
+  "requires": [
+    {
+      "type": "py",
+      "value": "requests",
+      "hint": "pip install requests"
+    },
+    {
+      "type": "env",
+      "value": "AGENTMAIL_API_KEY",
+      "hint": "API-Key von agentmail.to in die Skill-eigene .env eintragen (Vorlage: env.example.txt, oder setup.sh ausfuehren)"
+    },
+    {
+      "type": "env",
+      "value": "AGENTMAIL_INBOX",
+      "hint": "Inbox-Adresse in die Skill-eigene .env eintragen (Vorlage: env.example.txt)"
+    },
+    {
+      "type": "env",
+      "value": "AGENTMAIL_WEBHOOK_SECRET",
+      "optional": true,
+      "hint": "Nur fuer webhook_receiver.py noetig — Signing-Secret aus dem agentmail-Dashboard"
+    }
+  ]
+}

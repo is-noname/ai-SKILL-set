@@ -1,0 +1,10 @@
+{
+  "requires": [
+    {
+      "type": "cmd",
+      "value": "xdg-open",
+      "optional": true,
+      "hint": "Ohne xdg-open wird das Sheet trotzdem gerendert — der Pfad steht dann in der Meldung und muss manuell geoeffnet werden (Paket 'xdg-utils')"
+    }
+  ]
+}

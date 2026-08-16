@@ -81,6 +81,69 @@ nicht ins Skill-Verzeichnis und werden ignoriert (`.gitignore`, Update-Vergleich
 
 ---
 
+## Externe Voraussetzungen (`requires.json`)
+
+Braucht ein Skill etwas, das **nicht** im Repo liegt — ein Kommando, eine
+Umgebungsvariable, ein Python-Paket, eine Datei — gehört das in eine
+`requires.json` neben die `SKILL.md`. Prosa im SKILL.md reicht nicht: sie wird
+überlesen, und der Fehler fällt erst mitten in einer Session auf.
+
+```json
+{
+  "requires": [
+    { "type": "cmd", "value": "xdg-open",
+      "hint": "Paket 'xdg-utils' installieren" },
+    { "type": "env", "value": "AGENTMAIL_API_KEY",
+      "hint": "Key von agentmail.to in die Skill-eigene .env eintragen" },
+    { "type": "py", "value": "requests", "hint": "pip install requests" },
+    { "type": "file", "value": "~/.config/foo/config.toml",
+      "optional": true, "hint": "Ohne Config nutzt der Skill Defaults" }
+  ]
+}
+```
+
+| Feld | Pflicht | Bedeutung |
+|------|---------|-----------|
+| `type` | ja | `cmd` (in `PATH`), `env` (Shell **oder** skill-eigene `.env`), `py` (importierbar), `file` (Pfad existiert, `~`/`$VAR` werden aufgelöst) |
+| `value` | ja | Name des Kommandos / der Variable / des Moduls bzw. der Pfad |
+| `hint` | nein, aber praktisch immer sinnvoll | **Wie man es behebt** — dieser Text ist das, was der Nutzer zu sehen bekommt |
+| `optional` | nein (Default `false`) | `true` = Skill läuft eingeschränkt weiter (graceful degradation), wird als `~` gemeldet statt als `✗` |
+
+**Regel für `optional`:** Bricht der Skill ohne die Voraussetzung ab → Pflicht.
+Läuft er mit reduziertem Komfort weiter → `optional: true`.
+
+### `setup.sh` (optional)
+
+Lässt sich eine Voraussetzung automatisch herstellen (`.env` aus Vorlage anlegen,
+Paket installieren), gehört ein ausführbares `setup.sh` neben die `SKILL.md`. Es
+wird **nie ungefragt** ausgeführt — nur bei `--setup`:
+
+```bash
+python3 scripts/pull_skill.py pull agentmail --target .claude/skills --setup
+```
+
+Konventionen fürs Script: idempotent (mehrfacher Lauf schadet nicht), überschreibt
+nie eine bestehende `.env`, und beendet sich mit Exit-Code ≠ 0, wenn noch etwas
+von Hand nachzutragen ist.
+
+### Prüfung
+
+- `pull` und `update` prüfen automatisch nach dem Kopieren und melden Fehlendes
+  mit `hint`.
+- `python3 scripts/pull_skill.py doctor --target .claude/skills` prüft alle
+  installierten Skills nachträglich — für den Fall, dass eine Voraussetzung
+  später wegbricht (Key rotiert, Paket deinstalliert). Exit-Code 1 bei fehlender
+  Pflicht-Voraussetzung.
+- `generate_registry.py` inlined `requires` in `registry.json` (sichtbar **vor**
+  dem Pull) und lässt den Pre-Commit-Hook bei kaputter `requires.json` scheitern.
+
+**Secrets:** Eine `.env` im Skill-Verzeichnis gehört zur Maschine, nicht zum
+Skill — sie wird weder gepullt noch beim Update-Vergleich berücksichtigt.
+
+Hintergrund und verworfene Alternativen: `docs/.../ADR-20260816-001`.
+
+---
+
 ## `projects/` vs `layer-4-project/` — klare Abgrenzung
 
 | Verzeichnis | Enthält | Enthält NICHT |
