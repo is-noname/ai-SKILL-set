@@ -18,7 +18,7 @@ Die Hooks liegen im Repo in zwei Unterordnern nach **Default-Deploy-Ort**:
 
 | Ordner | Hooks | Bedeutung |
 |--------|-------|-----------|
-| `hooks/global/` | alle Guards (`protect-env`, `dir-scope-guard` +`dir-scope.conf`, `env-key-guard`, `file-dump-guard`, `gh-cli-guard`, `git-*-guard`, `read-size-guard`) sowie `piper-notify`, `check-chatbox`, `ticket-mover` | einmal in `~/.claude/hooks/` aufgesetzt, feuert überall, wird nie neu aufgesetzt |
+| `hooks/global/` | alle Guards (`protect-env`, `dir-scope-guard` +`dir-scope.conf`, `env-key-guard`, `file-dump-guard`, `gh-cli-guard`, `git-*-guard`, `read-size-guard`, `read-dedupe-guard`) sowie `piper-notify`, `check-chatbox`, `ticket-mover` | einmal in `~/.claude/hooks/` aufgesetzt, feuert überall, wird nie neu aufgesetzt |
 | `hooks/repo-local/` | `pre-commit-registry`, `pre-commit-agentdocs`, `pre-commit-toc` | wirken nur im `ai-SKILL-set`-Repo, nie global deployt |
 
 **Wichtig:** Die Unterordner gibt es nur im **Repo**. Beim Deploy landen die Skripte
@@ -41,7 +41,8 @@ nur sinnvoll als **Ersatz**, falls man ihn bewusst nicht global will.
 |------|------------|----------------|
 | `protect-env.sh` | Blockt jeden Zugriff auf Pfade die `.env` enthalten (API-Key-Schutz). | Vor Read/Edit/Write auf eine `.env*`-Datei. |
 | `dir-scope-guard.sh` | Blockt Zugriff auf sensible Verzeichnisse aus `dir-scope.conf` (Privat, Steuern, `.ssh`, `.gnupg`, …). | Vor Read/Edit/Write, wenn der Zielpfad unter einem `BLOCKED_DIRS`-Eintrag liegt. |
-| `read-size-guard.sh` | Blockt `.jsonl`/`.log` hart; warnt (kein Block) bei Dateien > 1000 Zeilen und empfiehlt `offset`/`limit`. | Vor jedem Read. |
+| `read-size-guard.sh` | Blockt `.jsonl`/`.log` hart; warnt ab 300 Zeilen (`READ_SIZE_GUARD_WARN`), blockt ab 600 (`READ_SIZE_GUARD_MAX`) und empfiehlt `offset`/`limit` bzw. Grep. Ventil: `READ_SIZE_GUARD_OFF=1`. | Vor jedem Read. |
+| `read-dedupe-guard.sh` | Meldet (kein Block) den zweiten Voll-Read derselben, seit dem ersten Read unveränderten Datei in derselben Session — höchstens einmal je Session und Datei. Zustand: `~/.claude/state/read-dedupe/<session_id>.tsv`, Dateien > 7 Tage werden aufgeräumt. Ventil: `READ_DEDUPE_GUARD_OFF=1`. | Vor jedem Read ohne `offset`/`limit`. |
 
 `dir-scope-guard.sh` liest seine Konfig aus `~/.claude/hooks/dir-scope.conf` (mitliefern).
 
@@ -127,7 +128,8 @@ Eigenschaften: idempotent, fragt bei Drift vor dem Überschreiben (`--force` umg
            { "type": "command", "command": "/home/USER/.claude/hooks/dir-scope-guard.sh" }
          ]},
          { "matcher": "Read", "hooks": [
-           { "type": "command", "command": "/home/USER/.claude/hooks/read-size-guard.sh" }
+           { "type": "command", "command": "/home/USER/.claude/hooks/read-size-guard.sh" },
+           { "type": "command", "command": "/home/USER/.claude/hooks/read-dedupe-guard.sh" }
          ]},
          { "matcher": "Bash", "hooks": [
            { "type": "command", "command": "/home/USER/.claude/hooks/env-key-guard.sh" },
