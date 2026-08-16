@@ -297,9 +297,11 @@ def cmd_pull(args: argparse.Namespace, registry: dict) -> int:
 
     # Auch die übersprungenen prüfen: "schon da" heißt nicht "einsatzbereit".
     touched = installed + skipped
-    report_requirements(touched, {n: target / n for n in touched}, run_setup=args.setup)
+    ok = report_requirements(touched, {n: target / n for n in touched}, run_setup=args.setup)
 
-    return 0
+    # Die Dateien liegen zwar, aber der Skill ist nicht lauffähig — das muss ein
+    # aufrufendes Script merken können, ohne die Ausgabe zu parsen.
+    return 0 if ok else 1
 
 
 def cmd_update(args: argparse.Namespace, registry: dict) -> int:
@@ -343,8 +345,8 @@ def cmd_update(args: argparse.Namespace, registry: dict) -> int:
     print("Updated:", ", ".join(installed_names))
 
     # Ein Update kann neue Voraussetzungen mitbringen — direkt melden statt zur Laufzeit.
-    report_requirements(installed_names, {n: target / n for n in installed_names})
-    return 0
+    ok = report_requirements(installed_names, {n: target / n for n in installed_names})
+    return 0 if ok else 1
 
 
 def cmd_doctor(args: argparse.Namespace, registry: dict) -> int:

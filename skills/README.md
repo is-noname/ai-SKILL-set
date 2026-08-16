@@ -132,8 +132,11 @@ von Hand nachzutragen ist.
   mit `hint`.
 - `python3 scripts/pull_skill.py doctor --target .claude/skills` prüft alle
   installierten Skills nachträglich — für den Fall, dass eine Voraussetzung
-  später wegbricht (Key rotiert, Paket deinstalliert). Exit-Code 1 bei fehlender
-  Pflicht-Voraussetzung.
+  später wegbricht (Key rotiert, Paket deinstalliert).
+- **Exit-Code 1** bei fehlender Pflicht-Voraussetzung — bei `pull`, `update` und
+  `doctor` gleichermaßen. Die Dateien liegen dann zwar, aber der Skill ist nicht
+  lauffähig; aufrufende Scripts erkennen das, ohne die Ausgabe zu parsen.
+  Optionale (`~`) Voraussetzungen beeinflussen den Exit-Code nicht.
 - `generate_registry.py` inlined `requires` in `registry.json` (sichtbar **vor**
   dem Pull) und lässt den Pre-Commit-Hook bei kaputter `requires.json` scheitern.
 
