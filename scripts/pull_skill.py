@@ -113,24 +113,54 @@ def load_requires(skill_dir: Path) -> tuple[list[dict], list[str]]:
     return valid, errors
 
 
-def _env_from_skill_dotenv(skill_dir: Path, var: str) -> bool:
-    """Prüft, ob `var` in einer skill-eigenen .env mit nicht-leerem Wert steht.
+def _strip_quotes(value: str) -> str:
+    """Entfernt ein umschließendes Anführungszeichen-Paar — wie env_loader.py der Skills."""
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    return value
 
-    Skills wie agentmail lesen ihren Key aus `<skill>/.env` statt aus der Shell —
-    ohne diesen Blick würde die Prüfung eine korrekt eingerichtete Installation
-    als kaputt melden.
+
+def parse_dotenv(path: Path) -> dict[str, str]:
+    """Parst KEY=VALUE-Zeilen. Gleiche Semantik wie env_loader.py der Skills.
+
+    Kommentare (`#`) und Zeilen ohne `=` werden übersprungen, `=` im Wert bleibt
+    erhalten (nur am ersten `=` getrennt), ein umschließendes Quote-Paar fällt weg.
+    Fehlt die Datei, ist das Ergebnis leer — kein Fehler.
     """
-    dotenv = skill_dir / ".env"
-    if not dotenv.exists():
-        return False
-    for line in dotenv.read_text(encoding="utf-8", errors="replace").splitlines():
+    if not path.is_file():
+        return {}
+    werte: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        if key.strip() == var:
-            return bool(value.strip().strip('"').strip("'"))
-    return False
+        key = key.strip()
+        if key:
+            werte[key] = _strip_quotes(value.strip())
+    return werte
+
+
+def _env_from_skill_dotenv(skill_dir: Path, var: str) -> str:
+    """Wert von `var` aus der skill-eigenen .env ("" wenn nicht gesetzt).
+
+    Nur `<skill>/.env` — genau die Datei, die `env_loader.py` der Skills liest.
+    Projektwurzel, `.local`-Varianten oder übergeordnete Verzeichnisse werden
+    bewusst ignoriert, sonst meldete die Prüfung grün, wo der Skill zur Laufzeit
+    nichts findet.
+    """
+    return parse_dotenv(skill_dir / ".env").get(var, "")
+
+
+def _is_placeholder(skill_dir: Path, var: str, value: str) -> bool:
+    """True, wenn `value` unverändert aus `env.example.txt` stammt.
+
+    Wer die Vorlage von Hand kopiert, hat `AGENTMAIL_INBOX=dein-agent@agentmail.to`
+    stehen — nicht leer, aber auch nicht eingerichtet. Nur der Pfad über `setup.sh`
+    leert die Platzhalter; der Handpfad ist der wahrscheinlichere.
+    """
+    vorlage = parse_dotenv(skill_dir / "env.example.txt").get(var, "")
+    return bool(vorlage) and value == vorlage
 
 
 def check_requirement(req: dict, skill_dir: Path) -> bool:
@@ -140,7 +170,10 @@ def check_requirement(req: dict, skill_dir: Path) -> bool:
     if rtype == "cmd":
         return shutil.which(value) is not None
     if rtype == "env":
-        return bool(os.environ.get(value)) or _env_from_skill_dotenv(skill_dir, value)
+        # Nur Existenz, nie Gueltigkeit: ein rotierter oder falscher Key besteht
+        # die Pruefung. Ein Netzwerkaufruf beim Pull waere der Preis dafuer.
+        gesetzt = os.environ.get(value, "").strip() or _env_from_skill_dotenv(skill_dir, value)
+        return bool(gesetzt) and not _is_placeholder(skill_dir, value, gesetzt)
     if rtype == "py":
         try:
             return importlib.util.find_spec(value) is not None
@@ -159,6 +192,14 @@ def check_skill(skill_dir: Path) -> tuple[list[dict], list[dict], list[str]]:
     for req in requires:
         if check_requirement(req, skill_dir):
             continue
+        # Platzhalter sind der Sonderfall, den "fehlt" falsch beschreibt: der
+        # Wert steht da, nur eben unveraendert aus der Vorlage.
+        if req["type"] == "env":
+            wert = os.environ.get(req["value"], "").strip() or _env_from_skill_dotenv(
+                skill_dir, req["value"]
+            )
+            if wert and _is_placeholder(skill_dir, req["value"], wert):
+                req = {**req, "_grund": f"steht noch auf dem Platzhalter '{wert}'"}
         (missing_optional if req.get("optional") else missing).append(req)
     return missing, missing_optional, errors
 
@@ -171,6 +212,9 @@ def _format_req(req: dict) -> str:
         "file": "Datei/Pfad",
     }[req["type"]]
     line = f"{label} '{req['value']}'"
+    grund = req.get("_grund")
+    if grund:
+        line = f"{line} ({grund})"
     hint = req.get("hint")
     return f"{line} — {hint}" if hint else line
 

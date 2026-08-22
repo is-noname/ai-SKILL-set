@@ -71,6 +71,19 @@ Skills.
 - `env`-Pruefungen sehen bewusst auch in die skill-eigene `.env`, nicht nur in
   die Shell-Umgebung — sonst gaelte eine korrekt eingerichtete
   agentmail-Installation als kaputt.
+- Nachgeschaerft in IZG-T-157 (die drei Punkte waren dort als ungeprueft
+  markiert, jetzt entschieden und getestet):
+  - **Fundorte:** ausschliesslich Shell und `<skill>/.env` — abgeglichen mit
+    `env_loader.py` der Skills, das genau diese eine Datei laedt. Projektwurzel,
+    `.local`-Varianten und uebergeordnete Verzeichnisse bleiben aussen vor; sie
+    wuerden zur Laufzeit nicht gefunden und ein gruenes `doctor` waere gelogen.
+  - **Platzhalter:** ein Wert, der unveraendert so in `env.example.txt` steht,
+    gilt als nicht gesetzt. Der Vergleich gegen die Vorlage kommt ohne
+    Heuristik und ohne fest verdrahtete Muster aus. Damit ist auch der Handpfad
+    (Vorlage kopieren) geschuetzt, nicht nur der ueber `setup.sh`.
+  - **Gueltigkeit:** wird nicht geprueft und soll es nicht — der Preis waere ein
+    Netzwerkaufruf beim Pull. Gruenes `doctor` heisst "eingetragen", nicht
+    "funktioniert".
 
 ## Bezug
 

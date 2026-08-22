@@ -12,12 +12,11 @@ echo "agentmail-Setup in $SKILL_DIR"
 if [ -f .env ]; then
     echo "  .env existiert bereits — unveraendert gelassen"
 else
-    # Platzhalterwerte leeren, sonst gilt die Pruefung als erfuellt, obwohl
-    # noch "dein-agent@agentmail.to" drinsteht.
-    sed -e 's|^AGENTMAIL_INBOX=.*|AGENTMAIL_INBOX=|' \
-        -e 's|^AGENTMAIL_WEBHOOK_SECRET=.*|AGENTMAIL_WEBHOOK_SECRET=|' \
-        env.example.txt > .env
-    echo "  .env aus env.example.txt angelegt (Platzhalter geleert)"
+    # Platzhalter bleiben stehen: pull_skill.py erkennt unveraenderte Werte aus
+    # env.example.txt als "nicht gesetzt" (IZG-T-157). Sie zeigen dem Nutzer,
+    # welche Form der Wert haben soll.
+    cp env.example.txt .env
+    echo "  .env aus env.example.txt angelegt"
 fi
 
 # --- requests ---
@@ -32,9 +31,18 @@ else
 fi
 
 # --- Was der Mensch noch selbst tun muss ---
+# Leer ODER unveraendert aus der Vorlage zaehlt beides als "fehlt" — gleiche
+# Semantik wie die env-Pruefung in pull_skill.py.
+ist_gesetzt() {
+    local var="$1" wert vorlage
+    wert="$(sed -n "s|^${var}=||p" .env | head -1)"
+    vorlage="$(sed -n "s|^${var}=||p" env.example.txt | head -1)"
+    [ -n "$wert" ] && [ "$wert" != "$vorlage" ]
+}
+
 missing=()
-grep -q '^AGENTMAIL_API_KEY=.\+' .env || missing+=("AGENTMAIL_API_KEY (Key von agentmail.to)")
-grep -q '^AGENTMAIL_INBOX=.\+' .env || missing+=("AGENTMAIL_INBOX (deine Inbox-Adresse)")
+ist_gesetzt AGENTMAIL_API_KEY || missing+=("AGENTMAIL_API_KEY (Key von agentmail.to)")
+ist_gesetzt AGENTMAIL_INBOX || missing+=("AGENTMAIL_INBOX (deine Inbox-Adresse)")
 
 if [ ${#missing[@]} -gt 0 ]; then
     echo ""

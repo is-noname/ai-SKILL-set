@@ -104,13 +104,30 @@ Umgebungsvariable, ein Python-Paket, eine Datei — gehört das in eine
 
 | Feld | Pflicht | Bedeutung |
 |------|---------|-----------|
-| `type` | ja | `cmd` (in `PATH`), `env` (Shell **oder** skill-eigene `.env`), `py` (importierbar), `file` (Pfad existiert, `~`/`$VAR` werden aufgelöst) |
+| `type` | ja | `cmd` (in `PATH`), `env` (Shell **oder** skill-eigene `.env`, siehe unten), `py` (importierbar), `file` (Pfad existiert, `~`/`$VAR` werden aufgelöst) |
 | `value` | ja | Name des Kommandos / der Variable / des Moduls bzw. der Pfad |
 | `hint` | nein, aber praktisch immer sinnvoll | **Wie man es behebt** — dieser Text ist das, was der Nutzer zu sehen bekommt |
 | `optional` | nein (Default `false`) | `true` = Skill läuft eingeschränkt weiter (graceful degradation), wird als `~` gemeldet statt als `✗` |
 
 **Regel für `optional`:** Bricht der Skill ohne die Voraussetzung ab → Pflicht.
 Läuft er mit reduziertem Komfort weiter → `optional: true`.
+
+**Was `env` genau prüft** (bewusst eng gefasst):
+
+- **Fundort:** Shell-Umgebung oder `<skill>/.env` — dieselbe Datei, die
+  `env_loader.py` der Skills liest. Eine `.env` in der Projektwurzel, eine
+  `.local`-Variante oder eine Ebene höher zählt **nicht**: sie würde zur Laufzeit
+  nicht gefunden, ein grünes `doctor` wäre gelogen.
+- **Platzhalter zählen nicht als gesetzt.** Steht der Wert unverändert so in
+  `env.example.txt` (`AGENTMAIL_INBOX=dein-agent@agentmail.to`), gilt die
+  Voraussetzung als fehlend — mit dem Platzhalter im Bericht. Wer die Vorlage
+  von Hand kopiert, käme sonst mit einer nicht eingerichteten Installation
+  durch. Konsequenz für Skill-Autoren: sprechende Platzhalter in
+  `env.example.txt` sind erwünscht, kein Problem mehr.
+- **Nur Existenz, nie Gültigkeit.** Ein rotierter, abgelaufener oder schlicht
+  falscher Key besteht die Prüfung. Gültigkeit ließe sich nur per Netzwerkaufruf
+  beim Pull feststellen — das ist bewusst nicht gewollt. Grünes `doctor` heißt
+  „ein Wert ist eingetragen", nicht „der Zugang funktioniert".
 
 ### `setup.sh` (optional)
 
