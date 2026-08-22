@@ -7,7 +7,7 @@
 
 Eine einzelne, eigenstaendige HTML-Datei im Temp-Verzeichnis, damit nichts im Repo landet. Pfad aus `$TMPDIR` aufloesen, Fallback `/tmp`, Dateiname `<tmpdir>/benchmark-<task>-<timestamp>.html`. Danach oeffnen (`xdg-open` / `open` / `start`) und dem User den absoluten Pfad nennen.
 
-Datenquelle sind `bench.py compare --json` (bzw. `history --json`) und, nur fuer das Tool-Profil der Variantenkarten, die Laufdatensaetze unter `<out>/<task>__<variante>__NN.json`. Keine Zahl im Report, die nicht in einer dieser beiden Quellen steht — und im Report kenntlich machen, welche Zahlen aus den Laufdatensaetzen kommen, weil dort geschaetzte Werte (Tool-Result-Tokens) neben exakten stehen.
+Datenquelle sind `bench.py compare --json` (bzw. `history --json`) und, nur fuer das Tool-Profil der Variantenkarten, die Laufdatensaetze unter `<out>/runs.jsonl` (eine Zeile je Lauf). Keine Zahl im Report, die nicht in einer dieser beiden Quellen steht — und im Report kenntlich machen, welche Zahlen aus den Laufdatensaetzen kommen, weil dort geschaetzte Werte (Tool-Result-Tokens) neben exakten stehen.
 
 ## Scaffold
 

@@ -151,16 +151,13 @@ def cmd_measure(args: argparse.Namespace) -> int:
 
 
 def cmd_judge(args: argparse.Namespace) -> int:
-    p = runs.record_path(Path(args.out), args.task, args.variant, args.run)
-    if not p.is_file():
-        print(f"Kein Lauf unter {p}")
-        return 1
-    rec = json.loads(p.read_text(encoding="utf-8"))
-    rec["outcome"] = args.outcome
+    changes = {"outcome": args.outcome}
     if args.note:
-        rec["note"] = args.note
-    p.write_text(json.dumps(rec, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"{p.name}: outcome={args.outcome}")
+        changes["note"] = args.note
+    if not runs.update_record(Path(args.out), args.task, args.variant, args.run, changes):
+        print(f"Kein Lauf {args.task}/{args.variant} #{args.run} unter {args.out}")
+        return 1
+    print(f"{args.task}/{args.variant} #{args.run}: outcome={args.outcome}")
     return 0
 
 

@@ -6,6 +6,11 @@ wird, dass run/measure denselben Feldsatz erzeugen, dass die Laufnummern-Vergabe
 respektiert, dass geschriebene Datensaetze unveraendert zurueckkommen und dass eine
 unlesbare Datei im Ablageverzeichnis load_records() nicht zum Absturz bringt.
 
+IZG-T-151: Laufdaten liegen als append-only `runs.jsonl`. Getestet wird, dass geschrieben
+wird, indem angehaengt wird, dass beide Lesepfade (runs.jsonl und Altdateien einer
+frueheren Fassung) zusammen ausgewertet werden, dass defekte Zeilen uebersprungen statt
+zum Abbruch fuehren und dass ein Nachurteil beide Ablagen erreicht.
+
 Alle Tests laufen gegen tmp_path (tempfile.TemporaryDirectory), nie gegen das echte
 Ablageverzeichnis.
 
@@ -15,6 +20,7 @@ Ablageverzeichnis.
 
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -124,6 +130,101 @@ class WriteAndLoad(unittest.TestCase):
     def test_leeres_verzeichnis_liefert_leere_liste(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(runs.load_records(Path(tmp) / "fehlt", "t1"), [])
+
+
+class Jsonl(unittest.TestCase):
+    """Das Format selbst: eine Zeile je Lauf, angehaengt statt neu serialisiert."""
+
+    def test_schreiben_haengt_an_statt_die_datei_neu_zu_schreiben(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            for run in (1, 2, 3):
+                p = runs.write_record(out, runs.build_record(
+                    task="t1", variant="v1", run=run, project=Path("/p"), outcome="ok",
+                    note="", measured=measured()))
+            self.assertEqual(p, out / "runs.jsonl")
+            zeilen = p.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(zeilen), 3)
+            # jede Zeile fuer sich lesbar, Reihenfolge = Schreibreihenfolge
+            self.assertEqual([json.loads(z)["run"] for z in zeilen], [1, 2, 3])
+            # keine Datei je Lauf mehr
+            self.assertEqual(list(out.glob("*.json")), [])
+
+    def test_defekte_zeile_wird_uebersprungen_statt_abzubrechen(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            runs.write_record(out, runs.build_record(
+                task="t1", variant="v1", run=1, project=Path("/p"), outcome="ok",
+                note="", measured=measured("sid-heil")))
+            with (out / "runs.jsonl").open("a", encoding="utf-8") as fh:
+                fh.write('{"task": "t1", "variant": "v1", abgeschnitten\n')
+                fh.write("\n")  # Leerzeile
+            runs.write_record(out, runs.build_record(
+                task="t1", variant="v1", run=2, project=Path("/p"), outcome="ok",
+                note="", measured=measured("sid-danach")))
+            geladen = runs.load_records(out, "t1")
+            self.assertEqual({r["session_id"] for r in geladen}, {"sid-heil", "sid-danach"})
+
+    def test_abgeschnittene_letzte_zeile_verschmilzt_nicht_mit_der_naechsten(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "runs.jsonl").write_text('{"task": "t1", "run": 1, "vari',
+                                            encoding="utf-8")
+            runs.write_record(out, runs.build_record(
+                task="t1", variant="v1", run=2, project=Path("/p"), outcome="ok",
+                note="", measured=measured("sid-danach")))
+            geladen = runs.load_records(out, "t1")
+            self.assertEqual(len(geladen), 1)
+            self.assertEqual(geladen[0]["session_id"], "sid-danach")
+
+
+class Altdaten(unittest.TestCase):
+    """Bereits gemessene Laeufe aus der Fassung mit einer Datei je Lauf."""
+
+    def _altdatei(self, out: Path, variant: str, run: int, session_id: str) -> None:
+        rec = runs.build_record(task="t1", variant=variant, run=run, project=Path("/p"),
+                                outcome="ok", note="", measured=measured(session_id))
+        runs.legacy_record_path(out, "t1", variant, run).write_text(
+            json.dumps(rec, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def test_alte_dateien_und_jsonl_werden_zusammen_gelesen(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            self._altdatei(out, "v1", 1, "sid-alt")
+            runs.write_record(out, runs.build_record(
+                task="t1", variant="v1", run=2, project=Path("/p"), outcome="ok",
+                note="", measured=measured("sid-neu")))
+            geladen = runs.load_records(out, "t1")
+            self.assertEqual({r["session_id"] for r in geladen}, {"sid-alt", "sid-neu"})
+
+    def test_alte_laufnummern_bleiben_belegt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            self._altdatei(out, "v1", 1, "sid-alt")
+            self.assertEqual(runs.next_run_index(out, "t1", "v1"), 2)
+            runs.write_record(out, runs.build_record(
+                task="t1", variant="v1", run=2, project=Path("/p"), outcome="ok",
+                note="", measured=measured()))
+            self.assertEqual(runs.next_run_index(out, "t1", "v1"), 3)
+            # andere Variante zaehlt eigenstaendig
+            self.assertEqual(runs.next_run_index(out, "t1", "v2"), 1)
+
+    def test_nachurteil_erreicht_beide_ablagen(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            self._altdatei(out, "v1", 1, "sid-alt")
+            runs.write_record(out, runs.build_record(
+                task="t1", variant="v1", run=2, project=Path("/p"), outcome="ok",
+                note="", measured=measured("sid-neu")))
+            self.assertTrue(runs.update_record(out, "t1", "v1", 1, {"outcome": "fail"}))
+            self.assertTrue(runs.update_record(out, "t1", "v1", 2,
+                                               {"outcome": "fail", "note": "nachgeurteilt"}))
+            self.assertFalse(runs.update_record(out, "t1", "v1", 9, {"outcome": "fail"}))
+            geladen = {r["run"]: r for r in runs.load_records(out, "t1")}
+            self.assertEqual({r["outcome"] for r in geladen.values()}, {"fail"})
+            self.assertEqual(geladen[2]["note"], "nachgeurteilt")
+            # das Nachurteil erzeugt keine zweite Zeile
+            self.assertEqual(len((out / "runs.jsonl").read_text(encoding="utf-8").splitlines()), 1)
 
 
 if __name__ == "__main__":

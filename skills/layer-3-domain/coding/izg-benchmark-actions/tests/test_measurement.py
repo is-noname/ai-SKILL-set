@@ -136,7 +136,7 @@ class Schleife(unittest.TestCase):
     def test_wiederholungen_zaehlen_die_laufnummern_hoch(self):
         results = self.drive(FakeExecutor(), 3)
         self.assertEqual([e.run for e in results], [1, 2, 3])
-        self.assertEqual(len(list(self.out.glob("*.json"))), 3)
+        self.assertEqual(len(runs.load_records(self.out, "t1")), 3)
 
     def test_verworfener_lauf_belegt_keine_laufnummer(self):
         results = self.drive(FakeExecutor(meta(exit_code=1), meta()), 2)
@@ -144,7 +144,7 @@ class Schleife(unittest.TestCase):
         self.assertIsNone(results[1].discarded)
         # Beide Versuche bekommen Laufnummer 1 - erst das Schreiben verbraucht sie.
         self.assertEqual([e.run for e in results], [1, 1])
-        self.assertEqual(len(list(self.out.glob("*.json"))), 1)
+        self.assertEqual(len(runs.load_records(self.out, "t1")), 1)
 
     def test_timeout_wird_verworfen_und_nicht_verbucht(self):
         res = self.drive(FakeExecutor("timeout"))[0]

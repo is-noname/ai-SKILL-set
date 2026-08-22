@@ -91,7 +91,7 @@ python3 scripts/bench.py --out /tmp/izg-bench run \
 
 `--out` steht **vor** dem Unterbefehl. Weitere Optionen: `--model`, `--timeout` (Default 900 s), `--round`.
 
-Die Laufdaten liegen dauerhaft unter `~/.local/share/izg-bench` (`--out` oder `IZG_BENCH_OUT` aendern das). Nicht in `/tmp` ablegen — die Messung von vor drei Monaten ist der Bezugspunkt der naechsten.
+Die Laufdaten liegen dauerhaft unter `~/.local/share/izg-bench` (`--out` oder `IZG_BENCH_OUT` aendern das). Nicht in `/tmp` ablegen — die Messung von vor drei Monaten ist der Bezugspunkt der naechsten. Ablage ist eine append-only `runs.jsonl` je Ausgabeverzeichnis: ein Lauf ist eine angehaengte Zeile. Laufdaten aus der frueheren Fassung (eine `.json`-Datei je Lauf) werden weiter mitgelesen und bleiben vergleichbar.
 
 Der erste `run` legt aus den Optionen einen **Messplan** an (`<out>/plans/<task>.json`) und schreibt die Umschaltung jeder Variante hinein. Jeder spaetere `run` derselben Testaufgabe zieht ihn heran; angegebene Optionen schlagen den Plan, weichen sie ab, wird das gemeldet. Damit reicht spaeter:
 
