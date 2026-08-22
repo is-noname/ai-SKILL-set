@@ -13,6 +13,13 @@ Teil-Reads (offset oder limit) werden getrennt gezaehlt und markieren keinen
 Voll-Read als Wiederholung. Tokens sind aus der Zeichenlaenge des Tool-Results
 geschaetzt (~4 Zeichen/Token), nicht gemessen.
 
+Der zweite Abschnitt (IZG-T-156) stellt das stueckweise Lesen dem Voll-Read
+gegenueber: je (Session, Datei) mit mindestens zwei Teil-Reads die Summe der
+Scheiben gegen die Kosten eines Voll-Reads, dazu die durch ueberlappende
+Zeilenbereiche doppelt gelesenen Tokens. Wo die Datei heute fehlt oder kuerzer
+ist als damals gelesen, wird der Voll-Read aus der Tokendichte der Scheiben
+hochgerechnet und getrennt ausgewiesen.
+
 Nutzung:
     python3 scripts/read_dedupe_report.py                    # alles
     python3 scripts/read_dedupe_report.py --since 2026-08-17 # ab Datum
@@ -23,11 +30,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 
 CHARS_PER_TOKEN = 4
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit"}
+LINE_NO_RE = re.compile(r"^\s*(\d+)\t", re.MULTILINE)
 
 
 def iter_entries(path: Path):
@@ -43,9 +52,23 @@ def iter_entries(path: Path):
                 continue
 
 
-def result_length(entry: dict) -> dict[str, int]:
-    """tool_use_id -> Zeichenlaenge des Ergebnisses, aus einer user-Nachricht."""
-    out: dict[str, int] = {}
+def line_range(text: str) -> tuple[int, int] | None:
+    """Erste und letzte Zeilennummer aus einem Read-Ergebnis (cat -n-Format).
+
+    Der Read gibt jede Zeile als "<nummer>\\t<inhalt>" aus. Aus dem tatsaechlichen
+    Ergebnis gelesen ist der Bereich verlaesslicher als offset/limit, weil ein
+    limit ueber das Dateiende hinaus dort nicht sichtbar waere.
+    """
+    nums = LINE_NO_RE.findall(text)
+    if not nums:
+        return None
+    values = [int(n) for n in nums]
+    return min(values), max(values)
+
+
+def result_info(entry: dict) -> dict[str, tuple[int, tuple[int, int] | None]]:
+    """tool_use_id -> (Zeichenlaenge, Zeilenbereich) aus einer user-Nachricht."""
+    out: dict[str, tuple[int, tuple[int, int] | None]] = {}
     content = (entry.get("message") or {}).get("content")
     if not isinstance(content, list):
         return out
@@ -59,7 +82,7 @@ def result_length(entry: dict) -> dict[str, int]:
             )
         else:
             text = payload if isinstance(payload, str) else ""
-        out[block.get("tool_use_id", "")] = len(text)
+        out[block.get("tool_use_id", "")] = (len(text), line_range(text))
     return out
 
 
@@ -85,6 +108,9 @@ class Stats:
         self.repeats_any = 0
         self.tokens_any_repeat = 0
         self.per_file: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
+        # (Session, Datei) -> Scheiben als (Tokens, erste Zeile, letzte Zeile)
+        self.slices: dict[tuple[str, str], list[tuple[int, int, int]]] = defaultdict(list)
+        self.slices_unranged = 0  # Teil-Reads ohne erkennbaren Zeilenbereich
 
 
 def analyse_session(path: Path, stats: Stats, since: str | None) -> None:
@@ -94,6 +120,8 @@ def analyse_session(path: Path, stats: Stats, since: str | None) -> None:
     pending: dict[str, str] = {}  # tool_use_id -> Pfad, wartet auf sein Ergebnis
     repeat_ids: dict[str, str] = {}  # tool_use_id -> "covered" | "avoidable"
     partial_repeat_ids: set[str] = set()
+    partial_ids: set[str] = set()  # jeder Teil-Read, fuer die Scheiben-Auswertung
+    session = str(path)
 
     for entry in iter_entries(path):
         ts = entry.get("timestamp") or ""
@@ -114,13 +142,14 @@ def analyse_session(path: Path, stats: Stats, since: str | None) -> None:
                 continue
             if tinput.get("offset") is not None or tinput.get("limit") is not None:
                 stats.partial += 1
+                partial_ids.add(tuid)
+                pending[tuid] = file_path  # Tokens und Zeilenbereich holt das Ergebnis
                 # Zweite, weitere Sicht: Wiederholungen auf Pfad-Ebene, Teil-Reads
                 # eingeschlossen. Der Hook deckt diesen Fall bewusst nicht ab, die
                 # Zahl gehoert aber danebengestellt - sie ist die groessere.
                 if file_path in touched:
                     stats.repeats_any += 1
                     partial_repeat_ids.add(tuid)
-                    pending[tuid] = file_path  # nur fuer die Token-Summe unten
                 touched.add(file_path)
                 continue
             if file_path in touched:
@@ -137,14 +166,20 @@ def analyse_session(path: Path, stats: Stats, since: str | None) -> None:
                     stats.repeats_covered += 1
             seen[file_path] = True
 
-        for tuid, length in result_length(entry).items():
+        for tuid, (length, rng) in result_info(entry).items():
             file_path = pending.pop(tuid, None)
             if file_path is None:
                 continue
             tokens = length // CHARS_PER_TOKEN
-            if tuid in partial_repeat_ids:
-                partial_repeat_ids.discard(tuid)
-                stats.tokens_any_repeat += tokens
+            if tuid in partial_ids:
+                partial_ids.discard(tuid)
+                if rng is None:
+                    stats.slices_unranged += 1
+                else:
+                    stats.slices[(session, file_path)].append((tokens, rng[0], rng[1]))
+                if tuid in partial_repeat_ids:
+                    partial_repeat_ids.discard(tuid)
+                    stats.tokens_any_repeat += tokens
                 continue  # Teil-Reads zaehlen nicht in die Voll-Read-Kontextlast
             stats.tokens_total += tokens
             kind = repeat_ids.pop(tuid, None)
@@ -163,6 +198,150 @@ def analyse_session(path: Path, stats: Stats, since: str | None) -> None:
 
 def pct(part: int, whole: int) -> str:
     return f"{part / whole * 100:.1f} %" if whole else "-"
+
+
+def full_read_tokens(file_path: str) -> tuple[int, int] | None:
+    """(Tokens, Zeilen) eines Voll-Reads der Datei heute, None wenn sie fehlt.
+
+    Der Read stellt jeder Zeile ihre Nummer und einen Tabulator voran; der
+    Zuschlag ist mitgerechnet, sonst waere der Vergleich zugunsten des
+    Voll-Reads verzerrt. Gemessen wird der heutige Stand der Datei - die
+    Zeilenzahl geht mit zurueck, damit der Aufrufer erkennt, ob die Datei
+    seit der Session geschrumpft ist und der Vergleich damit hinfaellig.
+    """
+    try:
+        text = Path(file_path).read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
+        return None
+    n_lines = text.count("\n") + (1 if text and not text.endswith("\n") else 0)
+    prefix = sum(len(str(i)) + 1 for i in range(1, n_lines + 1))
+    return (len(text) + prefix) // CHARS_PER_TOKEN, n_lines
+
+
+def overlap_tokens(slices: list[tuple[int, int, int]]) -> int:
+    """Tokens, die durch ueberlappende Scheiben mehrfach im Kontext landen.
+
+    Je Scheibe wird eine gleichmaessige Tokendichte ueber ihre Zeilen
+    angenommen. Eine Zeile, die k Scheiben abdecken, kostet (k-1)/k ihrer
+    Gesamtdichte zu viel - unabhaengig davon, welche Scheibe man als die
+    noetige ansieht.
+    """
+    density: dict[int, list[float]] = defaultdict(list)
+    for tokens, lo, hi in slices:
+        n_lines = max(hi - lo + 1, 1)
+        per_line = tokens / n_lines
+        for line in range(lo, hi + 1):
+            density[line].append(per_line)
+    excess = 0.0
+    for values in density.values():
+        k = len(values)
+        if k > 1:
+            excess += sum(values) * (k - 1) / k
+    return round(excess)
+
+
+def estimated_full_tokens(slices: list[tuple[int, int, int]]) -> int:
+    """Voll-Read-Kosten von damals, geschaetzt aus den Scheiben selbst.
+
+    Fuer Dateien, die es heute nicht mehr gibt oder die seither gekuerzt
+    wurden, ist der heutige Stand kein Vergleichswert. Naeherung: mittlere
+    Tokendichte der gelesenen Zeilen mal hoechste gelesene Zeilennummer. Das
+    ist eine Untergrenze - die Datei kann ueber die letzte gelesene Zeile
+    hinausgegangen sein, dann war der Voll-Read noch teurer.
+    """
+    tokens = sum(t for t, _, _ in slices)
+    lines = sum(max(hi - lo + 1, 1) for _, lo, hi in slices)
+    max_line = max(hi for _, _, hi in slices)
+    return round(tokens / lines * max_line) if lines else 0
+
+
+def count_table(rows: list[tuple], label: str) -> None:
+    """Anteil der Datei je Scheibenzahl - rows wie in slice_report aufgebaut."""
+    per_count: dict[int, list[float]] = defaultdict(list)
+    for share, n_slices, *_ in rows:
+        per_count[n_slices].append(share)
+    print()
+    print(label)
+    print("| Scheiben | Faelle | Median Anteil der Datei | teurer als Voll-Read |")
+    print("|---:|---:|---:|---:|")
+    for n_slices in sorted(per_count):
+        shares = sorted(per_count[n_slices])
+        median = shares[len(shares) // 2]
+        worse = sum(1 for s in shares if s >= 1.0)
+        print(f"| {n_slices} | {len(shares)} | {median * 100:.0f} % | "
+              f"{worse} ({pct(worse, len(shares))}) |")
+
+
+def slice_report(stats: Stats, top: int) -> None:
+    """Teil-Reads je (Session, Datei) gegen den Voll-Read stellen (IZG-T-156)."""
+    groups = {key: sl for key, sl in stats.slices.items() if len(sl) >= 2}
+    print()
+    print("## Stueckweises Lesen - Teil-Reads gegen Voll-Read (IZG-T-156)")
+    print()
+    if not groups:
+        print("Keine (Session, Datei) mit mindestens zwei Teil-Reads.")
+        return
+
+    full_cache: dict[str, tuple[int, int] | None] = {}
+    rows = []  # (Anteil, Scheiben, Summe, Voll, Ueberlappung, Datei)
+    missing = []  # Datei existiert heute nicht mehr
+    shrunk = []  # Datei ist seit der Session kuerzer geworden - nicht vergleichbar
+    overlap_cases = 0
+    overlap_sum = 0
+    for (_session, file_path), sl in groups.items():
+        total = sum(t for t, _, _ in sl)
+        over = overlap_tokens(sl)
+        if over:
+            overlap_cases += 1
+            overlap_sum += over
+        if file_path not in full_cache:
+            full_cache[file_path] = full_read_tokens(file_path)
+        info = full_cache[file_path]
+        est = estimated_full_tokens(sl)
+        bucket = None
+        if info is None or info[0] == 0:
+            bucket = missing
+        elif max(hi for _, _, hi in sl) > info[1]:
+            # Damals wurden Zeilen gelesen, die es heute nicht mehr gibt - der
+            # heutige Voll-Read ist dann kein gueltiger Vergleichswert.
+            bucket = shrunk
+        if bucket is not None:
+            bucket.append((total / est if est else 0.0, len(sl), total, est,
+                           over, file_path))
+            continue
+        full = info[0]
+        rows.append((total / full, len(sl), total, full, over, file_path))
+
+    estimated = missing + shrunk
+    print(f"(Session, Datei) mit >= 2 Teil-Reads: {len(groups):,} | "
+          f"am heutigen Dateistand gemessen: {len(rows):,} | "
+          f"geschaetzt (Datei fehlt: {len(missing):,}, seither gekuerzt: "
+          f"{len(shrunk):,}): {len(estimated):,}")
+    if stats.slices_unranged:
+        print(f"Teil-Reads ohne erkennbaren Zeilenbereich (nicht gewertet): "
+              f"{stats.slices_unranged:,}")
+    print()
+    print(f"Ueberlappende Faelle: {overlap_cases:,} | doppelt gelesen: "
+          f"{overlap_sum:,} Tokens")
+
+    count_table(rows, "Gemessen - Datei liegt heute unveraendert lang vor:")
+    if estimated:
+        count_table(estimated, "Geschaetzt - Voll-Read aus der Tokendichte der "
+                               "Scheiben hochgerechnet (Untergrenze):")
+
+    for label, bucket in (("gemessen", rows), ("geschaetzt", estimated)):
+        worse = sorted((r for r in bucket if r[0] >= 1.0), reverse=True)
+        print()
+        print(f"Teurer als ein Voll-Read ({label}): {len(worse):,} von "
+              f"{len(bucket):,} ({pct(len(worse), len(bucket))})")
+        if top and worse:
+            print()
+            print("| Datei | Scheiben | Teil-Reads | Voll-Read | Anteil | Ueberlappung |")
+            print("|---|---:|---:|---:|---:|---:|")
+            for share, n_slices, total, full, over, file_path in worse[:top]:
+                short = "/".join(Path(file_path).parts[-3:])
+                print(f"| `{short}` | {n_slices} | {total:,} | {full:,} | "
+                      f"{share * 100:.0f} % | {over:,} |")
 
 
 def main() -> None:
@@ -213,6 +392,8 @@ def main() -> None:
             for file_path, (reads, rep, tok) in rows:
                 short = "/".join(Path(file_path).parts[-3:])
                 print(f"| `{short}` | {reads} | {rep} | {tok:,} |")
+
+    slice_report(stats, args.top)
 
 
 if __name__ == "__main__":
