@@ -27,11 +27,19 @@ elif [[ "$tool_name" == "Bash" ]]; then
   # (cat/grep/less/head/git show) der eine Ticket-Datei nur liest, darf kein
   # Ticket verschieben — sonst wuerde z.B. `cat tickets/open/X.md` bei einem
   # fehlplatzierten Ticket eine stille Verschiebung ausloesen. Schreib-Indikatoren:
-  # in-place sed/perl, Umlenkung nach tickets/, tee in tickets/.
-  echo "$command" | grep -qE 'sed[[:space:]]+-i|perl[[:space:]]+-[A-Za-z]*i|>>?[[:space:]]*[^|&;]*tickets/|tee[[:space:]]+[^|&;]*tickets/' || exit 0
-  # Ticket-Pfad aus dem Bash-Befehl extrahieren (erstes tickets/*.md ohne Quote/Space)
-  file_path=$(echo "$command" | grep -oE "[^ '\"]+/tickets/[^ '\"]+\.md" | head -1)
+  # in-place sed/perl, Umlenkung nach tickets/, tee in tickets/ — und die
+  # Python-Schreibwege (write_text/writelines/open(...,"w")), die typischerweise
+  # per `python3 - <<EOF`-Heredoc kommen und bisher am Filter vorbeiliefen
+  # (IZG-T-158). Bewusst NICHT dabei: mv/cp auf Ticketdateien — die sind laut
+  # Konvention verboten, ein Treffer waere kein zu unterstuetzender Schreibweg.
+  echo "$command" | grep -qE 'sed[[:space:]]+-i|perl[[:space:]]+-[A-Za-z]*i|>>?[[:space:]]*[^|&;]*tickets/|tee[[:space:]]+[^|&;]*tickets/|write_text\(|writelines\(|open\([^)]*['"'"'"][wa]' || exit 0
+  # Ticket-Pfad aus dem Bash-Befehl extrahieren (erstes tickets/*.md ohne Quote/Space).
+  # Das Segment vor "tickets/" ist optional: in Heredocs steht der Pfad oft relativ
+  # (Path("tickets/open/X.md")), ein erzwungenes "/tickets/" fand den gar nicht.
+  file_path=$(echo "$command" | grep -oE "[^ '\"]*tickets/[^ '\"]+\.md" | head -1)
   [[ -n "$file_path" && -f "$file_path" ]] || exit 0
+  # Relativen Pfad absolut machen, sonst scheitert der */tickets/*-Test unten.
+  file_path="$(readlink -f "$file_path" 2>/dev/null || echo "$file_path")"
 else
   exit 0
 fi

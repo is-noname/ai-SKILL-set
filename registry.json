@@ -52,7 +52,7 @@
     },
     "izg-ai-repo-global-update": {
       "name": "izg-ai-repo-global-update",
-      "description": "Checks and updates the global agent conventions (tickets.md, doc-ids.md, design-tokens.md, init_tickets.sh, ticket-mover hook) deployed in agent dirs (~/.claude etc.) against the ai-SKILL-set repo. Use when the user wants to update, refresh, sync, or drift-check their global conventions/tickets/doc-ids setup.",
+      "description": "Checks and updates the global agent conventions (tickets.md, doc-ids.md, design-tokens.md, init_tickets.sh, ticket-mover hook) deployed in agent dirs (~/.claude etc.) and the per-project ticket infrastructure (scripts/tickets.sh, PROTOCOL.md, .counter) against the ai-SKILL-set repo. Use when the user wants to update, refresh, sync, or drift-check their global conventions/tickets/doc-ids setup or their projects' ticket setup.",
       "layer": 1,
       "dependencies": [],
       "path": "skills/layer-1-base/izg-ai-repo-global-update",

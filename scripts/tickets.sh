@@ -9,12 +9,12 @@
 #   resolve_ticket_file  Zeile 98
 #   cmd_show             Zeile 145
 #   sync_one             Zeile 209
-#   cmd_sync             Zeile 276
-#   cmd_move             Zeile 305
-#   cmd_next             Zeile 371
-#   slugify              Zeile 407
-#   cmd_new              Zeile 422
-#   cmd_help             Zeile 535
+#   cmd_sync             Zeile 284
+#   cmd_move             Zeile 327
+#   cmd_next             Zeile 393
+#   slugify              Zeile 461
+#   cmd_new              Zeile 476
+#   cmd_help             Zeile 589
 # --- Ende Inhaltsverzeichnis ---
 
 set -euo pipefail
@@ -210,6 +210,10 @@ sync_one() {
   local file_path="$1"
   local result_var="${2:-}"
   [ -f "$file_path" ] || return 0
+  # Relative Pfade zuerst aufloesen: der */tickets/*-Test verlangt ein Segment vor
+  # "tickets/", ein relatives "tickets/open/X.md" fiel sonst wortlos durch und war
+  # aus Aufrufersicht nicht von "nichts zu tun" unterscheidbar (IZG-T-158).
+  file_path="$(readlink -f "$file_path" 2>/dev/null || echo "$file_path")"
   [[ "$file_path" == */tickets/* ]] || return 0
   grep -qE "^id: [A-Z]+-T-[0-9]+" "$file_path" || return 0
 
@@ -270,13 +274,31 @@ sync_one() {
 
   mv -n "$file_path" "$target_dir/$filename"
   echo "$filename automatisch von $current_folder/ nach $status/ verschoben. Datei liegt jetzt unter $target_dir/ — kein manueller mv noetig."
+  # Ohne dieses return 0 ist der Rueckgabewert der des vorangehenden Tests: ohne
+  # result_var also 1 — und `set -e` beendet den Aufrufer nach der ersten
+  # tatsaechlichen Verschiebung (in cmd_sync ohne Ziel brach damit die Schleife ab).
   [ -n "$result_var" ] && printf -v "$result_var" '%s' "$target_dir/$filename"
+  return 0
 }
 
 cmd_sync() {
   local target="${1:-}"
   if [ -n "$target" ]; then
-    sync_one "$target"
+    # Explizit uebergebener Pfad wird laut validiert. Ohne das war jeder
+    # unbrauchbare Pfad von "nichts zu tun" ununterscheidbar (IZG-T-158) —
+    # in der Schleife unten bleibt sync_one dagegen bewusst still, dort werden
+    # massenhaft Dateien durchgereicht (z.B. tickets/PROTOCOL.md).
+    if [ ! -f "$target" ]; then
+      echo "Fehler: '$target' ist keine Datei." >&2
+      exit 1
+    fi
+    local resolved
+    resolved="$(readlink -f "$target" 2>/dev/null || echo "$target")"
+    if [[ "$resolved" != */tickets/* ]]; then
+      echo "Fehler: '$target' liegt nicht in einem tickets/-Verzeichnis ($resolved) — nichts zu synchronisieren." >&2
+      exit 1
+    fi
+    sync_one "$resolved"
     return 0
   fi
 

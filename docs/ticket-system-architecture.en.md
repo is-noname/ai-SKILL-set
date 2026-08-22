@@ -235,6 +235,32 @@ by themselves — they keep whatever their last run installed. After such change
 the same command again inside the existing project; it copies the current scripts over
 the old ones and leaves tickets, counter and `PROTOCOL.md` untouched.
 
+### Distribution and drift detection (IZG-T-158)
+
+`pull_skill.py` distributes **skills** (registry-based, target `.claude/skills/`).
+`scripts/tickets.sh` is not a skill but **project infrastructure** in the project root,
+and therefore deliberately stays a separate path via `init_tickets.sh`. Reason: skills are
+stateless directories comparable by digest; the ticket system carries project-local state
+(`PROTOCOL.md` with the prefix, `.counter`) that has to be verified alongside the copy. A
+freshly copied `tickets.sh` is not necessarily functional without that state.
+
+So that this state does not drift silently, there is an actual-vs-target report:
+
+```bash
+bash scripts/check_project_drift.sh                       # all projects under ~/Dokumente
+bash scripts/check_project_drift.sh /path/to/project      # a specific one
+```
+
+Read-only, the counterpart to `check_global_drift.sh` (same question for the agent dirs).
+Reported per project: deployed scripts (`missing` / `outdated` / `current`), completeness
+of the status folders, whether the `{PRJ}` placeholder in `PROTOCOL.md` has been replaced,
+and whether `.counter` sits below the highest ID actually assigned. Exit 1 = drift found.
+
+**No version field in `tickets.sh`.** The file content is compared against the repo
+source. A hand-maintained version number would be exactly the kind of silent drift the
+report is meant to expose — forget to bump it and the script falsely reports "current".
+The repo source is the single truth anyway and is always present during a check run.
+
 ---
 
 ## 7. Coupling with the doc-ids system
@@ -279,6 +305,8 @@ Multiple agents work on the same `tickets/`:
 | Two tickets with the same number exist | Rename one (fetch a higher free number via the script), note it in the history. |
 | `.counter` shows an absurd value | Doesn't matter — the script takes the max of counter and real tickets. Optionally reset it to the highest assigned number. |
 | Global setup aborts with a fetch error | Check out the repo locally or set `AISKILLSET_RAW_BASE` to a reachable source. |
+| Hook does nothing at all, no message | `<project>/scripts/tickets.sh` is missing — the hook is only an adapter and bails out silently. `bash scripts/check_project_drift.sh <project>` shows it, `init_tickets.sh` installs it. |
+| `tickets.sh new` says "Projekt-Prefix nicht ermittelbar" | `tickets/PROTOCOL.md` still contains the `{PRJ}` placeholder. `bash scripts/init_tickets.sh <project> PREFIX` replaces it. |
 
 ---
 
