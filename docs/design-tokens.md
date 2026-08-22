@@ -2,7 +2,7 @@
 
 Globale Designwerte für alle Outputs (Web, CLI, Apps, Reports).
 
-## Farben — Basis
+## Basis
 
 | Token | Wert | Verwendung |
 |-------|------|------------|
@@ -10,7 +10,7 @@ Globale Designwerte für alle Outputs (Web, CLI, Apps, Reports).
 | Accent dim | `rgba(6,252,153,.07)` | Active-State Hintergrund (Nav, Chips) |
 | Accent bg | `rgba(6,252,153,.13)` | Stärkere Akzent-Flächen (Badges, Tags) |
 
-## Farben — Dark Mode Ebenen
+## Dark Mode Ebenen
 
 3 Hintergrund-Ebenen, keine weiteren:
 
@@ -21,7 +21,7 @@ Globale Designwerte für alle Outputs (Web, CLI, Apps, Reports).
 | `--raised` | `#212121` | Hover-States, Card-Header, erhöhte Elemente |
 | `--topbar-bg` | `#0c0c0c` | Topbar (klar dunkler als alles andere) |
 
-## Farben — Borders
+## Borders
 
 | Token | Wert | Verwendung |
 |-------|------|------------|
@@ -29,17 +29,18 @@ Globale Designwerte für alle Outputs (Web, CLI, Apps, Reports).
 | `--border-mid` | `#363636` | Stärkere Trennlinien, Inputs, Tags |
 | `--border-hi` | `#484848` | Hover-Border, fokussierte Elemente |
 
-## Farben — Text
+## Text
 
-Nur 3 Stufen:
+4 Stufen:
 
 | Token | Wert | Verwendung |
 |-------|------|------------|
 | `--text` | `#ededed` | Primärer Text, Überschriften |
-| `--muted` | `#888888` | Sekundärer Text, Labels, Beschreibungen |
-| `--faint` | `#525252` | Tertiärer Text, Pfade, Platzhalter, Mono-Meta |
+| `--secondary` | `#b8b8b8` | Sekundärer Text, Beschreibungen, Fließtext-Nebeninfo — gut lesbar, nicht wie deaktiviert |
+| `--muted` | `#888888` | Labels, Metadaten, Platzhalter — bewusst zurückgenommen |
+| `--faint` | `#525252` | Tertiärer Text, Pfade, Mono-Meta |
 
-## Farben — Status
+## Status
 
 | Token | Wert | Verwendung |
 |-------|------|------------|
@@ -49,6 +50,7 @@ Nur 3 Stufen:
 | `--yellow` | `#fbbf24` | Warn-Text |
 | `--yellow-bg` | `rgba(217,119,6,.15)` | Warn-Badge Hintergrund |
 | `--blue` | `#60a5fa` | Info, sekundäre Datenreihen |
+| `--blue-bg` | `rgba(37,99,235,.16)` | Info-Badge Hintergrund |
 
 ## Typografie
 
