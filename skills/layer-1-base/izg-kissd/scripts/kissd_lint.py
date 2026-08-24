@@ -264,6 +264,8 @@ def check_requirements(path: Path, text: str, is_skill: bool) -> list[Finding]:
     for _, line, in_code, lang in iter_lines(text):
         if not in_code or lang not in SHELL_LANGS:
             continue
+        if re.match(r"\s*(export\s+|local\s+)?[a-zA-Z_][a-zA-Z0-9_]*=", line):
+            continue  # Variablenzuweisung, kein Kommando
         match = re.match(r"\s*([a-zA-Z][a-zA-Z0-9_.-]*)\b", line)
         if match and match.group(1) not in COMMON_CMDS:
             used.add(match.group(1))

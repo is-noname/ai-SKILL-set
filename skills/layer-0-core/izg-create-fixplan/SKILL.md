@@ -37,7 +37,10 @@ Regeln:
 
 Ablauf:
 1. Findings einlesen
-2. Abhaengigkeiten zwischen Findings bestimmen
+2. Abhaengigkeiten bestimmen: Finding A haengt von B ab, wenn (a) A eine Datei oder
+   Funktion aendert, die B erst anlegt, umbenennt oder entfernt, oder (b) der Test aus A
+   ohne den Fix aus B nicht gruen werden kann. Trifft keins von beiden zu, sind die
+   Findings unabhaengig.
 3. nach Sortierkaskade sortieren
 4. Felder pro Schritt ausfuellen
 5. Ausgabe schreiben (siehe Ablage)
@@ -47,7 +50,8 @@ Ausgabeformat:
 ## Fix-Reihenfolge
 Pro Schritt genau so:
 - Schritt: <nummer>
-- Finding-ID: <F-...>
+- Finding-ID: <ID> — bei zusammengefassten Findings mehrere IDs mit Komma und
+  Leerzeichen getrennt: `F-2, F-5`
 - Ziel: <was nach dem Fix korrekt sein muss>
 - Aenderungen: <betroffene dateien/funktionen>
 - Risiko: niedrig | mittel | hoch
@@ -55,7 +59,7 @@ Pro Schritt genau so:
 - Done-Kriterium: <messbares Ergebnis>
 
 ## Reihenfolge-Begruendung
-- 3-6 Stichpunkte
+- 3-6 Stichpunkte; bei weniger als drei Schritten genau ein Stichpunkt pro Schritt
 
 ## Ablage
 Schreibe die Ausgabe nach `docs/fixplan-<YYYY-MM-DD>.md` im Projekt-Root
@@ -83,18 +87,23 @@ Schreibe die Ausgabe nach `docs/fixplan-<YYYY-MM-DD>.md` im Projekt-Root
 Nach dem Schreiben pruefen — jede Abweichung korrigieren, bevor der Lauf als fertig gilt:
 
 1. Jede Finding-ID aus der Eingabe kommt in genau einem Schritt vor — keine fehlt, keine doppelt,
-   keine erfundene ID dazu.
+   keine erfundene ID dazu. Ein Schritt darf mehrere IDs tragen (Komma-getrennt), jede einzelne
+   aber nur in diesem einen Schritt.
 2. Jeder Schritt hat alle sieben Felder (`Schritt`, `Finding-ID`, `Ziel`, `Aenderungen`, `Risiko`,
    `Test danach`, `Done-Kriterium`) ausgefuellt — kein Platzhalter wie `TBD`, `<...>` oder leer.
 3. `Risiko` ist genau einer der Werte `niedrig`, `mittel`, `hoch`.
-4. `## Reihenfolge-Begruendung` hat 3-6 Stichpunkte.
+4. `## Reihenfolge-Begruendung` haelt die Stichpunkt-Regel aus dem Ausgabeformat ein.
 5. Die Datei existiert am genannten Pfad und der Fix-Plan dieses Laufs beginnt mit
    `## Fix-Reihenfolge`.
 
-Pruefbefehl (Pfad anpassen):
+Pruefbefehl:
 
 ```bash
-test -f docs/fixplan-$(date +%F).md && grep -c '^- Finding-ID:' docs/fixplan-$(date +%F).md
+PLAN="docs/fixplan-$(date +%F).md"
+test -f "$PLAN" || echo "FEHLT: $PLAN"
+awk '/^## Fix-Reihenfolge/{n=0} /^- Finding-ID:/{n++} END{print n}' "$PLAN"
 ```
 
-Erwartet: Exit-Code 0 und eine Zahl gleich der Anzahl der Schritte.
+Das `awk` setzt bei jedem `## Fix-Reihenfolge` zurueck und zaehlt daher nur den zuletzt
+angehaengten Fix-Plan, nicht die Schritte frueherer Laeufe in derselben Datei.
+Erwartet: keine `FEHLT:`-Zeile und eine Zahl gleich der Anzahl der Schritte dieses Laufs.
