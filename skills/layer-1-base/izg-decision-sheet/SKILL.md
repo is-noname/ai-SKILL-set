@@ -63,6 +63,12 @@ Vorab nichts nachsehen — kein `ls`, kein `mkdir`: `Write` legt `.decisions/` m
 {"id":"migration-modus","q":"Migrations-Skript synchron oder als Job?","t":"pick","o":["synchron","Job"],"ctx":"Bestand: 40k Zeilen in ticket_legacy, Migration lief 2025 zuletzt bei ticket_archive - synchron dauerte dort 6min und blockte den Import."}
 ```
 
+Dateiname und das `sheet`-Feld im Header müssen identisch sein
+(`.decisions/ticketsystem-v2.jsonl` zu `"sheet":"ticketsystem-v2"`): `render_sheet.py`
+nimmt den Slug aus `head['sheet']`, der Dateiname ist nur Fallback, während
+`fetch_answers.py --slug` nach dem Dateinamen der Antwort-Datei sucht — laufen beide
+auseinander, findet der Rückweg nichts.
+
 Danach **immer** diesen einen Befehl — unabhängig davon, ob die Hooks eingerichtet
 sind, und egal ob du die Datei per Write, Edit oder Bash-Heredoc angelegt hast:
 
@@ -190,7 +196,7 @@ die `.gitignore`. Der Skill-Pull bringt alles mit, was der Ablauf braucht —
 **Global: optional, aber empfohlen.** Ein Schritt, einmal pro Maschine:
 
 ```bash
-bash <ai-SKILL-set>/scripts/setup_global_conventions.sh ~/.claude
+bash ~/Dokumente/AI/ai-SKILL-set/scripts/setup_global_conventions.sh ~/.claude
 ```
 
 Spiegelt Renderer und Scripts nach `~/ai-shared/izg-decision-sheet/` und registriert zwei
@@ -209,6 +215,12 @@ Ohne sie läuft alles gleich, nur mit zwei bis drei Aufrufen mehr pro Sheet.
 
 Die Hooks sind Claude-spezifisch, das Format und die Scripts sind es nicht. Der
 komplette Ablauf funktioniert aus dem gepullten Skill heraus:
+
+`<skill>` löst sich agent-abhängig auf: bei Claude ist das der Pfad aus der Zeile
+"Base directory for this skill" über dieser SKILL.md. Codex, Vibe und Gemini haben
+diese Zeile nicht — dort gilt `.claude/skills/izg-decision-sheet/scripts/...` im
+Projekt, sonst der globale Spiegel `~/ai-shared/izg-decision-sheet/...`, wo die
+Scripts flach ohne `scripts`-Unterordner liegen.
 
 1. Sheet nach `.decisions/<slug>.jsonl` schreiben (identisches Format).
 2. `python3 <skill>/scripts/render_sheet.py .decisions/<slug>.jsonl` — öffnet das
