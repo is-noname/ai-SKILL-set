@@ -92,11 +92,19 @@
     },
     "izg-domain-modeling": {
       "name": "izg-domain-modeling",
-      "description": "Baut das Domänenmodell eines Projekts auf — Begriffe klären, ADRs erstellen, Glossar pflegen. Verwendet doc-ids für ADR-Benennung. Ersetzt domain-modeling vollständig.",
+      "description": "Baut das Domänenmodell eines Projekts auf — Begriffe klären, ADRs erstellen, Glossar pflegen. Verwendet doc-ids für ADR-Benennung. Ersetzt domain-modeling vollständig. Use when ein Projekt Begriffe klaeren, ein Glossar pflegen oder Architekturentscheidungen als ADR festhalten soll.",
       "layer": 1,
       "dependencies": [],
       "path": "skills/layer-1-base/izg-domain-modeling",
-      "disable-model-invocation": true
+      "disable-model-invocation": true,
+      "requires": [
+        {
+          "type": "file",
+          "value": "~/.claude/doc-ids.md",
+          "optional": true,
+          "hint": "Ohne doc-ids.md PROJ-Prefix und SEQ-Zaehlweise beim Nutzer erfragen statt zu raten"
+        }
+      ]
     },
     "izg-kissd": {
       "name": "izg-kissd",

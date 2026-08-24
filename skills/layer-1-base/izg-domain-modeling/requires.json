@@ -1,0 +1,10 @@
+{
+  "requires": [
+    {
+      "type": "file",
+      "value": "~/.claude/doc-ids.md",
+      "optional": true,
+      "hint": "Ohne doc-ids.md PROJ-Prefix und SEQ-Zaehlweise beim Nutzer erfragen statt zu raten"
+    }
+  ]
+}

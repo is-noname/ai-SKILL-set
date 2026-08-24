@@ -1,6 +1,6 @@
 ---
 name: izg-domain-modeling
-description: Baut das Domänenmodell eines Projekts auf — Begriffe klären, ADRs erstellen, Glossar pflegen. Verwendet doc-ids für ADR-Benennung. Ersetzt domain-modeling vollständig.
+description: Baut das Domänenmodell eines Projekts auf — Begriffe klären, ADRs erstellen, Glossar pflegen. Verwendet doc-ids für ADR-Benennung. Ersetzt domain-modeling vollständig. Use when ein Projekt Begriffe klaeren, ein Glossar pflegen oder Architekturentscheidungen als ADR festhalten soll.
 layer: 1
 dependencies: []
 disable-model-invocation: true
@@ -61,10 +61,18 @@ Nur wenn alle drei zutreffen:
 2. Ohne Kontext überraschend
 3. Echtes Trade-off gegen konkrete Alternativen
 
-**Benennung** nach `@doc-ids.md` (Typ `ADR`):
+**Benennung** nach dem Typ-Code-Schema in `~/.claude/doc-ids.md` (Typ `ADR`).
+Existiert die Datei nicht, PROJ-Prefix und SEQ-Zaehlweise beim Nutzer erfragen
+statt zu raten:
 ```
 {PROJ}-ADR-{YYYYMMDD}-{SEQ}_{Beschreibung}.md
 ```
+
+`{PROJ}` = Kurzkuerzel des Projekts. Liegt eine `project-identifier.md`/Registry
+vor, das dort definierte Prefix nutzen; sonst den Nutzer nach dem Kuerzel fragen.
+
+`{SEQ}` = naechste freie laufende Nummer im `workspace/`-Ordner des Kontexts
+(existierende ADR-Dateien zaehlen, +1). Bei 0 vorhandenen ADRs mit `001` beginnen.
 
 **Inhalt** (minimal):
 ```md
