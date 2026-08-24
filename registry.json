@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-22",
+  "generated": "2026-08-24",
   "skills": {
     "grilling": {
       "name": "grilling",
@@ -130,6 +130,13 @@
           "hint": "Ohne gio muss das Desktop-Icon in Cinnamon/GNOME einmal manuell als vertrauenswuerdig markiert werden"
         }
       ]
+    },
+    "izg-tmuxxing": {
+      "name": "izg-tmuxxing",
+      "description": "Eigenstaendige CLI-Agenten (Vibe, Claude) als Worker in tmux-Panes starten, mit Aufgaben fuettern, beobachten und beenden - statt Subagents im eigenen Chat zu spawnen. Use when Arbeit an einen zweiten Agenten delegiert werden soll, mehrere Aufgaben parallel laufen, der Nutzer zusehen oder uebernehmen will, oder Token gespart werden sollen.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/izg-tmuxxing"
     },
     "izg-transcript-reader": {
       "name": "izg-transcript-reader",
