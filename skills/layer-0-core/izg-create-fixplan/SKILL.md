@@ -1,6 +1,8 @@
 ---
 name: izg-create-fixplan
-description: Erstelle einen umsetzbaren Fix-Plan.
+description: Erstelle einen umsetzbaren Fix-Plan aus einer Findings-Liste. Use when nach einem Review oder Audit die Findings in eine abgearbeitete Reihenfolge gebracht werden sollen.
+layer: 0
+dependencies: []
 disable-model-invocation: true
 ---
 
