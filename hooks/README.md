@@ -20,6 +20,7 @@ Die Hooks liegen im Repo in zwei Unterordnern nach **Default-Deploy-Ort**:
 |--------|-------|-----------|
 | `hooks/global/` | alle Guards (`protect-env`, `dir-scope-guard` +`dir-scope.conf`, `env-key-guard`, `file-dump-guard`, `gh-cli-guard`, `git-*-guard`, `read-size-guard`, `read-dedupe-guard`) sowie `piper-notify`, `check-chatbox`, `ticket-mover` | einmal in `~/.claude/hooks/` aufgesetzt, feuert überall, wird nie neu aufgesetzt |
 | `hooks/repo-local/` | `pre-commit-registry`, `pre-commit-agentdocs`, `pre-commit-toc` | wirken nur im `ai-SKILL-set`-Repo, nie global deployt |
+| `hooks/tests/` | `test_read-dedupe-guard.sh` | Selbsttests einzelner Hooks, laufen in einer Wegwerf-`HOME`-Umgebung; werden nicht deployt |
 
 **Wichtig:** Die Unterordner gibt es nur im **Repo**. Beim Deploy landen die Skripte
 flach in `~/.claude/hooks/` — die `settings.json`-Pfade unten zeigen deshalb auf
@@ -41,8 +42,8 @@ nur sinnvoll als **Ersatz**, falls man ihn bewusst nicht global will.
 |------|------------|----------------|
 | `protect-env.sh` | Blockt jeden Zugriff auf Pfade die `.env` enthalten (API-Key-Schutz). | Vor Read/Edit/Write auf eine `.env*`-Datei. |
 | `dir-scope-guard.sh` | Blockt Zugriff auf sensible Verzeichnisse aus `dir-scope.conf` (Privat, Steuern, `.ssh`, `.gnupg`, …). | Vor Read/Edit/Write, wenn der Zielpfad unter einem `BLOCKED_DIRS`-Eintrag liegt. |
-| `read-size-guard.sh` | Blockt `.jsonl`/`.log` hart; warnt ab 300 Zeilen (`READ_SIZE_GUARD_WARN`), blockt ab 600 (`READ_SIZE_GUARD_MAX`) und empfiehlt `offset`/`limit` bzw. Grep. Ventil: `READ_SIZE_GUARD_OFF=1`. | Vor jedem Read. |
-| `read-dedupe-guard.sh` | Meldet (kein Block) den zweiten Voll-Read derselben, seit dem ersten Read unveränderten Datei in derselben Session — höchstens einmal je Session und Datei. Zustand: `~/.claude/state/read-dedupe/<session_id>.tsv`, Dateien > 7 Tage werden aufgeräumt. Ventil: `READ_DEDUPE_GUARD_OFF=1`. | Vor jedem Read ohne `offset`/`limit`. |
+| `read-size-guard.sh` | Blockt `.jsonl`/`.log` hart; schaetzt die Kontextlast eines Voll-Reads ueber die Dateigroesse (4 Zeichen/Token), warnt ab 1.000 Tokens (`READ_SIZE_GUARD_WARN_TOKENS`), blockt ab 2.500 (`READ_SIZE_GUARD_MAX_TOKENS`) und empfiehlt `offset`/`limit` bzw. Grep. Gesetzte `READ_SIZE_GUARD_WARN`/`_MAX` wirken zusaetzlich als Zeilenschwellen. Ventil: `READ_SIZE_GUARD_OFF=1`. | Vor jedem Read. |
+| `read-dedupe-guard.sh` | **Blockt** den Wieder-Read derselben, seit dem gemerkten Voll-Read unveränderten Datei, solange er innerhalb von 200 neuen Transcript-Zeilen (≈ 30 Turns) liegt; die Deny-Meldung nennt den Zeitpunkt des ersten Reads. Danach nur noch ein einmaliger Hinweis, weil der Inhalt aus dem Fenster gefallen sein kann. Ohne lesbares `transcript_path` wird nie geblockt. Zustand: `~/.claude/state/read-dedupe/<session_id>.tsv`, Dateien > 7 Tage werden aufgeräumt. Ventile: `READ_DEDUPE_GUARD_OFF=1`, `READ_DEDUPE_GUARD_WINDOW=<zeilen>` (`0` = nie blocken). Test: `bash hooks/tests/test_read-dedupe-guard.sh`. | Vor jedem Read; `offset`/`limit`-Reads nur, wenn ein Voll-Read derselben Datei im Fenster liegt. |
 
 `dir-scope-guard.sh` liest seine Konfig aus `~/.claude/hooks/dir-scope.conf` (mitliefern).
 

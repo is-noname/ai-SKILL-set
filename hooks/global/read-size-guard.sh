@@ -1,17 +1,22 @@
 #!/bin/bash
-# PreToolUse Read: erzwingt die 300-Zeilen-Regel der globalen CLAUDE.md.
+# PreToolUse Read: bremst Voll-Reads, die zu viel Kontext ins Fenster kippen.
 #
-# Hintergrund: Voll-Reads von Dateien zwischen 300 und 1.000 Zeilen liefen bisher
-# ungebremst durch (alte Schwelle: Hinweis ab 1.000, nie blockiert). Token-Review
-# 12.08.2026: 98 Voll-Reads = 37,3 Mio. Turn-Kosten, 12,2 % aller Cache-Treffer.
+# Hintergrund: Die Schwelle hing bis IZG-T-153 an Zeilen. Zeilen sind ein schlechter
+# Tokenproxy - dichter Python-Code kostet ~10 Tokens/Zeile, lockeres YAML/Markdown
+# ein Vielfaches weniger. Gemessen 16.08.2026: drei Dateien unter der alten
+# 600-Zeilen-Sperre lagen trotzdem bei 2.100-3.100 Tokens. Seither schaetzt der Guard
+# Tokens ueber die Dateigroesse (4 Zeichen/Token, Faktor aus analyze_transcript.py).
 #
 # Verhalten:
 #   .jsonl/.log        -> harte Sperre (Transcripts, Logs)
 #   offset oder limit  -> immer durchlassen, der Read ist bereits begrenzt
-#   > WARN  (300)      -> Hinweis via additionalContext
-#   > MAX   (600)      -> deny mit Verweis auf Grep / offset/limit
+#   > WARN  (1000 Tok) -> Hinweis via additionalContext
+#   > MAX   (2500 Tok) -> deny mit Verweis auf Grep / offset/limit
 #
-# Schwellen: READ_SIZE_GUARD_WARN (Default 300), READ_SIZE_GUARD_MAX (Default 600).
+# Schwellen: READ_SIZE_GUARD_WARN_TOKENS (Default 1000),
+#            READ_SIZE_GUARD_MAX_TOKENS  (Default 2500).
+# Bestand:   READ_SIZE_GUARD_WARN / READ_SIZE_GUARD_MAX wirken weiter als
+#            Zeilenschwellen, falls gesetzt - sonst braechen alte Setzungen still.
 # Ventil:    READ_SIZE_GUARD_OFF=1 schaltet die Groessenpruefung ab.
 # Muster analog zu FILE_DUMP_GUARD_MAX_LINES in file-dump-guard.sh.
 
@@ -35,7 +40,7 @@ if echo "$FILE" | grep -qE '\.(jsonl|log)$'; then
 fi
 
 # Bilder/PDF/Binaerformate durchlassen: Read rendert sie als Bild bzw. ueber pages,
-# `wc -l` zaehlt dort nur Zeilenumbrueche im Binaerstrom - offset/limit hilft nicht.
+# die Byte-Groesse sagt dort nichts ueber die Kontextlast - offset/limit hilft nicht.
 if echo "$FILE" | grep -qiE '\.(png|jpe?g|webp|gif|bmp|ico|pdf|ipynb)$'; then
   exit 0
 fi
@@ -51,29 +56,57 @@ if [ "$BOUNDED" = "1" ]; then
   exit 0
 fi
 
-WARN="${READ_SIZE_GUARD_WARN:-300}"
-MAX="${READ_SIZE_GUARD_MAX:-600}"
+CHARS_PER_TOKEN=4
+WARN_TOK="${READ_SIZE_GUARD_WARN_TOKENS:-1000}"
+MAX_TOK="${READ_SIZE_GUARD_MAX_TOKENS:-2500}"
 
-LINES=$(wc -l < "$FILE" 2>/dev/null || echo 0)
+BYTES=$(wc -c < "$FILE" 2>/dev/null || echo 0)
+TOKENS=$(( BYTES / CHARS_PER_TOKEN ))
 
-if [ "$LINES" -gt "$MAX" ]; then
-  jq -n --arg lines "$LINES" --arg file "$(basename "$FILE")" --arg max "$MAX" '{
+NAME=$(basename "$FILE")
+HINT="Nutze Grep mit Pattern, um die Stelle zu finden, oder Read mit offset/limit auf den relevanten Abschnitt. Wird die ganze Datei wirklich gebraucht: READ_SIZE_GUARD_OFF=1 setzen."
+
+deny() {
+  jq -n --arg reason "$1" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: ("Voll-Read von " + $file + " (" + $lines + " Zeilen) blockiert - ab " + $max + " Zeilen kippt das zu viel Kontextlast ins Fenster, die jeder Folge-Turn mitbezahlt. Nutze Grep mit Pattern, um die Stelle zu finden, oder Read mit offset/limit auf den relevanten Abschnitt. Wird die ganze Datei wirklich gebraucht: READ_SIZE_GUARD_OFF=1 setzen.")
+      permissionDecisionReason: $reason
     }
   }'
   exit 0
-fi
+}
 
-if [ "$LINES" -gt "$WARN" ]; then
-  jq -n --arg lines "$LINES" --arg file "$(basename "$FILE")" --arg warn "$WARN" '{
+hint() {
+  jq -n --arg msg "$1" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      additionalContext: ("ACHTUNG: " + $file + " hat " + $lines + " Zeilen. Die CLAUDE.md-Regel verlangt ab " + $warn + " Zeilen einen Teil-Read: Read mit offset/limit auf den relevanten Abschnitt, oder Grep mit Pattern.")
+      additionalContext: $msg
     }
   }'
+  exit 0
+}
+
+# Bestandsschwellen in Zeilen: nur pruefen, wenn jemand sie ausdruecklich gesetzt hat
+LINES=0
+if [ -n "${READ_SIZE_GUARD_WARN:-}" ] || [ -n "${READ_SIZE_GUARD_MAX:-}" ]; then
+  LINES=$(wc -l < "$FILE" 2>/dev/null || echo 0)
+fi
+
+if [ -n "${READ_SIZE_GUARD_MAX:-}" ] && [ "$LINES" -gt "$READ_SIZE_GUARD_MAX" ]; then
+  deny "Voll-Read von $NAME ($LINES Zeilen) blockiert - ueber der gesetzten Zeilenschwelle READ_SIZE_GUARD_MAX=$READ_SIZE_GUARD_MAX. $HINT"
+fi
+
+if [ "$TOKENS" -gt "$MAX_TOK" ]; then
+  deny "Voll-Read von $NAME kostet geschaetzt $TOKENS Tokens - blockiert, ab $MAX_TOK Tokens kippt das zu viel Kontextlast ins Fenster, die jeder Folge-Turn mitbezahlt. $HINT"
+fi
+
+if [ -n "${READ_SIZE_GUARD_WARN:-}" ] && [ "$LINES" -gt "$READ_SIZE_GUARD_WARN" ]; then
+  hint "ACHTUNG: $NAME hat $LINES Zeilen - ueber der gesetzten Zeilenschwelle READ_SIZE_GUARD_WARN=$READ_SIZE_GUARD_WARN. Besser: Read mit offset/limit auf den relevanten Abschnitt, oder Grep mit Pattern."
+fi
+
+if [ "$TOKENS" -gt "$WARN_TOK" ]; then
+  hint "ACHTUNG: Voll-Read von $NAME kostet geschaetzt $TOKENS Tokens. Ab $WARN_TOK Tokens verlangt die CLAUDE.md-Regel einen Teil-Read: Read mit offset/limit auf den relevanten Abschnitt, oder Grep mit Pattern."
 fi
 
 exit 0
