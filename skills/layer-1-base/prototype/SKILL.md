@@ -1,6 +1,8 @@
 ---
 name: prototype
 description: Build a throwaway prototype to flesh out a design — a runnable terminal app for state/business-logic questions, or several radically different UI variations toggleable from one route.
+layer: 1
+dependencies: []
 disable-model-invocation: true
 ---
 
