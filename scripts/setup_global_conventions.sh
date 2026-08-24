@@ -232,6 +232,9 @@ render_claude_ticket_block() {
   auf eine Ticketdatei, der \`ticket-mover\`-Hook verschiebt sie dann selbst.
 - Jeder Statuswechsel braucht einen Verlaufseintrag.
 - Tickets liegen in \`tickets/\`. Auf Ansage nachsehen — kein automatischer Scan bei Sessionstart.
+- Voraussetzung: \`tickets/\` + \`scripts/tickets.sh\` im Repo-Root. Fehlen sie, ist das Projekt
+  nicht gebootstrappt — dann kein Ticket von Hand mit erfundener ID anlegen, stattdessen
+  Nutzer fragen (Bootstrap via \`init_tickets.sh\`?).
 - Volle Konvention bei Bedarf lesen: \`$AGENT_DIR/tickets.md\`
 
 ## Dokument-IDs
@@ -265,6 +268,10 @@ Lookup-Reihenfolge:
 1. \`tickets/in-progress/\` — läuft noch was?
 2. \`tickets/open/\` — nächste Arbeit
 3. \`tickets/blocked/\` — nur wenn Blocker gezielt gelöst werden soll
+
+Voraussetzung: \`tickets/\` + \`scripts/tickets.sh\` im Repo-Root. Fehlen sie, ist das Projekt
+nicht gebootstrappt — dann kein Ticket von Hand mit erfundener ID anlegen, stattdessen
+Nutzer fragen (Bootstrap via \`init_tickets.sh\`?).
 
 Ticket anlegen: \`bash scripts/tickets.sh new --type ... --title "..." --by <agent>\`
 (Standardweg, ein Kommando statt ID abfragen + Datei von Hand anlegen).
