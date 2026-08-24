@@ -98,6 +98,20 @@
       "path": "skills/layer-1-base/izg-domain-modeling",
       "disable-model-invocation": true
     },
+    "izg-kissd": {
+      "name": "izg-kissd",
+      "description": "Prueft Skills und Workflows auf Idiotensicherheit — findet Stellen, an denen ein schwaches Modell abweichen kann, und liefert konkrete Korrekturvorschlaege. Use when ein Skill, ein Prompt oder ein Workflow reproduzierbar und fremdmodell-tauglich werden soll.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/izg-kissd",
+      "requires": [
+        {
+          "type": "cmd",
+          "value": "python3",
+          "hint": "Paket 'python3' installieren (Debian/Ubuntu: apt install python3)"
+        }
+      ]
+    },
     "izg-starter-icon-mkr": {
       "name": "izg-starter-icon-mkr",
       "description": "Erstellt für eine selbstgebaute Server-App (Flask, FastAPI, Streamlit, Node etc.) ein Desktop-Startericon auf dem Schreibtisch. Beim Klick werden laufende Instanzen beendet, der Server losgelöst gestartet und der Browser geöffnet, ohne dass ein Terminalfenster hängen bleibt. Dieser Skill sollte verwendet werden, wenn ein Doppelklick-Starter, Desktop-Icon oder Launcher für eine lokale App gewünscht ist (mach mir ein Startericon, Desktop-Verknüpfung, App per Klick starten). Prüft dabei verpflichtend, dass die App einen Beenden-Button hat und kein Terminalfenster offen bleibt.",

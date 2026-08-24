@@ -1,0 +1,6 @@
+{
+  "requires": [
+    { "type": "cmd", "value": "python3",
+      "hint": "Paket 'python3' installieren (Debian/Ubuntu: apt install python3)" }
+  ]
+}
