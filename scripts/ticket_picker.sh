@@ -80,6 +80,7 @@ fi
 DESIGN_TOKENS="fg:#e5e4df,bg:-1,hl:#06fc99,fg+:#e5e4df,bg+:#302f2c,hl+:#06fc99,info:#888888,prompt:#06fc99,pointer:#06fc99,marker:#06fc99,spinner:#06fc99,header:#888888,border:#3a3a38"
 
 SELECTED="$(printf '%s' "$LINES" | fzf \
+  --multi \
   --ansi \
   --delimiter=$'\t' \
   --with-nth=1,2,3 \
@@ -96,8 +97,28 @@ SELECTED="$(printf '%s' "$LINES" | fzf \
   --preview-window='right:55%:wrap:border-left')"
 [ -z "$SELECTED" ] && exit 0
 
-ID="$(printf '%s' "$SELECTED" | cut -f1)"
-TITLE="$(printf '%s' "$SELECTED" | cut -f2)"
+TICKET_COUNT="$(printf '%s\n' "$SELECTED" | grep -c . || true)"
 
-tmux send-keys -t "$TARGET_PANE" -l "arbeite an ${ID}: ${TITLE}"
-tmux send-keys -t "$TARGET_PANE" Enter
+if [ "$TICKET_COUNT" -le 1 ]; then
+  # Einzelauswahl: unveraendert ein Auftrag an TARGET_PANE (IZG-T-194).
+  while IFS=$'\t' read -r ID TITLE _; do
+    [ -z "$ID" ] && continue
+    tmux send-keys -t "$TARGET_PANE" -l "arbeite an ${ID}: ${TITLE}"
+    tmux send-keys -t "$TARGET_PANE" Enter
+  done <<< "$SELECTED"
+else
+  # Mehrfachauswahl: ein einziger Orchestrierungsauftrag an TARGET_PANE.
+  # Panes koennen von einem Shell-Skript nur geraten werden - Verteilung
+  # uebernimmt der Agent im TARGET_PANE per ListAgents/SendMessage nach dem
+  # Orchestrierungs-Playbook (IZG-T-196, skills/layer-1-base/izg-tmuxxing/SKILL.md).
+  # Einzeiliger Text: tmux send-keys -l tippt eingebettete Newlines als Enter,
+  # was den Auftrag zeilenweise vorzeitig abschicken wuerde.
+  LIST=""
+  while IFS=$'\t' read -r ID TITLE _; do
+    [ -z "$ID" ] && continue
+    LIST+="${ID}: ${TITLE}; "
+  done <<< "$SELECTED"
+  ORDER="Orchestriere folgende Tickets nach dem Playbook in skills/layer-1-base/izg-tmuxxing/SKILL.md (IZG-T-196): ${LIST%; }"
+  tmux send-keys -t "$TARGET_PANE" -l "$ORDER"
+  tmux send-keys -t "$TARGET_PANE" Enter
+fi
