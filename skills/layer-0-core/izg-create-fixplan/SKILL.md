@@ -8,6 +8,20 @@ disable-model-invocation: true
 
 Erstelle einen umsetzbaren Fix-Plan.
 
+Eingabe:
+Eine Liste von Findings mit IDs im Format `F-<n>` — typischerweise aus einem Review-,
+Audit- oder KISSD-Report, entweder direkt im Prompt oder als Datei, auf die der Nutzer
+zeigt. Die `Finding-ID` im Ausgabeformat wird aus dieser Liste uebernommen, nie erfunden.
+
+- Keine Findings-Liste vorhanden: nicht raten und nicht selbst ein Review fahren.
+  Den Nutzer nach der Quelle fragen ("Welcher Report / welche Datei enthaelt die
+  Findings?") und hier abbrechen.
+- Findings ohne IDs gegeben: in der Reihenfolge, in der sie dastehen, selbst
+  durchnummerieren als `F-1`, `F-2`, ... und im Report unter der Fix-Reihenfolge
+  vermerken: "Findings waren unnummeriert, IDs in Eingabereihenfolge vergeben."
+- Findings mit einem anderen ID-Schema (z.B. `K1`, `SEC-03`): die vorhandenen IDs
+  unveraendert uebernehmen, nicht auf `F-<n>` umschreiben.
+
 Regeln:
 - Reihenfolge nach Risiko und Abhaengigkeit
 - Kleine, einzeln testbare Schritte
