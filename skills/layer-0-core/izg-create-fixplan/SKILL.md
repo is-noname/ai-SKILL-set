@@ -42,5 +42,10 @@ Pro Schritt genau so:
 ## Reihenfolge-Begruendung
 - 3-6 Stichpunkte
 
-Ablagepflicht:
-- Speichere die Ausgabe als Markdown-Datei
+## Ablage
+Schreibe die Ausgabe nach `docs/fixplan-<YYYY-MM-DD>.md` im Projekt-Root
+(Datum des Laufs, nicht des Findings-Reports).
+- Existiert `docs/` nicht: Verzeichnis anlegen.
+- Existiert die Zieldatei bereits: nicht ueberschreiben, sondern einen neuen
+  Abschnitt `## Lauf <YYYY-MM-DDTHH:MM>` mit dem vollstaendigen Fix-Plan
+  dieses Laufs anhaengen.
