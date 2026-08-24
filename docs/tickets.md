@@ -16,8 +16,12 @@ Leichtgewichtiges, file-basiertes Tracking für Bugs, Tasks, Features und Fragen
 `tickets/` liegt immer im **Repo-Root**. Bootstrap, falls noch nicht vorhanden
 (Prefix als zweites Argument, sonst bleibt `{PRJ}` stehen):
 ```bash
-bash ~/.claude/scripts/init_tickets.sh /pfad/zum/projekt PREFIX
+# <AGENT_DIR>: dein eigener Agent-Ordner, z.B. ~/.claude, ~/.codex, ~/.gemini, ~/.vibe
+bash <AGENT_DIR>/scripts/init_tickets.sh /pfad/zum/projekt PREFIX
 ```
+
+Fehlt `init_tickets.sh` dort, ist der globale Bootstrap fuer diesen Agenten noch nicht
+gelaufen: `bash scripts/setup_global_conventions.sh <AGENT_DIR>` im `ai-SKILL-set`-Repo.
 
 ```
 tickets/
