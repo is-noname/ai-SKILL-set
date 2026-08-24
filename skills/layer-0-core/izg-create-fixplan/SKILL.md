@@ -23,10 +23,25 @@ zeigt. Die `Finding-ID` im Ausgabeformat wird aus dieser Liste uebernommen, nie 
   unveraendert uebernehmen, nicht auf `F-<n>` umschreiben.
 
 Regeln:
-- Reihenfolge nach Risiko und Abhaengigkeit
+- Sortierkaskade (deterministisch, jede Stufe nur bei Gleichstand der vorigen):
+  1. Schritte, von denen andere Schritte abhaengen, zuerst.
+  2. Bei gleicher Abhaengigkeitsstufe: Risiko hoch vor mittel vor niedrig.
+  3. Bei weiterem Gleichstand: aufsteigend nach Finding-ID.
+- Risikostufen (je mit pruefbarem Kriterium):
+  - hoch: oeffentliche API, Datenmodell oder Migration betroffen
+  - mittel: geteilte Funktion/Modul mit mehr als einem Aufrufer betroffen
+  - niedrig: Aenderung lokal auf eine Funktion begrenzt
 - Kleine, einzeln testbare Schritte
 - Pro Schritt genau EIN primaeres Ziel
 - Keine neuen Features
+
+Ablauf:
+1. Findings einlesen
+2. Abhaengigkeiten zwischen Findings bestimmen
+3. nach Sortierkaskade sortieren
+4. Felder pro Schritt ausfuellen
+5. Ausgabe schreiben (siehe Ablage)
+6. verifizieren (siehe Verifikation)
 
 Ausgabeformat:
 ## Fix-Reihenfolge
