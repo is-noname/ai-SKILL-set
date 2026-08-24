@@ -104,6 +104,40 @@ je Modell aus. Damit laesst sich Delegation gegen Eigenarbeit vergleichen: die F
 nicht, ob der Worker Token verbraucht, sondern ob seine Token billiger sind als dieselbe
 Arbeit in deinem Kontextfenster.
 
+## Ticket-Picker (Popup)
+
+Ein zweites, unabhaengiges Pattern fuer denselben Skill-Bereich: statt einen Worker
+per `tmuxx.sh` zu starten, weist du ein **offenes Ticket direkt einem bereits
+laufenden Pane zu** — per tmux-Popup, ohne die Tastatur zu verlassen.
+
+Bausteine:
+
+1. `scripts/ticket_board.sh <projekt-pfad>` — listet OPEN/IN-PROGRESS/BLOCKED aus
+   `tickets/`. Passiv, gedacht fuer `watch -n 5 ...` in einer schmalen Statuszeile.
+2. `scripts/ticket_picker.sh <projekt-pfad>` — interaktiv: baut aus `tickets/open/*.md`
+   eine `fzf`-Liste (`id`, `title`), schickt bei Auswahl
+   `arbeite an <ID>: <Titel>` per `tmux send-keys -l` an `$TARGET_PANE` (Env-Var,
+   muss vom Aufrufer gesetzt sein — die pane_id des Panes, aus dem heraus
+   ausgewaehlt wurde).
+3. tmux-Keybinding, das `TARGET_PANE` **vor** dem Popup einfaengt (sonst zeigt
+   `#{pane_id}` auf das Popup-Pane selbst statt auf den Ziel-Worker):
+
+```tmux
+bind t run-shell "tmux display-popup -E -w 80% -h 60% -T Tickets \
+  \"TARGET_PANE=#{pane_id} bash '<repo>/scripts/ticket_picker.sh' '<projekt-pfad>'\""
+```
+
+Voraussetzung: `fzf` installiert (`sudo apt install fzf`). Ohne echtes Terminal
+(z.B. Testlauf ohne tty) bricht `fzf` mit "inappropriate ioctl for device" ab —
+das ist erwartetes Verhalten ausserhalb eines echten Popups, kein Bug.
+
+Aktuell sind `ticket_board.sh`/`ticket_picker.sh` generisch (nehmen jeden
+Projektpfad mit `tickets/`-Ordner entgegen), liegen aber im Top-Level
+`ai-SKILL-set/scripts/`, nicht im Skill-Ordner selbst — wer sie in ein fremdes
+Projekt pullen will, kopiert sie manuell mit, `pull_skill.py` fasst sie nicht an.
+Das Keybinding-Beispiel oben ist bewusst mit Platzhaltern (`<repo>`,
+`<projekt-pfad>`) statt fester Pfade notiert.
+
 ## Zustand
 
 Pro Worker eine Datei `~/.tmuxx/<name>.state` (`pane_id`, tmux-Session, Workdir,
