@@ -281,9 +281,20 @@ cmd_await() {
 }
 
 cmd_peek() {
-  local name="${1:?Name fehlt}"; local n="${2:-30}"
+  local name="${1:?Name fehlt}"; shift
+  local raw=0 n=""
+  for a in "$@"; do
+    case "$a" in
+      --raw) raw=1 ;;
+      *)     n="$a" ;;
+    esac
+  done
   reg_load "$name"
-  tmux capture-pane -p -J -t "$PANE" | tail -"$n"
+  if [ "$raw" = 1 ]; then
+    tmux capture-pane -p -J -t "$PANE" | tail -"${n:-30}"
+  else
+    tmux capture-pane -p -J -t "$PANE" | signal_lines | tail -"${n:-15}"
+  fi
 }
 
 cmd_key() {

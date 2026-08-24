@@ -28,7 +28,8 @@ bash $T send  recherche "Auftrag in einem Absatz, mit Pfaden und erwartetem Outp
 bash $T await recherche 120       # blockiert bis idle|dialog|dead, gibt das Ergebnis aus
 bash $T answer recherche 2        # blockierende Auswahl beantworten (default 2)
 bash $T status recherche          # idle | busy | dialog | dead, ohne zu warten
-bash $T peek   recherche 40       # rohe Pane-Zeilen, nur zur Fehlersuche
+bash $T peek   recherche 15       # gefilterte Pane-Zeilen, nur zur Fehlersuche
+bash $T peek   recherche --raw 40 # ungefiltert, wenn Rahmen/TUI selbst das Problem ist
 bash $T cost   recherche          # Tokenverbrauch des Workers
 bash $T stop   recherche
 ```
