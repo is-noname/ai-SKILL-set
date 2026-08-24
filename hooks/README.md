@@ -45,6 +45,17 @@ nur sinnvoll als **Ersatz**, falls man ihn bewusst nicht global will.
 | `read-size-guard.sh` | Blockt `.jsonl`/`.log` hart; schaetzt die Kontextlast eines Voll-Reads ueber die Dateigroesse (4 Zeichen/Token), warnt ab 1.000 Tokens (`READ_SIZE_GUARD_WARN_TOKENS`), blockt ab 2.500 (`READ_SIZE_GUARD_MAX_TOKENS`) und empfiehlt `offset`/`limit` bzw. Grep. Gesetzte `READ_SIZE_GUARD_WARN`/`_MAX` wirken zusaetzlich als Zeilenschwellen. Ventil: `READ_SIZE_GUARD_OFF=1`. | Vor jedem Read. |
 | `read-dedupe-guard.sh` | **Blockt** den Wieder-Read derselben, seit dem gemerkten Voll-Read unveränderten Datei, solange er innerhalb von 200 neuen Transcript-Zeilen (≈ 30 Turns) liegt; die Deny-Meldung nennt den Zeitpunkt des ersten Reads. Danach nur noch ein einmaliger Hinweis, weil der Inhalt aus dem Fenster gefallen sein kann. Ohne lesbares `transcript_path` wird nie geblockt. Zustand: `~/.claude/state/read-dedupe/<session_id>.tsv`, Dateien > 7 Tage werden aufgeräumt. Ventile: `READ_DEDUPE_GUARD_OFF=1`, `READ_DEDUPE_GUARD_WINDOW=<zeilen>` (`0` = nie blocken). Test: `bash hooks/tests/test_read-dedupe-guard.sh`. | Vor jedem Read; `offset`/`limit`-Reads nur, wenn ein Voll-Read derselben Datei im Fenster liegt. |
 
+**200-Zeilen-Fenster nachgemessen (IZG-T-159, 24.08.2026):** 3 Tage nach der
+Umstellung von Hinweis auf Deny, 3 Projekte mit ≥ 3 Sessions seit dem 22.08.2026.
+17 Deny-Ereignisse gefunden; in allen 17 fand der Agent im naechsten Turn einen
+Ersatz (Grep, `sed`-Ausschnitt oder `READ_DEDUPE_GUARD_OFF=1`) — keine einzige
+Faelle, in denen der Inhalt wirklich fehlte (Fehlblock-Quote 0/17, Schwelle war
+< 10 %). `read_dedupe_report.py` bestaetigt den Rueckgang: vermeidbare
+Wieder-Reads ueber Read-Tool-Aufrufe fielen von 46 (999 Tokens) vor der
+Umstellung auf 0 danach — die verbleibende Last verlagert sich auf den einen
+zusaetzlichen Bash-Turn pro Fall, nicht auf verlorenen Kontext. Fenster bleibt
+bei 200 Zeilen.
+
 `dir-scope-guard.sh` liest seine Konfig aus `~/.claude/hooks/dir-scope.conf` (mitliefern).
 
 ### PreToolUse — Bash
@@ -72,6 +83,7 @@ nur sinnvoll als **Ersatz**, falls man ihn bewusst nicht global will.
 | Hook | Was er tut | Wann er feuert |
 |------|------------|----------------|
 | `check-chatbox.sh` | Meldet beim Start Inbox, offene Threads (ohne `[DONE:claude]`) und Board-Einträge der Agent-Chatbox. | Bei `SessionStart` (matcher `startup`), nur wenn `agent_chatbox/` im cwd existiert. |
+| `tmux-context.sh` | Meldet eine Zeile Kontext (`tmux: skillset:1.1 %0, 4 Panes (frei: %2 %3 %6)`) via `additionalContext`, sonst `tmux: nein`. Erspart den `tmux list-panes`-Orientierungs-Turn vor Worker-Start (IZG-T-168). | Bei jedem `SessionStart`. |
 
 ### Notification
 

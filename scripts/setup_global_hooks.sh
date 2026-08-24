@@ -40,6 +40,7 @@ HOOK_SPECS=(
   "gh-cli-guard|PreToolUse|Bash"
   "piper-notify|Notification|"
   "check-chatbox|SessionStart|startup"
+  "tmux-context|SessionStart|"
 )
 
 # spec zerlegen: das matcher-Feld kann selbst | enthalten (Read|Edit|Write), daher
