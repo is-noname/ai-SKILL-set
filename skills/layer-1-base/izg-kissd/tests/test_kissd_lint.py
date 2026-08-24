@@ -125,6 +125,17 @@ def test_k2_aufforderung_ohne_kopiervorlage(tmp_path):
     assert "K2" in checks(lint.audit_file(write(tmp_path, text)))
 
 
+def test_k2_ignoriert_substantiviertes_verb(tmp_path):
+    text = CLEAN_SKILL.replace("# Demo", "# Demo\n\nOhne Hook zwei Aufrufen mehr pro Sheet.")
+    assert "K2" not in checks(lint.audit_file(write(tmp_path, text)))
+
+
+def test_k10_deutscher_ausloeser_zaehlt(tmp_path):
+    text = CLEAN_SKILL.replace("Use when der Nutzer X will.",
+                               "Dieser Skill sollte verwendet werden, wenn der Nutzer X will.")
+    assert "K10" not in checks(lint.audit_file(write(tmp_path, text)))
+
+
 def test_k3_platzhalter_im_befehl(tmp_path):
     text = CLEAN_SKILL.replace("--out report.md", "--out /pfad/report.md")
     assert "K3" in checks(lint.audit_file(write(tmp_path, text)))

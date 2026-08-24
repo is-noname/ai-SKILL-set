@@ -65,6 +65,15 @@ COMMON_CMDS = {
     "true", "false", "exit", "printf", "touch", "chmod", "bash", "sh", "date",
 }
 
+# Formulierungen, die in der description den Ausloeser benennen. Deutsch gehoert
+# dazu: die Skills dieses Repos schreiben ihn als "Dieser Skill sollte verwendet
+# werden, wenn ..." — das ist ein Ausloeser, kein fehlender.
+TRIGGER_MARKERS = (
+    "use when", "use this", "verwenden wenn", "verwendet werden, wenn",
+    "verwendet werden wenn", "genutzt werden, wenn", "genutzt werden wenn",
+    "aufrufen, wenn", "einsetzen, wenn", "should be used when",
+)
+
 VERIFY_MARKERS = ("verif", "prüf", "pruef", "check", "erwartete ausgabe",
                   "erwartet:", "expected", "danach sollte", "test")
 ERROR_MARKERS = ("fehler", "schlägt fehl", "schlaegt fehl", "fails", "failure",
@@ -156,7 +165,7 @@ def check_frontmatter(path: Path, text: str, is_skill: bool) -> list[Finding]:
                            f"name '{name}' != Verzeichnis '{path.parent.name}'",
                            "Beide angleichen — der Pull matcht ueber den Namen"))
     desc = fields.get("description", "")
-    if desc and "use when" not in desc.lower() and "verwenden wenn" not in desc.lower():
+    if desc and not any(m in desc.lower() for m in TRIGGER_MARKERS):
         out.append(Finding("K10", "warn", str(path), 1,
                            "description nennt keinen Ausloeser ('Use when ...')",
                            "Satz anhaengen: 'Use when <konkreter Ausloeser>.'"))
@@ -177,7 +186,11 @@ def check_prose(path: Path, text: str) -> list[Finding]:
                                    f"Vage Anweisung: '{word}'",
                                    "Durch die konkrete Bedingung oder den exakten Wert ersetzen"))
                 break
-        if re.search(r"\b(ausführen|ausfuehren|aufrufen|starte[n]?|run|execute)\b", low):
+        # Gross geschrieben ist es im Deutschen das substantivierte Verb ("zwei
+        # Aufrufen mehr") — eine Feststellung, keine Anweisung. Deshalb wird hier
+        # gegen die Originalschreibung geprueft, nicht gegen `low`.
+        plain = strip_quoted(line)
+        if re.search(r"\b(ausführen|ausfuehren|aufrufen|starten?|run|execute)\b", plain):
             if "`" not in line:
                 window = "\n".join(lines[no:no + 3])
                 if "```" not in window and "`" not in window:
