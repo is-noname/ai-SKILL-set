@@ -7,7 +7,7 @@ für Funktionsverständnis, nicht als Konvention-Nachschlagewerk.
 
 > **Platzhalter-Hinweis:** In diesem Dokument steht `PRJ` überall für das
 > **projektspezifische Prefix**. Jedes Projekt hat sein eigenes Prefix in der
-> Registry `project-identifier.md` im globalen Agent-Verzeichnis (z.B. ein
+> Registry `~/ai-shared/project-identifier.md` (z.B. ein
 > dreistelliges Prefix pro Repo). `PRJ`, `NNN` und Namen wie `mein-projekt` sind
 > generische Platzhalter — **keine** festen oder reservierten Bezeichnungen.
 
@@ -136,7 +136,7 @@ Das Skript ist **selbstheilend** und **kollisionssicher**. Ablauf:
   nachträglich ab (nur die Echtzeit-Eindeutigkeit ist dann nicht garantiert).
 
 > Das Prefix `PRJ` ist **kein** Teil des Skripts — es kommt als Argument und stammt
-> aus der Registry `project-identifier.md` im globalen Agent-Verzeichnis (Single
+> aus der Registry `~/ai-shared/project-identifier.md` (Single
 > Source of Truth für Projekt-Prefix). Jedes Projekt hat sein eigenes.
 
 > **Standardweg:** `scripts/tickets.sh new` ruft denselben `flock`-Codepfad auf,

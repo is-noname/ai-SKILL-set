@@ -42,7 +42,7 @@ tickets/
 
 `{PRJ}` wird zur Laufzeit aus `tickets/PROTOCOL.md` des Projekts gelesen (dort von
 `init_tickets.sh` verankert). Vergeben wird das Prefix zentral in der Registry
-`project-identifier.md` im globalen Agent-Verzeichnis.
+`~/ai-shared/project-identifier.md`.
 
 **Standardweg zum Anlegen:** `scripts/tickets.sh new` — Flags/Beispiel: `tickets.sh help`.
 
@@ -101,6 +101,13 @@ Flags/Beispiel: `tickets.sh help`.
 - `blocked/` → immer zurück nach `open/`, nie direkt nach `in-progress/`.
 - `done/` ist finales Archiv, nicht löschen. Nach Jahr unterteilt (`created:`-Feld,
   Fallback: aktuelles Jahr).
+
+## Ablauf Ticketbearbeitung
+
+1. Tickets finden: `bash scripts/tickets.sh list`
+2. In Bearbeitung nehmen: `bash scripts/tickets.sh move <ID> in-progress "<verlaufstext>" --by <agent>`
+3. Arbeit erledigen (Akzeptanzkriterien abhaken)
+4. Abschliessen: `bash scripts/tickets.sh move <ID> done "<verlaufstext>" --by <agent>`
 
 ## Tickets finden
 

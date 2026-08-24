@@ -7,7 +7,7 @@ internally — for understanding the mechanics, not as a convention reference.
 
 > **Placeholder note:** Throughout this document, `PRJ` is a stand-in for the
 > **per-project prefix**. Every project has its own prefix in the registry
-> `project-identifier.md` in the global agent directory (e.g. a short three-letter
+> `~/ai-shared/project-identifier.md` (e.g. a short three-letter
 > code per repo). `PRJ`, `NNN`, and names like `my-project` are generic placeholders
 > — **not** fixed or reserved identifiers.
 
@@ -136,7 +136,7 @@ The script is **self-healing** and **collision-safe**. Flow:
   is then not guaranteed).
 
 > The prefix `PRJ` is **not** part of the script — it comes in as an argument and
-> originates from the registry `project-identifier.md` in the global agent directory
+> originates from the registry `~/ai-shared/project-identifier.md`
 > (single source of truth for project prefixes). Every project has its own.
 
 > **Standard path:** `scripts/tickets.sh new` calls the same `flock` code path but

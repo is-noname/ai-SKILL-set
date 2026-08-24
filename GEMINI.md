@@ -29,7 +29,7 @@ Ask the user which of these applies — do not guess:
 
 ```bash
 python3 scripts/pull_skill.py list                          # show all skills
-python3 scripts/pull_skill.py pull <skill-name> --target .claude/skills
+python3 scripts/pull_skill.py pull izg-kissd --target .claude/skills   # replace izg-kissd with the skill you want
 ```
 
 **Bootstrap tickets — global setup (once per machine, per agent):**
@@ -51,6 +51,8 @@ Use the repo-local script (agent-neutral — works regardless of which agent you
 ```bash
 bash scripts/init_tickets.sh /pfad/zum/projekt
 ```
+
+Expected output: `tickets/ ready in <pfad> (Prefix <PREFIX> in PROTOCOL.md verankert, scripts deployed)` — without a prefix argument, the script prints a placeholder variant instead ("Prefix nicht gesetzt, ..."); that's expected, not an error.
 
 (After global setup the same script also lives at `<your-agent-dir>/scripts/init_tickets.sh`, e.g.
 `~/.vibe/scripts/init_tickets.sh` — but the repo-local one above always works.)

@@ -60,6 +60,8 @@ bash /path/to/ai-SKILL-set/scripts/setup_global_conventions.sh ~/.claude
 ```bash
 bash /path/to/ai-SKILL-set/scripts/init_tickets.sh
 ```
+Expected output: `tickets/ ready in <pfad> (Prefix <PREFIX> in PROTOCOL.md verankert, scripts deployed)` — without a prefix argument, the script prints a placeholder variant instead ("Prefix nicht gesetzt, ..."); that's expected, not an error.
+
 This creates `tickets/` (with subfolders), `.counter`, a project-local
 `tickets/PROTOCOL.md`, and `scripts/next_ticket_id.sh`. It does **not** copy the
 convention docs into the project — `PROTOCOL.md` points back to the global
