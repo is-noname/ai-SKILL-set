@@ -109,6 +109,14 @@ Flags/Beispiel: `tickets.sh help`.
 3. Arbeit erledigen (Akzeptanzkriterien abhaken)
 4. Abschliessen: `bash scripts/tickets.sh move <ID> done "<verlaufstext>" --by <agent>`
 
+## Wenn etwas fehlschlaegt
+
+| Symptom | Massnahme |
+|---|---|
+| Platzhalter `{PRJ}` in `tickets/PROTOCOL.md` noch nicht ersetzt (z.B. `tickets.sh new` bricht mit "Projekt-Prefix nicht ermittelbar" ab) | `bash scripts/init_tickets.sh <projekt-pfad> <PREFIX>` erneut aufrufen — idempotent, ersetzt den Platzhalter nachtraeglich |
+| `scripts/tickets.sh` nicht gefunden | Falsches cwd — ins Repo-Root wechseln (dort liegt `tickets/` neben `scripts/`) |
+| `move` schlaegt fehl (z.B. `blocked` -> `in-progress` verboten, siehe Status-Lifecycle oben) | Fehlermeldung des Skripts lesen, erlaubten Statusuebergang pruefen; kein manuelles `mv` als Ersatz |
+
 ## Tickets finden
 
 Nur auf Ansage — kein automatischer Scan bei Sessionstart. Der User gibt vor, ob und an
