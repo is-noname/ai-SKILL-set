@@ -5,10 +5,17 @@ Vollständige Konvention: `~/ai-shared/tickets.md` (auch erreichbar als
 Bedienung (Flags, Beispiele): Aus dem Repo-Root: `bash scripts/tickets.sh help`.
 
 ## Ablauf
-1. `bash scripts/tickets.sh list`
-2. `bash scripts/tickets.sh move <ID> in-progress "<verlaufstext>" --by <agent>`
-3. Arbeit erledigen
-4. `bash scripts/tickets.sh move <ID> done "<verlaufstext>" --by <agent>`
+1. `bash scripts/tickets.sh list` — erwartet: Tabelle mit offenen/in-progress Tickets.
+2. `bash scripts/tickets.sh move <ID> in-progress "<verlaufstext>" --by <agent>` — erwartet: Meldung "... nach in-progress/ verschoben." mit neuem Pfad.
+3. Arbeit erledigen.
+4. `bash scripts/tickets.sh move <ID> done "<verlaufstext>" --by <agent>` — erwartet: Meldung "... nach done/ verschoben." mit neuem Pfad.
+
+## Wenn etwas fehlschlaegt
+| Symptom | Massnahme |
+|---|---|
+| Platzhalter `{PRJ}` unten im Abschnitt "Prefix" noch nicht ersetzt (z.B. `tickets.sh new` bricht mit "Projekt-Prefix nicht ermittelbar" ab) | `bash scripts/init_tickets.sh <projekt-pfad> <PREFIX>` erneut aufrufen — idempotent, ersetzt den Platzhalter nachtraeglich |
+| `scripts/tickets.sh` nicht gefunden | Falsches cwd — ins Repo-Root wechseln (dort liegt `tickets/` neben `scripts/`) |
+| `move` schlaegt fehl (z.B. `blocked` -> `in-progress` verboten) | Fehlermeldung des Skripts lesen, erlaubten Statusuebergang pruefen; kein manuelles `mv` als Ersatz |
 
 ## Prefix
 `{PRJ}-T-{NNN}_{kurz-beschreibung}.md`
