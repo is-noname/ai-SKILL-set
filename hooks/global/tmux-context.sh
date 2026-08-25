@@ -28,4 +28,15 @@ free="${free# }"
 [ -n "$free" ] || free="keine"
 
 msg="tmux: $cur, $total Panes (frei: $free)"
+
+cheatsheet="$HOME/ai-shared/tmuxxing-cheatsheet.md"
+if [ -f "$cheatsheet" ]; then
+  content=$(cat "$cheatsheet") || content=""
+  if [ -n "$content" ]; then
+    msg="$msg
+
+$content"
+  fi
+fi
+
 jq -n --arg m "$msg" '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $m}}'
