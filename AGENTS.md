@@ -49,7 +49,7 @@ bash scripts/setup_global_conventions.sh ~/.claude  # if you are Claude
 Use the repo-local script (agent-neutral — works regardless of which agent you are):
 
 ```bash
-bash scripts/init_tickets.sh /pfad/zum/projekt
+bash scripts/init_tickets.sh /pfad/zum/projekt PREFIX   # PREFIX: 2-6 Grossbuchstaben
 ```
 
 Expected output: `tickets/ ready in <pfad> (Prefix <PREFIX> in PROTOCOL.md verankert, scripts deployed)` — without a prefix argument, the script prints a placeholder variant instead ("Prefix nicht gesetzt, ..."); that's expected, not an error.

@@ -58,7 +58,7 @@ bash /path/to/ai-SKILL-set/scripts/setup_global_conventions.sh ~/.claude
 
 *b) Per project* — run from within the target project:
 ```bash
-bash /path/to/ai-SKILL-set/scripts/init_tickets.sh
+bash /path/to/ai-SKILL-set/scripts/init_tickets.sh /pfad/zum/projekt PREFIX   # PREFIX: 2-6 Grossbuchstaben
 ```
 Expected output: `tickets/ ready in <pfad> (Prefix <PREFIX> in PROTOCOL.md verankert, scripts deployed)` — without a prefix argument, the script prints a placeholder variant instead ("Prefix nicht gesetzt, ..."); that's expected, not an error.
 
