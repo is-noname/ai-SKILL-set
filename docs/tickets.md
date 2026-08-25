@@ -127,8 +127,11 @@ welchem Ticket gearbeitet wird.
 
 `tickets.sh list` ist der Weg, Tickets zu finden — eine Frontmatter-Zeile pro Ticket statt
 N volle Datei-Reads. Ohne `--status` in dieser Reihenfolge, `done/` ausgenommen:
-`in-progress` (angefangene Arbeit) → `open` (nächste sinnvolle Arbeit) → `blocked` (nur
-wenn gezielt ein Blocker gelöst werden soll). Flags/Beispiele: `tickets.sh help`.
+`in-progress` (angefangene Arbeit) → `open` → `blocked` (nur wenn gezielt ein Blocker
+gelöst werden soll). Innerhalb von `open` ist die Ausgabe nicht nach `priority` sortiert,
+sondern nach ID aufsteigend (Dateinamen-Reihenfolge) — das älteste offene Ticket steht
+zuerst. Wer nach Priorität vorgehen will, filtert explizit: `tickets.sh list --status open
+--priority high`. Flags/Beispiele: `tickets.sh help`.
 
 **Nie rekursiv über `tickets/` suchen** (`grep -r`, `find`, Volltext-Read über alle
 Unterordner) — `done/` wächst monoton und zahlt sonst bei jeder Abfrage mit. Immer über
