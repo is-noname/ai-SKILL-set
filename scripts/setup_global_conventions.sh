@@ -552,6 +552,29 @@ TOML
     fi
   fi
 
+  # Globale Guard-/Utility-Hooks (IZG-T-212): alle verbleibenden hooks/global/-Hooks
+  # (ausser ticket-mover.sh/-vibe.sh, s.o.) sprechen Claudes PreToolUse/SessionStart-
+  # JSON-Kontrakt (tool_input.*, hookSpecificOutput) - anders als ticket-mover.sh haben
+  # sie kein agent-neutrales Kernformat, das eine eigene Vibe-/Codex-/Gemini-Fassung
+  # rechtfertigen wuerde. Kriterium: Claude-only, solange kein Adapter fuer ein anderes
+  # Hook-Format existiert. deploy_file statt deploy_shared_convention: lokale Aenderungen
+  # sind hier erwuenschter User-State (Beleg: gh-cli-guard.sh lief lokal auseinander,
+  # s. Ticket-Verlauf), kein Sync-Problem - Clobber-Schutz warnt statt zu ueberschreiben.
+  # Registrierung in settings.json ist NICHT Teil dieses Deploys (offener Punkt,
+  # IZG-T-212) - deployte Hooks liegen bereit, wirken aber erst nach Eintrag im
+  # PreToolUse/SessionStart-Block von settings.json.
+  if [ "$agent_name" = ".claude" ]; then
+    for guard_hook in check-chatbox.sh dir-scope-guard.sh env-key-guard.sh \
+        file-dump-guard.sh gh-cli-guard.sh git-commit-guard.sh git-destructive-guard.sh \
+        git-push-guard.sh piper-notify.sh protect-env.sh read-dedupe-guard.sh \
+        read-size-guard.sh tmux-context.sh; do
+      deploy_file "hooks/global/$guard_hook" "$AGENT_DIR/hooks/$guard_hook" || return 1
+      [ -f "$AGENT_DIR/hooks/$guard_hook" ] && chmod +x "$AGENT_DIR/hooks/$guard_hook"
+    done
+    # dir-scope-guard.sh braucht dir-scope.conf als Sibling-Konfigurationsdatei.
+    deploy_file "hooks/global/dir-scope.conf" "$AGENT_DIR/hooks/dir-scope.conf" || return 1
+  fi
+
   # izg-decision-sheet (IZG-T-063): Renderer global bereitstellen, Abhol-Hook je Agent-Dir.
   deploy_decision_sheet || return 1
   # Quelle sind die Hooks IM Skill, nicht hooks/global/: so kommen sie beim
