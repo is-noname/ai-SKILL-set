@@ -50,7 +50,9 @@ It lists available skills, resolves dependencies, and installs into `.claude/ski
 **4. Optionally set up the ticket system. Two levels:**
 
 *a) Global, once per machine per agent* — deploys the convention docs
-`tickets.md` + `doc-ids.md` into your agent dir and patches your global config
+`tickets.md`, `doc-ids.md`, `design-tokens.md` and
+[`file-reading.md`](docs/file-reading.md) (Read/Grep instead of `cat`/`sed`/`head`)
+into your agent dir and patches your global config
 (`~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, …) to load them:
 ```bash
 bash /path/to/ai-SKILL-set/scripts/setup_global_conventions.sh ~/.claude

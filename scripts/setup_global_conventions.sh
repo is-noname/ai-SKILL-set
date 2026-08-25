@@ -22,15 +22,16 @@
 
 # --- Inhaltsverzeichnis (auto) ---
 # Von update_script_toc.py generiert — nicht von Hand pflegen.
-#   _fetch                              Zeile 68
-#   deploy_file                         Zeile 109
-#   deploy_shared_convention            Zeile 126
-#   deploy_decision_sheet               Zeile 151
-#   sync_block                          Zeile 177
-#   render_claude_ticket_block          Zeile 223
-#   render_ticket_lookup_block          Zeile 250
-#   render_doc_ids_design_tokens_block  Zeile 282
-#   process_agent_dir                   Zeile 295
+#   _fetch                              Zeile 69
+#   deploy_file                         Zeile 110
+#   deploy_shared_convention            Zeile 127
+#   deploy_decision_sheet               Zeile 152
+#   sync_block                          Zeile 178
+#   render_claude_ticket_block          Zeile 224
+#   render_ticket_lookup_block          Zeile 254
+#   render_doc_ids_design_tokens_block  Zeile 290
+#   render_file_reading_block           Zeile 305
+#   process_agent_dir                   Zeile 325
 # --- Ende Inhaltsverzeichnis ---
 
 REPO_ROOT="$(dirname "$0")/.."
@@ -200,7 +201,10 @@ sync_block() {
   else
     local heading
     for heading in "$@"; do
-      if grep -qF "$heading" "$cfg"; then
+      # Zeilenanfang statt "irgendwo in der Zeile" (IZG-T-161): sonst matcht
+      # "## Datei-Handling" auch eine fremde "### Datei-Handling"-Sektion und der
+      # Block wird faelschlich nie gepatcht.
+      if awk -v h="$heading" 'index($0, h) == 1 { found = 1 } END { exit !found }' "$cfg"; then
         echo "  WARNUNG: $cfg enthält bereits eine \"$heading\"-Sektion ohne izg-block-Marker (vor IZG-T-092 angelegt oder von Hand angepasst) — NICHT automatisch verändert, um keine manuellen Ergänzungen zu verlieren. Block manuell mit dem aktuellen Skript-Inhalt abgleichen und in <!-- izg-block:$block_id start/end --> einfassen, danach übernimmt der Hash-Vergleich automatisch." >&2
         return 0
       fi
@@ -298,6 +302,28 @@ Beide sind Symlinks auf die gemeinsame Quelle \`~/ai-shared/\` — bei Bedarf le
 BLOCK
 }
 
+# Datei-Handling-Regel (IZG-T-161). Der Kurzblock steht direkt in der Agent-Konfig, weil
+# er bei jedem Lesevorgang gilt und ein Nachschlage-Verweis dafuer zu spaet kaeme; die
+# Langfassung (Hooks, Ventile, Verhalten bei Deny) liegt in file-reading.md.
+render_file_reading_block() {
+  local AGENT_DIR="$1"
+  cat << BLOCK
+## Datei-Handling
+
+- **Lesen:** Read statt \`cat\`/\`less\`/\`nl\`/\`sed\`/\`head\`/\`tail\`. Ab ~4 KB Dateigroesse
+  (~1.000 Tokens) Read mit \`offset\`/\`limit\` auf den relevanten Abschnitt, oder Grep mit
+  Pattern — nie die ganze Datei ins Fenster kippen.
+- **Suchen/Auflisten:** Glob statt \`find\`, Grep statt \`grep -rn\`. Wenn doch die Shell:
+  \`find\` eingrenzen (\`-name\`, \`-maxdepth\`) oder nachfiltern (\`| head\`, \`| grep\`),
+  Listings filtern statt \`ls -R\`. Die Shell gibt gefilterte Ergebnisse aus, keinen Dateiinhalt.
+- **Nicht durchsuchen:** \`.git/\`, \`__pycache__/\`, \`node_modules/\`, \`.idea/\`, \`.vscode/\`, \`.gemini/\`.
+- Gilt auch im Auto-Modus und bei genehmigtem Plan. Guard-Hooks (nur Claude) blocken
+  Verstoesse — Deny-Meldung befolgen, nicht auf ein anderes Dump-Kommando ausweichen.
+
+Volle Konvention inkl. Hooks und Ventilen bei Bedarf: \`$AGENT_DIR/file-reading.md\`
+BLOCK
+}
+
 # Setup/Update für genau ein Agent-Dir. Rückgabe 0 = ok, 1 = Fehler.
 process_agent_dir() {
   local AGENT_DIR="$1"
@@ -367,6 +393,11 @@ HDR
   # design-tokens.md — globale Designwerte, ebenfalls reine Konvention. Wird ab
   # IZG-T-054 erstmals an alle Agent-Dirs verteilt (lag zuvor nur in ~/.claude).
   deploy_shared_convention "docs/design-tokens.md" "design-tokens.md" "$AGENT_DIR" || return 1
+
+  # file-reading.md — Read/Grep-statt-cat/sed/head-Konvention (IZG-T-161). Lag zuvor nur
+  # handgeschrieben in ~/.claude/CLAUDE.md; die Guard-Hooks greifen ebenfalls nur bei
+  # Claude. Als geteilte Konvention gilt sie jetzt fuer alle Agent-Dirs.
+  deploy_shared_convention "docs/file-reading.md" "file-reading.md" "$AGENT_DIR" || return 1
 
   # project-identifier.md enthält die Prefix-Registry (User-State). Statt einer
   # Kopie pro Agent-Dir gibt es nur eine physische Datei unter ~/ai-shared/, jeder
@@ -569,6 +600,14 @@ PY
     conventions_block="$(render_doc_ids_design_tokens_block "$AGENT_DIR")"
     sync_block "$cfg" "doc-ids-design-tokens" "$conventions_block" "## Konventionen (Dokument-IDs & Design Tokens)"
   fi
+
+  # Datei-Handling gilt fuer jeden Agent gleich (IZG-T-161) — daher ausserhalb der
+  # CLAUDE.md/AGENTS.md-Verzweigung. Legacy-Heading "## Datei-Handling": eine von Hand
+  # geschriebene Sektion (so lag die Regel bisher in ~/.claude/CLAUDE.md) wird gemeldet
+  # statt ueberschrieben.
+  local file_reading_block
+  file_reading_block="$(render_file_reading_block "$AGENT_DIR")"
+  sync_block "$cfg" "file-reading" "$file_reading_block" "## Datei-Handling"
 
   echo "Done: $AGENT_DIR"
   return 0

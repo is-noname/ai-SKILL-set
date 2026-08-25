@@ -10,6 +10,11 @@ Exit-Code (`exit 2` = harter Abbruch).
 > `file-dump-guard.sh` nutzt stattdessen `python3` für die Kommando-Zerlegung.
 > `piper-notify.sh` braucht zusätzlich `python3`, Piper-TTS und `aplay`.
 
+> **Regel vs. Netz:** `read-size-guard`, `read-dedupe-guard` und `file-dump-guard` sichern
+> die Datei-Handling-Konvention ab, sie *sind* sie nicht. Die Konvention selbst steht in
+> [`docs/file-reading.md`](../docs/file-reading.md) und gilt auch dort, wo diese Hooks nicht
+> laufen (Vibe/Codex/Gemini, Sessions ohne globale Agent-Konfig).
+
 ---
 
 ## Ordnerstruktur — global/ vs. repo-local/

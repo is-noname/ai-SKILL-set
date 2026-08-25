@@ -32,6 +32,7 @@ MANAGED=(
   "docs/tickets.md|tickets.md"
   "docs/doc-ids.md|doc-ids.md"
   "docs/design-tokens.md|design-tokens.md"
+  "docs/file-reading.md|file-reading.md"
   "scripts/init_tickets.sh|scripts/init_tickets.sh"
   "scripts/ticket_protocol_template.md|scripts/ticket_protocol_template.md"
   "hooks/global/ticket-mover.sh|hooks/ticket-mover.sh"
@@ -123,7 +124,8 @@ check_izg_block() {
 
   local heading
   for heading in "$@"; do
-    if grep -qF "$heading" "$cfg"; then
+    # Zeilenanfang-Match, identisch zu sync_block() (IZG-T-161).
+    if awk -v h="$heading" 'index($0, h) == 1 { found = 1 } END { exit !found }' "$cfg"; then
       echo "  ~~ izg-block:$block_id ($cfg) — Sektion ohne Marker (vor IZG-T-092 angelegt oder von Hand ergaenzt, nicht automatisch pruefbar)"
       drift_found=1
       return
@@ -172,6 +174,11 @@ for adir in "${agent_dirs[@]}"; do
     check_izg_block "$cfg" "ticket-lookup" "$(render_ticket_lookup_block "$adir")" "## Ticketsystem"
     check_izg_block "$cfg" "doc-ids-design-tokens" "$(render_doc_ids_design_tokens_block "$adir")" \
       "## Konventionen (Dokument-IDs & Design Tokens)"
+  fi
+
+  # Datei-Handling-Block: agent-unabhaengig (IZG-T-161).
+  if [ -n "$cfg_file" ] && [ -f "$cfg" ]; then
+    check_izg_block "$cfg" "file-reading" "$(render_file_reading_block "$adir")" "## Datei-Handling"
   fi
 done
 
