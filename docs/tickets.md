@@ -106,6 +106,8 @@ Flags/Beispiel: `tickets.sh help`.
 
 1. Tickets finden: `bash scripts/tickets.sh list`
 2. In Bearbeitung nehmen: `bash scripts/tickets.sh move <ID> in-progress "<verlaufstext>" --by <agent>`
+   Verifikation: `bash scripts/tickets.sh list --status <neuer-status>` zeigt die ID. Fehlt sie:
+   `bash scripts/tickets.sh sync`.
 3. Arbeit erledigen (Akzeptanzkriterien abhaken)
 4. Abschliessen: `bash scripts/tickets.sh move <ID> done "<verlaufstext>" --by <agent>`
 
