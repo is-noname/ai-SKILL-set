@@ -22,16 +22,17 @@
 
 # --- Inhaltsverzeichnis (auto) ---
 # Von update_script_toc.py generiert — nicht von Hand pflegen.
-#   _fetch                              Zeile 69
-#   deploy_file                         Zeile 110
-#   deploy_shared_convention            Zeile 127
-#   deploy_decision_sheet               Zeile 152
-#   sync_block                          Zeile 178
-#   render_claude_ticket_block          Zeile 224
-#   render_ticket_lookup_block          Zeile 254
-#   render_doc_ids_design_tokens_block  Zeile 290
-#   render_file_reading_block           Zeile 305
-#   process_agent_dir                   Zeile 325
+#   _fetch                              Zeile 70
+#   deploy_file                         Zeile 111
+#   deploy_shared_convention            Zeile 128
+#   deploy_tmuxxing_cheatsheet          Zeile 158
+#   deploy_decision_sheet               Zeile 182
+#   sync_block                          Zeile 208
+#   render_claude_ticket_block          Zeile 257
+#   render_ticket_lookup_block          Zeile 287
+#   render_doc_ids_design_tokens_block  Zeile 323
+#   render_file_reading_block           Zeile 338
+#   process_agent_dir                   Zeile 358
 # --- Ende Inhaltsverzeichnis ---
 
 REPO_ROOT="$(dirname "$0")/.."
@@ -144,6 +145,35 @@ deploy_shared_convention() {
     ln -sf "$master" "$dest"
     echo "  symlinked: $dest -> $master"
   fi
+}
+
+# Deployt CHEATSHEET.md des izg-tmuxxing-Skills als tmuxxing-cheatsheet.md nach
+# ~/ai-shared, analog zu den anderen geteilten Konventionen — aber KEIN Eintrag im
+# Config-Block: die Datei wird vom SessionStart-Hook (IZG-T-205) gelesen, nicht
+# permanent verlinkt (sonst zahlt man sie doppelt). Besonderheit: CHEATSHEET.md
+# traegt den Platzhalter "<skill-pfad>" (im Skill-Kontext kennt der Agent seinen
+# eigenen Ordner) — im injizierten Hook-Kontext ist er kontextlos und der Agent
+# wuerde raten. Der deployte Master bekommt deshalb den aufgeloesten absoluten
+# Pfad, die Repo-Fassung behaelt den Platzhalter (IZG-T-209).
+deploy_tmuxxing_cheatsheet() {
+  local AGENT_DIR="$1"
+  local relpath="skills/layer-1-base/izg-tmuxxing/CHEATSHEET.md"
+  local fname="tmuxxing-cheatsheet.md"
+  deploy_shared_convention "$relpath" "$fname" "$AGENT_DIR" || return 1
+
+  local master="$HOME/ai-shared/$fname"
+  local skill_dir="$REPO_ROOT/skills/layer-1-base/izg-tmuxxing"
+  local skill_pfad
+  skill_pfad="$(cd "$skill_dir" 2>/dev/null && pwd)"
+  if [ -z "$skill_pfad" ]; then
+    echo "Error: Skill-Verzeichnis '$skill_dir' nicht gefunden — <skill-pfad> in $master NICHT aufgeloest (bliebe sonst ein wertloser Pfad wie 'T=/scripts/tmuxx.sh')." >&2
+    return 1
+  fi
+  if [ ! -f "$skill_pfad/scripts/tmuxx.sh" ]; then
+    echo "Error: '$skill_pfad/scripts/tmuxx.sh' existiert nicht — <skill-pfad> in $master NICHT aufgeloest (Ziel waere ein toter Pfad)." >&2
+    return 1
+  fi
+  sed -i "s#<skill-pfad>#$skill_pfad#g" "$master"
 }
 
 # Deployt den izg-decision-sheet Renderer nach ~/ai-shared/izg-decision-sheet/ (IZG-T-063).
@@ -398,6 +428,10 @@ HDR
   # handgeschrieben in ~/.claude/CLAUDE.md; die Guard-Hooks greifen ebenfalls nur bei
   # Claude. Als geteilte Konvention gilt sie jetzt fuer alle Agent-Dirs.
   deploy_shared_convention "docs/file-reading.md" "file-reading.md" "$AGENT_DIR" || return 1
+
+  # tmuxxing-cheatsheet.md — wird vom SessionStart-Hook (IZG-T-205) direkt gelesen,
+  # nicht per Config-Block verlinkt. Kein render_*_block dafuer (IZG-T-209).
+  deploy_tmuxxing_cheatsheet "$AGENT_DIR" || return 1
 
   # project-identifier.md enthält die Prefix-Registry (User-State). Statt einer
   # Kopie pro Agent-Dir gibt es nur eine physische Datei unter ~/ai-shared/, jeder

@@ -160,6 +160,13 @@
       "dependencies": [],
       "path": "skills/layer-1-base/izg-tmuxxing"
     },
+    "izg-tmuxxing-setup": {
+      "name": "izg-tmuxxing-setup",
+      "description": "Einmaliger Maschinen-Setup fuer izg-tmuxxing - tmux/kitty-Configs deployen, fzf installieren und den Ticket-Picker-Popup per Keybinding einrichten. Laeuft EINMAL PRO MASCHINE, NICHT zur Laufzeit eines Workers. Use when eine neue Maschine fuer izg-tmuxxing eingerichtet wird, tmux.conf/kitty.conf fehlen, oder der Ticket-Picker (bind t) noch nicht konfiguriert ist. NICHT verwenden, um einen Worker zu starten oder zu steuern - dafuer izg-tmuxxing selbst.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/izg-tmuxxing-setup"
+    },
     "izg-transcript-reader": {
       "name": "izg-transcript-reader",
       "description": "Gemeinsamer Adapter fuer das undokumentierte Claude-Code-Transcript-Format (~/.claude/projects/<slug>/*.jsonl). Kein eigenstaendig aufrufbarer Skill, sondern Formatwissen-Baustein fuer Skills, die Transcripts auswerten.",
