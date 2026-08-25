@@ -7,7 +7,8 @@
 >
 > Beschrieben wird die **Konvention** (Felder, Regeln) — was `tickets.sh` nicht selbst
 > sagen kann. Flags, Optionen, Beispielaufrufe: `tickets.sh help`. Interna (ID-Vergabe,
-> Status-Hook, Bootstrap-Ebenen): `docs/ticketsystem-architektur.md`.
+> Status-Hook, Bootstrap-Ebenen): `docs/ticketsystem-architektur.md` im ai-SKILL-set-Repo
+> (nicht lokal deployt).
 
 Leichtgewichtiges, file-basiertes Tracking für Bugs, Tasks, Features und Fragen.
 
