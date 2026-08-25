@@ -9,10 +9,17 @@ if [ -z "${TMUX:-}" ]; then
   exit 0
 fi
 
-cur=$(tmux display-message -p '#{session_name}:#{window_index}.#{pane_index} #{pane_id}' 2>/dev/null) || {
-  jq -n '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: "tmux: nein"}}'
-  exit 0
-}
+if [ -n "${TMUX_PANE:-}" ]; then
+  cur=$(tmux display-message -p -t "$TMUX_PANE" '#{session_name}:#{window_index}.#{pane_index} #{pane_id}' 2>/dev/null) || {
+    jq -n '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: "tmux: nein"}}'
+    exit 0
+  }
+else
+  cur=$(tmux display-message -p '#{session_name}:#{window_index}.#{pane_index} #{pane_id}' 2>/dev/null) || {
+    jq -n '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: "tmux: nein"}}'
+    exit 0
+  }
+fi
 
 panes=$(tmux list-panes -F '#{pane_id} #{pane_current_command}' 2>/dev/null) || panes=""
 total=$(printf '%s\n' "$panes" | grep -c . || true)
