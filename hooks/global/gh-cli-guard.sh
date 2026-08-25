@@ -15,14 +15,17 @@ if echo "$COMMAND" | grep -qE 'gh\s+repo\s+edit.*--visibility[= ]+public'; then
   exit 0
 fi
 
-# Repo-Visibility aendern auf private: nur mit expliziter User-Bestaetigung
-if echo "$COMMAND" | grep -qE 'gh\s+repo\s+edit.*--visibility[= ]+private'; then
-  jq -n '{
+# Jede andere Visibility-Aenderung (private, internal, unbekannte/kuenftige Werte):
+# nur mit expliziter User-Bestaetigung. Bewusst als Default statt als Werteliste — eine
+# Aufzaehlung laesst jeden nicht genannten Wert ungeprueft durch (IZG-T-212).
+if echo "$COMMAND" | grep -qE 'gh\s+repo\s+edit.*--visibility'; then
+  VIS=$(echo "$COMMAND" | grep -oE -- '--visibility[= ]+[a-zA-Z]+' | head -1 | grep -oE '[a-zA-Z]+$')
+  jq -n --arg vis "${VIS:-unbekannt}" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "ask"
     },
-    systemMessage: "Repo-Visibility -> private erkannt — nur ausfuehren wenn der User es explizit angefragt hat."
+    systemMessage: ("Repo-Visibility -> " + $vis + " erkannt — nur ausfuehren wenn der User es explizit angefragt hat.")
   }'
   exit 0
 fi
