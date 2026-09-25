@@ -32,6 +32,9 @@ HOOK_SPECS=(
   "protect-env|PreToolUse|Bash"
   "dir-scope-guard|PreToolUse|Read|Edit|Write"
   "read-size-guard|PreToolUse|Read"
+  "read-dedupe-guard|PreToolUse|Read"
+  # zweite Registrierung: merkt erst den erfolgten Read (IZG-T-216)
+  "read-dedupe-guard|PostToolUse|Read"
   "env-key-guard|PreToolUse|Bash"
   "file-dump-guard|PreToolUse|Bash"
   "git-commit-guard|PreToolUse|Bash"

@@ -8,19 +8,30 @@ SCR="$(mktemp -d)"; trap 'rm -rf "$SCR"' EXIT
 export HOME="$SCR/testhome"
 rm -rf "$HOME"; mkdir -p "$HOME/.claude/state"
 
-HOOK=/home/izg/.claude/hooks/read-dedupe-guard.sh
+# Default: Repo-Fassung neben diesem Test; READ_DEDUPE_HOOK=<pfad> prueft eine andere (z.B. die deployte).
+HOOK="${READ_DEDUPE_HOOK:-$(cd "$(dirname "$0")/../global" && pwd)/read-dedupe-guard.sh}"
 TARGET="$SCR/target.txt"; printf 'zeile\n%.0s' $(seq 1 50) > "$TARGET"
 TRANS="$SCR/transcript.jsonl"; : > "$TRANS"
 SID=testsession
 
 lines() { printf '{"x":1}\n%.0s' $(seq 1 "$1") >> "$TRANS"; }
-call() { # $1=offset|-  $2=limit|-
-  local o="$1" l="$2" extra=""
+event() { # $1=PreToolUse|PostToolUse  $2=offset|-  $3=limit|-
+  local e="$1" o="$2" l="$3" extra=""
   [ "$o" != "-" ] && extra="$extra, \"offset\": $o"
   [ "$l" != "-" ] && extra="$extra, \"limit\": $l"
-  printf '{"session_id":"%s","transcript_path":"%s","tool_name":"Read","tool_input":{"file_path":"%s"%s}}' \
-    "$SID" "$TRANS" "$TARGET" "$extra" | bash "$HOOK"
+  printf '{"session_id":"%s","transcript_path":"%s","hook_event_name":"%s","tool_name":"Read","tool_input":{"file_path":"%s"%s}}' \
+    "$SID" "$TRANS" "$e" "$TARGET" "$extra" | bash "$HOOK"
 }
+# Read, wie Claude Code ihn fahren wuerde: PreToolUse, bei Durchlass danach PostToolUse.
+# Ausgabe ist die des PreToolUse-Hooks.
+call() { # $1=offset|-  $2=limit|-
+  local out
+  out=$(event PreToolUse "$1" "$2")
+  echo "$out" | grep -q '"permissionDecision": *"deny"' || event PostToolUse "$1" "$2" >/dev/null
+  echo "$out"
+}
+# Read, den ein anderer PreToolUse-Hook (read-size-guard) ablehnt: kein PostToolUse.
+blocked() { event PreToolUse "$1" "$2"; }
 check() { # $1=name $2=erwartet(pass|deny|hint) $3=output
   local got=pass
   echo "$3" | grep -q '"permissionDecision": *"deny"' && got=deny
@@ -59,9 +70,25 @@ check "12. WINDOW=0 -> Hinweis"     hint "$(READ_DEDUPE_GUARD_WINDOW=0 call - -)
 rm -rf "$HOME/.claude/state"; call - - >/dev/null
 check "13. GUARD_OFF"               pass "$(READ_DEDUPE_GUARD_OFF=1 call - -)"
 
+# IZG-T-216: ein von anderer Seite abgelehnter Voll-Read wird nicht gemerkt
+rm -rf "$HOME/.claude/state"; : > "$TRANS"; lines 10
+check "15. Voll-Read, fremd abgelehnt" pass "$(blocked - -)"
+lines 2
+check "16. Teil-Read danach"        pass "$(call 1 20)"
+check "17. naechster Teil-Read"     pass "$(call 20 20)"
+# ...auch nicht, wenn er ausserhalb des Fensters nur den Hinweis ausloest
+rm -rf "$HOME/.claude/state"; : > "$TRANS"; lines 10
+call - - >/dev/null; lines 400
+check "18. Hinweis, fremd abgelehnt" hint "$(blocked - -)"
+lines 2
+check "19. Teil-Read danach"        pass "$(call 1 20)"
+check "20. PostToolUse ohne Ausgabe" pass "$(event PostToolUse - -)"
+
 # ohne transcript_path kein Block
 rm -rf "$HOME/.claude/state"
-printf '{"session_id":"%s","tool_name":"Read","tool_input":{"file_path":"%s"}}' "$SID" "$TARGET" | bash "$HOOK" >/dev/null
+for e in PreToolUse PostToolUse; do
+  printf '{"session_id":"%s","hook_event_name":"%s","tool_name":"Read","tool_input":{"file_path":"%s"}}' "$SID" "$e" "$TARGET" | bash "$HOOK" >/dev/null
+done
 out=$(printf '{"session_id":"%s","tool_name":"Read","tool_input":{"file_path":"%s"}}' "$SID" "$TARGET" | bash "$HOOK")
 check "14. ohne transcript_path"    hint "$out"
 

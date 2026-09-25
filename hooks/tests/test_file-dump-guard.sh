@@ -47,6 +47,16 @@ check pass  "cat $D/big.txt | wc -l"
 check block "cat $D/big.txt | grep -n ''"
 check pass  "cat $D/big.txt > $D/kopie.txt"
 
+echo "--- Meldung nennt Spanne statt Dateigroesse (IZG-T-216) ---"
+msg() { # $1=erwarteter Textteil $2=kommando
+  if call "$2" | grep -qF "$1"; then echo "OK   '$1'  <- $2"
+  else echo "FAIL '$1' fehlt  <- $2"; FAILED=1; fi
+}
+msg "Ausschnitt von 158 Zeilen aus big.txt (400 Zeilen)" "sed -n '78,235p' $D/big.txt"
+msg "Ausschnitt von 200 Zeilen aus big.txt (400 Zeilen)" "head -200 $D/big.txt"
+msg "Voll-Dump von big.txt (400 Zeilen)" "cat $D/big.txt"
+msg "kann nur der Nutzer" "cat $D/big.txt"
+
 echo "--- ls (IZG-T-160) ---"
 check block "ls -la $D/big"
 check block "ls -l $D/big"

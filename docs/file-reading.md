@@ -38,14 +38,15 @@ ein Kostenthema — und je voller das Fenster, desto schlechter die Antwortquali
 Absicherung derselben Regel, deployt via `setup_global_hooks.sh`. Details:
 `hooks/README.md` im ai-SKILL-set-Repo.
 
-| Hook | Blockt | Ventil |
+| Hook | Blockt | Ventil (nur Nutzer) |
 |------|--------|--------|
 | `read-size-guard.sh` | `Read` auf `.jsonl`/`.log` hart; Voll-Reads ab ~2.500 geschaetzten Tokens (Warnung ab ~1.000) | `READ_SIZE_GUARD_OFF=1` |
 | `read-dedupe-guard.sh` | erneuten `Read` derselben, unveraenderten Datei innerhalb des Kontextfensters | `READ_DEDUPE_GUARD_OFF=1` |
-| `file-dump-guard.sh` | Bash-Voll-Dumps von Dateien > 300 Zeilen und ungefiltertes `find`/lange Listings | `FILE_DUMP_GUARD_MAX_LINES=<n>` |
+| `file-dump-guard.sh` | Bash-Voll-Dumps und `sed -n`/`head`/`tail`-Ausschnitte ueber 120 Zeilen und ungefiltertes `find`/lange Listings | `FILE_DUMP_GUARD_MAX_LINES=<n>` |
 
-Ein Ventil nur setzen, wenn die ganze Datei wirklich gebraucht wird — und das im
-Turn begruenden, nicht stillschweigend.
+Die Ventile liest der Hook aus der Env von Claude Code selbst — als Inline-Prefix eines
+Tool-Aufrufs (`FOO=1 sed ...`) wirken sie nicht. Braucht ein Agent die ganze Datei
+wirklich, bittet er den Nutzer darum und begruendet es, statt es selbst zu versuchen.
 
 ## Wenn ein Hook blockt
 
@@ -55,7 +56,7 @@ Die Deny-Meldung nennt den Grund und den Ausweg. Erwartetes Verhalten:
 2. Nicht dasselbe Kommando wiederholen und nicht auf ein anderes Dump-Kommando
    ausweichen (`cat` → `sed` → `nl`), um den Guard zu umgehen.
 3. Bleibt es blockiert und ist der Voll-Read wirklich noetig: dem Nutzer sagen,
-   warum — dann das Ventil setzen.
+   warum — der Nutzer entscheidet ueber das Ventil.
 
 ## Im Auto-/Genehmigt-Modus
 

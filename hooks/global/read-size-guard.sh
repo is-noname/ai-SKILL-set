@@ -18,6 +18,8 @@
 # Bestand:   READ_SIZE_GUARD_WARN / READ_SIZE_GUARD_MAX wirken weiter als
 #            Zeilenschwellen, falls gesetzt - sonst braechen alte Setzungen still.
 # Ventil:    READ_SIZE_GUARD_OFF=1 schaltet die Groessenpruefung ab.
+#            Alle Variablen wirken nur in der Umgebung von Claude Code selbst - Nutzer-,
+#            keine Agent-Ventile (IZG-T-216).
 # Muster analog zu FILE_DUMP_GUARD_MAX_LINES in file-dump-guard.sh.
 
 INPUT=$(cat)
@@ -64,7 +66,7 @@ BYTES=$(wc -c < "$FILE" 2>/dev/null || echo 0)
 TOKENS=$(( BYTES / CHARS_PER_TOKEN ))
 
 NAME=$(basename "$FILE")
-HINT="Nutze Grep mit Pattern, um die Stelle zu finden, oder Read mit offset/limit auf den relevanten Abschnitt. Wird die ganze Datei wirklich gebraucht: READ_SIZE_GUARD_OFF=1 setzen."
+HINT="Nutze Grep mit Pattern, um die Stelle zu finden, oder Read mit offset/limit auf den relevanten Abschnitt. Wird die ganze Datei wirklich gebraucht, den Nutzer bitten - nur er kann den Guard abschalten (READ_SIZE_GUARD_OFF=1 beim Start von Claude Code; als Prefix eines Tool-Aufrufs wirkt es nicht)."
 
 deny() {
   jq -n --arg reason "$1" '{

@@ -1,5 +1,13 @@
 #!/bin/bash
-# PreToolUse Read: blockt Wieder-Reads derselben, unveraenderten Datei in einer Session.
+# PreToolUse + PostToolUse Read: blockt Wieder-Reads derselben, unveraenderten Datei in
+# einer Session.
+#
+# Registrierung: zweimal, beide mit matcher "Read" - als PreToolUse (prueft, blockt) und
+# als PostToolUse (merkt). Gemerkt wird erst in PostToolUse, weil erst dort feststeht,
+# dass der Read gelaufen ist: ein paralleler PreToolUse-Hook (read-size-guard.sh) kann
+# ihn ablehnen, und ein abgelehnter Voll-Read darf nicht als gelesen gelten - sonst
+# blockt die Teil-Read-Regel danach jeden offset/limit-Read einer Datei, deren Inhalt
+# nie im Kontext war (IZG-T-216).
 #
 # Hintergrund: Wird dieselbe Datei mehrfach gelesen, steht ihr Inhalt danach mehrfach
 # im Kontextfenster und wird in jedem Folge-Turn erneut mitbezahlt. Messung 16.08.2026
@@ -7,7 +15,7 @@
 # Aenderung dazwischen = 277.171 Tokens vermeidbare Kontextlast.
 #
 # Verhalten:
-#   erster Voll-Read einer Datei -> Zustand merken, durchlassen
+#   erster Voll-Read einer Datei -> durchlassen, nach erfolgtem Read merken
 #   Teil-Read ohne vorherigen Voll-Read -> durchlassen, nicht gemerkt (Weiterblaettern)
 #   Datei zwischenzeitlich geaendert (mtime oder Groesse abweichend) -> durchlassen
 #   unveraendert, innerhalb des Fensters -> deny mit Zeitpunkt des ersten Reads
@@ -33,6 +41,8 @@
 # Ventil:  READ_DEDUPE_GUARD_OFF=1 schaltet den Hook ab.
 #          READ_DEDUPE_GUARD_WINDOW=<n> setzt das Fenster in Transcript-Zeilen,
 #          0 = nie blocken (nur Hinweis wie vor dem 22.08.2026).
+#          Beide wirken nur in der Umgebung von Claude Code selbst (Start der Session),
+#          nicht als Inline-Prefix eines Tool-Aufrufs - Nutzer-Ventile, keine Agent-Ventile.
 # Getrennt von read-size-guard.sh: andere Zustaendigkeit, getrennt abschaltbar.
 
 if [ "$READ_DEDUPE_GUARD_OFF" = "1" ]; then
@@ -45,6 +55,7 @@ case "$WINDOW_LINES" in
 esac
 
 INPUT=$(cat)
+EVENT=$(echo "$INPUT" | jq -r '.hook_event_name // "PreToolUse"')
 FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 SESSION=$(echo "$INPUT" | jq -r '.session_id // empty')
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
@@ -104,31 +115,39 @@ write_entry() {
   mv "$tmp" "$STATE_FILE" 2>/dev/null || rm -f "$tmp"
 }
 
-if [ -z "$PREV" ]; then
-  # Nur Voll-Reads werden gemerkt - ein Teil-Read deckt den Rest der Datei nicht ab.
-  [ "$BOUNDED" = "0" ] && write_entry 0 "$LINES" "$NOW"
-  exit 0
+PREV_MTIME=""; PREV_SIZE=""; PREV_FLAG=0; PREV_LINES=-1; PREV_TS=""
+if [ -n "$PREV" ]; then
+  PREV_MTIME=$(echo "$PREV" | cut -d' ' -f1)
+  PREV_SIZE=$(echo "$PREV" | cut -d' ' -f2)
+  PREV_FLAG=$(echo "$PREV" | cut -d' ' -f3)
+  PREV_LINES=$(echo "$PREV" | cut -d' ' -f4)
+  PREV_TS=$(echo "$PREV" | cut -d' ' -f5)
 fi
-
-PREV_MTIME=$(echo "$PREV" | cut -d' ' -f1)
-PREV_SIZE=$(echo "$PREV" | cut -d' ' -f2)
-PREV_FLAG=$(echo "$PREV" | cut -d' ' -f3)
-PREV_LINES=$(echo "$PREV" | cut -d' ' -f4)
-PREV_TS=$(echo "$PREV" | cut -d' ' -f5)
 case "$PREV_LINES" in
   ''|*[!0-9]*) PREV_LINES=-1 ;;
 esac
 [ -z "$PREV_TS" ] && PREV_TS="frueher in dieser Session"
+CHANGED=0
+if [ -n "$PREV" ] && { [ "$PREV_MTIME" != "$MTIME" ] || [ "$PREV_SIZE" != "$SIZE" ]; }; then
+  CHANGED=1
+fi
 
-# Datei hat sich geaendert: der Wieder-Read ist gedeckt, nur Zustand nachziehen.
-# Das Melde-Flag bleibt stehen - der Hinweis kommt hoechstens einmal je Datei.
-if [ "$PREV_MTIME" != "$MTIME" ] || [ "$PREV_SIZE" != "$SIZE" ]; then
+# PostToolUse: der Read ist gelaufen, jetzt merken. Nie eine Ausgabe, nie ein Block.
+if [ "$EVENT" = "PostToolUse" ]; then
   if [ "$BOUNDED" = "0" ]; then
+    # Voll-Read: Inhalt steht jetzt komplett im Kontext, Fenster beginnt neu.
+    # Das Melde-Flag bleibt stehen - der Hinweis kommt hoechstens einmal je Datei.
     write_entry "$PREV_FLAG" "$LINES" "$NOW"
-  else
+  elif [ "$CHANGED" = "1" ]; then
     # Teil-Read einer geaenderten Datei: der gemerkte Voll-Read ist entwertet.
     write_entry "$PREV_FLAG" -1 "$PREV_TS"
   fi
+  # Teil-Read ohne Voll-Read wird nicht gemerkt - er deckt den Rest der Datei nicht ab.
+  exit 0
+fi
+
+# PreToolUse ab hier: nur pruefen. Unbekannte oder geaenderte Datei -> durchlassen.
+if [ -z "$PREV" ] || [ "$CHANGED" = "1" ]; then
   exit 0
 fi
 
@@ -139,7 +158,7 @@ if [ "$WINDOW_LINES" -gt 0 ] && [ "$LINES" -ge 0 ] && [ "$PREV_LINES" -ge 0 ] \
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: ($file + " wurde in dieser Session um " + $ts + " bereits vollstaendig gelesen und hat sich seitdem nicht geaendert - der Inhalt steht noch im Kontextfenster, scrolle dort zurueck statt erneut zu lesen. Falls wirklich etwas fehlt: Grep mit Pattern auf die gesuchte Stelle. Ventil, wenn der Read wirklich noetig ist: READ_DEDUPE_GUARD_OFF=1.")
+      permissionDecisionReason: ($file + " wurde in dieser Session um " + $ts + " bereits vollstaendig gelesen und hat sich seitdem nicht geaendert - der Inhalt steht noch im Kontextfenster, scrolle dort zurueck statt erneut zu lesen. Falls wirklich etwas fehlt: Grep mit Pattern auf die gesuchte Stelle. Ist der Inhalt wirklich nicht mehr im Kontext, den Nutzer bitten - nur er kann den Guard abschalten (READ_DEDUPE_GUARD_OFF=1 beim Start von Claude Code; als Prefix eines Tool-Aufrufs wirkt es nicht).")
     }
   }'
   exit 0
@@ -149,7 +168,9 @@ if [ "$PREV_FLAG" = "1" ]; then
   exit 0
 fi
 
-write_entry 1 "$LINES" "$NOW"
+# Nur das Melde-Flag setzen. Zeilen und Zeitpunkt zieht erst PostToolUse nach, falls der
+# Read wirklich laeuft - sonst verschoebe ein abgelehnter Read das Fenster.
+write_entry 1 "$PREV_LINES" "$PREV_TS"
 jq -n --arg file "$(basename "$FILE")" --arg ts "$PREV_TS" '{
   hookSpecificOutput: {
     hookEventName: "PreToolUse",

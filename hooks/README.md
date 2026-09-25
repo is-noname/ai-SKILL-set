@@ -15,6 +15,11 @@ Exit-Code (`exit 2` = harter Abbruch).
 > [`docs/file-reading.md`](../docs/file-reading.md) und gilt auch dort, wo diese Hooks nicht
 > laufen (Vibe/Codex/Gemini, Sessions ohne globale Agent-Konfig).
 
+> **Ventile sind Nutzer-Ventile:** Alle `*_GUARD_*`-Variablen liest der Hook aus der Env
+> von Claude Code selbst. Als Inline-Prefix eines Tool-Aufrufs (`FOO=1 sed ...`) wirken sie
+> nicht — ein Agent kann sie nicht setzen, die Deny-Meldungen verweisen ihn deshalb an den
+> Nutzer (IZG-T-216).
+
 ---
 
 ## Ordnerstruktur — global/ vs. repo-local/
@@ -48,7 +53,7 @@ nur sinnvoll als **Ersatz**, falls man ihn bewusst nicht global will.
 | `protect-env.sh` | Blockt jeden Zugriff auf Pfade die `.env` enthalten (API-Key-Schutz). | Vor Read/Edit/Write auf eine `.env*`-Datei. |
 | `dir-scope-guard.sh` | Blockt Zugriff auf sensible Verzeichnisse aus `dir-scope.conf` (Privat, Steuern, `.ssh`, `.gnupg`, …). | Vor Read/Edit/Write, wenn der Zielpfad unter einem `BLOCKED_DIRS`-Eintrag liegt. |
 | `read-size-guard.sh` | Blockt `.jsonl`/`.log` hart; schaetzt die Kontextlast eines Voll-Reads ueber die Dateigroesse (4 Zeichen/Token), warnt ab 1.000 Tokens (`READ_SIZE_GUARD_WARN_TOKENS`), blockt ab 2.500 (`READ_SIZE_GUARD_MAX_TOKENS`) und empfiehlt `offset`/`limit` bzw. Grep. Gesetzte `READ_SIZE_GUARD_WARN`/`_MAX` wirken zusaetzlich als Zeilenschwellen. Ventil: `READ_SIZE_GUARD_OFF=1`. | Vor jedem Read. |
-| `read-dedupe-guard.sh` | **Blockt** den Wieder-Read derselben, seit dem gemerkten Voll-Read unveränderten Datei, solange er innerhalb von 200 neuen Transcript-Zeilen (≈ 30 Turns) liegt; die Deny-Meldung nennt den Zeitpunkt des ersten Reads. Danach nur noch ein einmaliger Hinweis, weil der Inhalt aus dem Fenster gefallen sein kann. Ohne lesbares `transcript_path` wird nie geblockt. Zustand: `~/.claude/state/read-dedupe/<session_id>.tsv`, Dateien > 7 Tage werden aufgeräumt. Ventile: `READ_DEDUPE_GUARD_OFF=1`, `READ_DEDUPE_GUARD_WINDOW=<zeilen>` (`0` = nie blocken). Test: `bash hooks/tests/test_read-dedupe-guard.sh`. | Vor jedem Read; `offset`/`limit`-Reads nur, wenn ein Voll-Read derselben Datei im Fenster liegt. |
+| `read-dedupe-guard.sh` | **Blockt** den Wieder-Read derselben, seit dem gemerkten Voll-Read unveränderten Datei, solange er innerhalb von 200 neuen Transcript-Zeilen (≈ 30 Turns) liegt; die Deny-Meldung nennt den Zeitpunkt des ersten Reads. Danach nur noch ein einmaliger Hinweis, weil der Inhalt aus dem Fenster gefallen sein kann. Ohne lesbares `transcript_path` wird nie geblockt. Gemerkt wird erst im PostToolUse-Lauf, also nur ein tatsächlich gelaufener Read – ein von `read-size-guard` abgelehnter Voll-Read sperrt danach keine Teil-Reads (IZG-T-216). **Braucht zwei Registrierungen** (PreToolUse + PostToolUse, matcher `Read`); ohne die PostToolUse-Registrierung merkt er nichts und blockt nie. Zustand: `~/.claude/state/read-dedupe/<session_id>.tsv`, Dateien > 7 Tage werden aufgeräumt. Ventile: `READ_DEDUPE_GUARD_OFF=1`, `READ_DEDUPE_GUARD_WINDOW=<zeilen>` (`0` = nie blocken). Test: `bash hooks/tests/test_read-dedupe-guard.sh`. | Vor jedem Read (prüfen) und nach jedem erfolgreichen Read (merken); `offset`/`limit`-Reads nur, wenn ein Voll-Read derselben Datei im Fenster liegt. |
 
 **200-Zeilen-Fenster nachgemessen (IZG-T-159, 24.08.2026):** 3 Tage nach der
 Umstellung von Hinweis auf Deny, 3 Projekte mit ≥ 3 Sessions seit dem 22.08.2026.
@@ -68,7 +73,7 @@ bei 200 Zeilen.
 | Hook | Was er tut | Wann er feuert |
 |------|------------|----------------|
 | `env-key-guard.sh` | Blockt `env`/`printenv` (nackt oder per `grep`-Pipe) und direkte Expansion bekannter Key-Variablen (`$ANTHROPIC*`, `$OPENAI*`, `$*TOKEN` …). | Vor Bash-Befehlen, die Keys aus dem Environment auslesen könnten. |
-| `file-dump-guard.sh` | Blockt Voll-Dumps von Dateien > 300 Zeilen (`cat`, `less`, `nl`, `head -n 2000`, `sed` ohne begrenzenden Ausdruck) und verweist auf Read mit `offset`/`limit`. Pipelines, Umleitungen, Heredocs und begrenzte Ausschnitte laufen durch. Schwellwert über `FILE_DUMP_GUARD_MAX_LINES`. | Vor Bash-Befehlen, die eine Datei vollständig ausgeben. Braucht `python3`. |
+| `file-dump-guard.sh` | Blockt Voll-Dumps von Dateien > 300 Zeilen (`cat`, `less`, `nl`, `head -n 2000`, `sed` ohne begrenzenden Ausdruck) und verweist auf Read mit `offset`/`limit`. Pipelines, Umleitungen, Heredocs und begrenzte Ausschnitte laufen durch. Schwellwert über `FILE_DUMP_GUARD_MAX_LINES`. Bei `sed -n`/`head`/`tail` nennt die Meldung die angeforderte Spanne, nicht die Dateigröße. | Vor Bash-Befehlen, die eine Datei vollständig ausgeben. Braucht `python3`. |
 | `git-commit-guard.sh` | Setzt `ask` — Commit nur nach expliziter User-Anfrage. | Bei `git commit`. |
 | `git-push-guard.sh` | `git push` → `ask`; `git push --force` → **deny**. | Bei jedem `git push`. |
 | `git-destructive-guard.sh` | Blockt `reset --hard`, `clean -f`, `checkout .`, `branch -D`, `rebase`. | Bei destruktiven Git-Operationen. |
@@ -77,10 +82,11 @@ bei 200 Zeilen.
 | `pre-commit-agentdocs.sh` | Regeneriert `CLAUDE.md`/`GEMINI.md` aus `AGENTS.md` (Source of Truth) und stagt sie nach, wenn eine der drei Root-Configs gestaged ist; bricht ab (`exit 2`) bei Fehler. | Bei `git commit` in diesem Repo. |
 | `pre-commit-toc.sh` | Aktualisiert das Kopf-Inhaltsverzeichnis (Funktionsname + Zeilennummer, via `scripts/update_script_toc.py`) von `scripts/setup_global_conventions.sh` und `scripts/tickets.sh` und stagt sie nach, wenn eine der beiden gestaged ist; bricht ab (`exit 2`) bei Fehler. | Bei `git commit` in diesem Repo. |
 
-### PostToolUse — Edit / Write
+### PostToolUse — Edit / Write / Read
 
 | Hook | Was er tut | Wann er feuert |
 |------|------------|----------------|
+| `read-dedupe-guard.sh` | Zweite Registrierung desselben Hooks (siehe PreToolUse — Read): merkt den erfolgten Read im Session-Zustand. Keine Ausgabe. | Nach jedem erfolgreichen Read. |
 | `ticket-mover.sh` | Verschiebt eine Ticket-Datei in den Ordner, der ihrem `status:`-Frontmatter entspricht (`open`/`in-progress`/`blocked`/`done`). Kollisionsschutz: überschreibt kein vorhandenes Ziel. | Nach Edit/Write auf eine Datei unter `*/tickets/*` mit gültigem `id: PRJ-T-NNN`. |
 
 ### SessionStart
@@ -161,6 +167,9 @@ Eigenschaften: idempotent, fragt bei Drift vor dem Überschreiben (`--force` umg
        "PostToolUse": [
          { "matcher": "Edit|Write", "hooks": [
            { "type": "command", "command": "/home/USER/.claude/hooks/ticket-mover.sh" }
+         ]},
+         { "matcher": "Read", "hooks": [
+           { "type": "command", "command": "/home/USER/.claude/hooks/read-dedupe-guard.sh" }
          ]}
        ],
        "SessionStart": [

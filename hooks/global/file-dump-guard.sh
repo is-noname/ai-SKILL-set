@@ -16,7 +16,10 @@
 # begrenzte Ausschnitte (head -30, sed -n '10,60p'), Dateien unter dem Schwellwert,
 # kurze Verzeichnisse und gefilterte find-Aufrufe.
 # Schwellwerte ueber FILE_DUMP_GUARD_MAX_LINES (Default 120) und
-# FILE_DUMP_GUARD_MAX_ENTRIES (Default 40) setzbar.
+# FILE_DUMP_GUARD_MAX_ENTRIES (Default 40) setzbar - nur in der Umgebung von Claude Code
+# selbst. Als Inline-Prefix eines Bash-Aufrufs (FOO=1 sed ...) wirken sie nicht, der Hook
+# sieht die Env des Harness, nicht die des Kommandos. Die Deny-Meldungen nennen sie
+# deshalb als Nutzer-Ventil (IZG-T-216).
 #
 # Warum 120 und nicht 300: 120 Zeilen sind ein Ausschnitt zum Nachsehen, 300 sind ein
 # halbes Modul. Ein sed -n '1,300p' kippt rund 3.000 Tokens ohne Zeilennummern ins
@@ -251,6 +254,7 @@ def offenders(segment):
 
     cmd = os.path.basename(tokens[0])
     candidates = []
+    span = None                # angeforderte Zeilenzahl bei head/tail/sed, sonst ganze Datei
 
     if cmd in DUMPERS:
         candidates = file_args(tokens)
@@ -264,6 +268,7 @@ def offenders(segment):
             return []          # Default 10 Zeilen - unbedenklich
         if limit <= MAX:
             return []
+        span = limit
         candidates = file_args(tokens)
     elif cmd == "sed":
         span = sed_span(tokens)
@@ -296,8 +301,12 @@ def offenders(segment):
             continue
         hit = too_big(name)
         if hit:
-            found.append({"kind": "file", "name": name, "lines": hit[0],
-                          "tokens": hit[1], "pipeline": pipeline})
+            entry = {"kind": "file", "name": name, "lines": hit[0],
+                     "tokens": hit[1], "pipeline": pipeline, "span": None}
+            if span is not None and span < hit[0]:
+                entry["span"] = span
+                entry["tokens"] = hit[1] * span // max(hit[0], 1)
+            found.append(entry)
     return found
 
 
@@ -318,7 +327,8 @@ if kind == "ls":
         "Verzeichnis-Dump von %s (%s%d Eintraege) blockiert - ein langes Listing kostet "
         "rund 10 Tokens je Zeile Kontextlast. Nutze das Glob-Tool fuer Dateinamen, oder "
         "filtere: '%s %s | head -20', '%s %s | grep <pattern>'. "
-        "Schwellwert notfalls ueber FILE_DUMP_GUARD_MAX_ENTRIES hochsetzen."
+        "Schwellwert (FILE_DUMP_GUARD_MAX_ENTRIES) kann nur der Nutzer beim Start von "
+        "Claude Code anheben - als Prefix des Kommandos wirkt er nicht."
         % (hit["name"], "mindestens " if hit["recursive"] else "", hit["entries"],
            form, hit["name"], form, hit["name"])
     )
@@ -330,12 +340,19 @@ elif kind == "find":
         % hit["name"]
     )
 else:
+    name = os.path.basename(hit["name"])
+    if hit["span"] is not None:
+        what = ("Ausschnitt von %d Zeilen aus %s (%d Zeilen) blockiert - ueber der Schwelle "
+                "von %d Zeilen je Ausschnitt" % (hit["span"], name, hit["lines"], MAX))
+    else:
+        what = "Voll-Dump von %s (%d Zeilen) blockiert" % (name, hit["lines"])
     reason = (
-        "Voll-Dump von %s (%d Zeilen) blockiert - das kippt ~%d Tokens Kontextlast ins Fenster. "
+        "%s - das kippt ~%d Tokens Kontextlast ins Fenster. "
         "Nutze Read mit offset/limit auf den relevanten Abschnitt, oder Grep mit Pattern. "
         "Wenn die Ausgabe wirklich vollstaendig gebraucht wird: in eine Pipeline filtern "
-        "(| grep, | wc) oder FILE_DUMP_GUARD_MAX_LINES hochsetzen."
-        % (os.path.basename(hit["name"]), hit["lines"], hit["tokens"])
+        "(| grep, | wc). Den Schwellwert (FILE_DUMP_GUARD_MAX_LINES) kann nur der Nutzer "
+        "beim Start von Claude Code anheben - als Prefix des Kommandos wirkt er nicht."
+        % (what, hit["tokens"])
     )
 
 if pipeline and kind == "file":
