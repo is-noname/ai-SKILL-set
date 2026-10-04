@@ -563,8 +563,9 @@ TOML
   # Registrierung in settings.json erfolgt weiter unten (IZG-T-215) - Event und
   # Matcher je Hook aus den vorhandenen Eintraegen in ~/.claude/settings.json
   # abgeleitet, deployte Hooks liegen bis dahin bereit, wirken aber noch nicht.
+  # check-chatbox.sh wird nicht deployt: Agent-Chatbox ist stillgelegt (IZG-T-215).
   if [ "$agent_name" = ".claude" ]; then
-    for guard_hook in check-chatbox.sh dir-scope-guard.sh env-key-guard.sh \
+    for guard_hook in dir-scope-guard.sh env-key-guard.sh \
         file-dump-guard.sh gh-cli-guard.sh git-commit-guard.sh git-destructive-guard.sh \
         git-push-guard.sh piper-notify.sh protect-env.sh read-dedupe-guard.sh \
         read-size-guard.sh tmux-context.sh; do
@@ -575,13 +576,10 @@ TOML
     deploy_file "hooks/global/dir-scope.conf" "$AGENT_DIR/hooks/dir-scope.conf" || return 1
   fi
 
-  # settings.json fuer 12 der 13 Guard-/Utility-Hooks ergaenzen (IZG-T-215): idempotent,
-  # bestehende matcher-Bloecke (PreToolUse) werden ergaenzt statt ersetzt, Events ohne
-  # Matcher (Notification, SessionStart) bekommen einen matcherlosen Eintrag wie im
-  # izg-decision-sheet-Muster unten. check-chatbox.sh bleibt aussen vor: kein
-  # Referenzeintrag in ~/.claude/settings.json vorhanden, Event/Matcher sind dafuer
-  # nicht ableitbar (Ticket-Abbruchbedingung, s. Ticket-Verlauf) - Hook liegt bereit,
-  # muss manuell eingetragen werden.
+  # settings.json fuer alle 12 deployten Guard-/Utility-Hooks ergaenzen (IZG-T-215):
+  # idempotent, bestehende matcher-Bloecke (PreToolUse) werden ergaenzt statt ersetzt,
+  # Events ohne Matcher (Notification, SessionStart) bekommen einen matcherlosen Eintrag
+  # wie im izg-decision-sheet-Muster unten.
   if [ "$agent_name" = ".claude" ]; then
     local guard_settings="$AGENT_DIR/settings.json"
     if [ ! -f "$guard_settings" ]; then
@@ -648,7 +646,6 @@ if changed:
 else:
     print("  settings.json: Guard-Hooks bereits registriert — übersprungen")
 PY
-      echo "  check-chatbox.sh: kein Referenzeintrag in settings.json — Event/Matcher nicht ableitbar, ausgespart (manuell eintragen)"
     fi
   fi
 
