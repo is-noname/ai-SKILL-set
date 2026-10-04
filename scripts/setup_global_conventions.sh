@@ -560,9 +560,9 @@ TOML
   # Hook-Format existiert. deploy_file statt deploy_shared_convention: lokale Aenderungen
   # sind hier erwuenschter User-State (Beleg: gh-cli-guard.sh lief lokal auseinander,
   # s. Ticket-Verlauf), kein Sync-Problem - Clobber-Schutz warnt statt zu ueberschreiben.
-  # Registrierung in settings.json ist NICHT Teil dieses Deploys (offener Punkt,
-  # IZG-T-212) - deployte Hooks liegen bereit, wirken aber erst nach Eintrag im
-  # PreToolUse/SessionStart-Block von settings.json.
+  # Registrierung in settings.json erfolgt weiter unten (IZG-T-215) - Event und
+  # Matcher je Hook aus den vorhandenen Eintraegen in ~/.claude/settings.json
+  # abgeleitet, deployte Hooks liegen bis dahin bereit, wirken aber noch nicht.
   if [ "$agent_name" = ".claude" ]; then
     for guard_hook in check-chatbox.sh dir-scope-guard.sh env-key-guard.sh \
         file-dump-guard.sh gh-cli-guard.sh git-commit-guard.sh git-destructive-guard.sh \
@@ -573,6 +573,83 @@ TOML
     done
     # dir-scope-guard.sh braucht dir-scope.conf als Sibling-Konfigurationsdatei.
     deploy_file "hooks/global/dir-scope.conf" "$AGENT_DIR/hooks/dir-scope.conf" || return 1
+  fi
+
+  # settings.json fuer 12 der 13 Guard-/Utility-Hooks ergaenzen (IZG-T-215): idempotent,
+  # bestehende matcher-Bloecke (PreToolUse) werden ergaenzt statt ersetzt, Events ohne
+  # Matcher (Notification, SessionStart) bekommen einen matcherlosen Eintrag wie im
+  # izg-decision-sheet-Muster unten. check-chatbox.sh bleibt aussen vor: kein
+  # Referenzeintrag in ~/.claude/settings.json vorhanden, Event/Matcher sind dafuer
+  # nicht ableitbar (Ticket-Abbruchbedingung, s. Ticket-Verlauf) - Hook liegt bereit,
+  # muss manuell eingetragen werden.
+  if [ "$agent_name" = ".claude" ]; then
+    local guard_settings="$AGENT_DIR/settings.json"
+    if [ ! -f "$guard_settings" ]; then
+      echo "  $guard_settings nicht gefunden — Guard-Hooks nicht registriert (liegen bereit)"
+    elif ! command -v python3 >/dev/null 2>&1; then
+      echo "  python3 fehlt — Guard-Hooks nicht registriert (liegen bereit)"
+    else
+      python3 - "$guard_settings" "$AGENT_DIR/hooks" <<'PY'
+import json, sys
+
+settings_path, hooks_dir = sys.argv[1], sys.argv[2]
+with open(settings_path) as f:
+    data = json.load(f)
+hooks = data.setdefault("hooks", {})
+
+# (event, matcher_oder_None, hook-Dateiname, statusMessage_oder_None)
+# Quelle: vorhandene Eintraege in ~/.claude/settings.json (IZG-T-215).
+guard_wanted = [
+    ("PreToolUse", "Read|Edit|Write", "dir-scope-guard.sh", "Verzeichnis-Scope pruefen..."),
+    ("PreToolUse", "Read|Edit|Write", "protect-env.sh", ".env-Schutz pruefen..."),
+    ("PreToolUse", "Read", "read-size-guard.sh", "Dateigroesse pruefen..."),
+    ("PreToolUse", "Read", "read-dedupe-guard.sh", "Doppel-Read pruefen..."),
+    # zweite Registrierung: merkt erst den erfolgten Read (IZG-T-216)
+    ("PostToolUse", "Read", "read-dedupe-guard.sh", None),
+    ("PreToolUse", "Bash", "env-key-guard.sh", "API-Key Schutz pruefen..."),
+    ("PreToolUse", "Bash", "file-dump-guard.sh", None),
+    ("PreToolUse", "Bash", "git-commit-guard.sh", "Git-Commit pruefen..."),
+    ("PreToolUse", "Bash", "git-push-guard.sh", "Git-Push pruefen..."),
+    ("PreToolUse", "Bash", "git-destructive-guard.sh", "Destruktive Git-Ops pruefen..."),
+    ("PreToolUse", "Bash", "gh-cli-guard.sh", "GitHub CLI pruefen..."),
+    ("PreToolUse", "Bash", "protect-env.sh", None),
+    ("Notification", None, "piper-notify.sh", None),
+    ("SessionStart", None, "tmux-context.sh", None),
+]
+
+changed = []
+for event, matcher, fname, msg in guard_wanted:
+    cmd = f"{hooks_dir}/{fname}"
+    entries = hooks.setdefault(event, [])
+    target = None
+    for entry in entries:
+        if entry.get("matcher") == matcher if matcher is not None else "matcher" not in entry:
+            target = entry
+            break
+    if target is None:
+        target = {"hooks": []}
+        if matcher is not None:
+            target["matcher"] = matcher
+        entries.append(target)
+    hook_list = target.setdefault("hooks", [])
+    if any(h.get("command") == cmd for h in hook_list):
+        continue
+    new_hook = {"type": "command", "command": cmd}
+    if msg:
+        new_hook["statusMessage"] = msg
+    hook_list.append(new_hook)
+    changed.append(f"{event}:{fname}")
+
+if changed:
+    with open(settings_path, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print("  settings.json gepatcht (Guard-Hooks): " + ", ".join(changed))
+else:
+    print("  settings.json: Guard-Hooks bereits registriert — übersprungen")
+PY
+      echo "  check-chatbox.sh: kein Referenzeintrag in settings.json — Event/Matcher nicht ableitbar, ausgespart (manuell eintragen)"
+    fi
   fi
 
   # izg-decision-sheet (IZG-T-063): Renderer global bereitstellen, Abhol-Hook je Agent-Dir.
