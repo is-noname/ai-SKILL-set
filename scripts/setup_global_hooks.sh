@@ -42,7 +42,6 @@ HOOK_SPECS=(
   "git-destructive-guard|PreToolUse|Bash"
   "gh-cli-guard|PreToolUse|Bash"
   "piper-notify|Notification|"
-  "check-chatbox|SessionStart|startup"
   "tmux-context|SessionStart|"
 )
 

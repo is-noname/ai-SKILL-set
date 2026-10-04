@@ -563,7 +563,6 @@ TOML
   # Registrierung in settings.json erfolgt weiter unten (IZG-T-215) - Event und
   # Matcher je Hook aus den vorhandenen Eintraegen in ~/.claude/settings.json
   # abgeleitet, deployte Hooks liegen bis dahin bereit, wirken aber noch nicht.
-  # check-chatbox.sh wird nicht deployt: Agent-Chatbox ist stillgelegt (IZG-T-215).
   if [ "$agent_name" = ".claude" ]; then
     for guard_hook in dir-scope-guard.sh env-key-guard.sh \
         file-dump-guard.sh gh-cli-guard.sh git-commit-guard.sh git-destructive-guard.sh \

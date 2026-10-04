@@ -28,7 +28,7 @@ Die Hooks liegen im Repo in zwei Unterordnern nach **Default-Deploy-Ort**:
 
 | Ordner | Hooks | Bedeutung |
 |--------|-------|-----------|
-| `hooks/global/` | alle Guards (`protect-env`, `dir-scope-guard` +`dir-scope.conf`, `env-key-guard`, `file-dump-guard`, `gh-cli-guard`, `git-*-guard`, `read-size-guard`, `read-dedupe-guard`) sowie `piper-notify`, `check-chatbox`, `ticket-mover` | einmal in `~/.claude/hooks/` aufgesetzt, feuert überall, wird nie neu aufgesetzt |
+| `hooks/global/` | alle Guards (`protect-env`, `dir-scope-guard` +`dir-scope.conf`, `env-key-guard`, `file-dump-guard`, `gh-cli-guard`, `git-*-guard`, `read-size-guard`, `read-dedupe-guard`) sowie `piper-notify`, `tmux-context`, `ticket-mover` | einmal in `~/.claude/hooks/` aufgesetzt, feuert überall, wird nie neu aufgesetzt |
 | `hooks/repo-local/` | `pre-commit-registry`, `pre-commit-agentdocs`, `pre-commit-toc` | wirken nur im `ai-SKILL-set`-Repo, nie global deployt |
 | `hooks/tests/` | `test_read-dedupe-guard.sh` | Selbsttests einzelner Hooks, laufen in einer Wegwerf-`HOME`-Umgebung; werden nicht deployt |
 
@@ -93,7 +93,6 @@ bei 200 Zeilen.
 
 | Hook | Was er tut | Wann er feuert |
 |------|------------|----------------|
-| `check-chatbox.sh` | Meldet beim Start Inbox, offene Threads (ohne `[DONE:claude]`) und Board-Einträge der Agent-Chatbox. | Bei `SessionStart` (matcher `startup`), nur wenn `agent_chatbox/` im cwd existiert. |
 | `tmux-context.sh` | Meldet eine Zeile Kontext (`tmux: skillset:1.1 %0, 4 Panes (frei: %2 %3 %6)`) via `additionalContext`, sonst `tmux: nein`. Erspart den `tmux list-panes`-Orientierungs-Turn vor Worker-Start (IZG-T-168). | Bei jedem `SessionStart`. |
 
 ### Notification
@@ -173,8 +172,8 @@ Eigenschaften: idempotent, fragt bei Drift vor dem Überschreiben (`--force` umg
          ]}
        ],
        "SessionStart": [
-         { "matcher": "startup", "hooks": [
-           { "type": "command", "command": "/home/USER/.claude/hooks/check-chatbox.sh" }
+         { "hooks": [
+           { "type": "command", "command": "/home/USER/.claude/hooks/tmux-context.sh" }
          ]}
        ],
        "Notification": [
