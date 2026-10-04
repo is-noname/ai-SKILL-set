@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-25",
+  "generated": "2026-10-04",
   "skills": {
     "grilling": {
       "name": "grilling",
@@ -105,6 +105,13 @@
           "hint": "Ohne doc-ids.md PROJ-Prefix und SEQ-Zaehlweise beim Nutzer erfragen statt zu raten"
         }
       ]
+    },
+    "izg-excalidraw-chuck": {
+      "name": "izg-excalidraw-chuck",
+      "description": "This skill should be used when the user asks to create, extend, or update an Excalidraw diagram/drawing/visualization inside the Obsidian vault \"Chuck\" (fixed path /home/izg/Dokumente/AI/00_chuck/Chuck/Excalidraw/) — e.g. cashflow structures, wealth/budget overviews, decision trees, or profile/role diagrams for CFO, banker, broker, CEO, or CTO. Not for diagrams outside this vault.",
+      "layer": 1,
+      "dependencies": [],
+      "path": "skills/layer-1-base/izg-excalidraw-chuck"
     },
     "izg-kissd": {
       "name": "izg-kissd",
