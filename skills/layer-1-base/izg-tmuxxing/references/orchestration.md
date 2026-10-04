@@ -29,6 +29,18 @@ der Agent selbst. Ablauf, Schritt fuer Schritt:
    im Pane kann den Busy-Indikator verdecken, ein Watcher meldet dann faelschlich
    "fertig", obwohl der Agent noch arbeitet. Nur Sessions mit Status `idle` sind
    Kandidaten fuer einen Auftrag.
+
+   **Fallback bei 0 idle Sessions (IZG-T-202):** Liefert `ListAgents` keine idle
+   Peer-Session, selbst Worker starten — `tmuxx.sh start <name> <workdir> --pane %X`
+   fuer ein freies, leeres Pane bzw. `--split` ohne freies Pane (siehe "Ablauf" in
+   `SKILL.md`). Der Fallback greift NICHT automatisch: vorher per
+   `AskUserQuestion` bestaetigen lassen (Anzahl Worker, Worker-Typ, Pane-Ziel), weil
+   er neue Prozesse startet und Tokens kostet. Lehnt der Nutzer ab, gilt die ganze
+   Auswahl als Ueberhang (Schritt 6). So gestartete Worker sind keine
+   `ListAgents`-Peers: fuer sie `tmuxx.sh send`/`await` statt `SendMessage` mit
+   `notify_when_idle` (Schritt 5), und `tmuxx.sh stop` am Ende der Runde. Die
+   Schritte 2, 3, 4 und 7 gelten unveraendert — im Verlaufstext von Schritt 3
+   steht dann die Pane-ID aus der `~/.tmuxx/<name>.state`-Datei.
 2. **Dateibereiche pruefen:** Der Orchestrator bestimmt den GESCHRIEBENEN
    Dateibereich pro Ticket selbst — aus den Akzeptanzkriterien, nicht aus der
    Ticket-Prosa. Prosa-Angaben zu betroffenen Dateien sind Hinweis, nicht
@@ -67,6 +79,20 @@ der Agent selbst. Ablauf, Schritt fuer Schritt:
    den Pane-Status abzufragen. Beim Nachlegen: `/clear` im Zielpane, kurze Pause,
    dann der naechste Auftrag. Die `[Cross-session idle notice]`, die dabei
    eintrifft, ist kein Fertigmeldungsersatz — siehe Warnung in Schritt 7.
+
+   **Doppelte Meldung ist erwartet (IZG-T-204):** Ein kooperativer Peer schickt
+   seinen Bericht aktiv per `cross-session-message`, kurz danach feuert die
+   Subscription zusaetzlich die `[Cross-session idle notice]` mit einer
+   Kurzfassung. Das sind zwei gewollte, unabhaengige Signale fuer dasselbe
+   Ereignis, kein doppelter oder toter Nachrichtenpfad. `notify_when_idle: true`
+   trotzdem pauschal setzen: die Subscription ist one-shot und kostet den Peer
+   nichts, und sie ist das einzige Signal, falls der Peer OHNE Bericht stehen
+   bleibt (Rueckfrage im eigenen Pane, vergessene Meldung, Session beendet) —
+   dann kommt die Notice bzw. eine "subscription expired"-Meldung statt Stille.
+   Umgang: Liegt der aktive Bericht (mit Ticket-ID) schon vor, die Notice nur als
+   "Pane frei" lesen und nicht erneut auswerten. Kommt nur die Notice ohne
+   Bericht, ist das der Anlass, im Pane nachzusehen — nicht, das Ticket
+   abzunehmen.
 6. **Ueberhang behandeln:** Mehr gewaehlte Tickets als idle Panes → Ueberhang
    sichtbar melden, nicht verwerfen und nicht blind an ein bereits belegtes Pane
    schicken. Panes koennen legitim leer ausgehen, wenn die Dateibereiche das
